@@ -26,7 +26,7 @@
 
 <main class="page">
   <div class="page-eyebrow">Tools / Radiant QuikQA</div>
-  <h1 class="page-title">Radiant QuikQA <em style="font-style:italic;color:var(--accent);font-weight:300;">v1.1.0</em></h1>
+  <h1 class="page-title">Radiant QuikQA <em style="font-style:italic;color:var(--accent);font-weight:300;">v1.1.1</em></h1>
   <p class="page-lede">
     PyLinac-powered Windows QA tool for radiation oncology physics:
     Winston-Lutz, Picket Fence, VMAT, TG-142 MLC leaf-speed,
@@ -52,13 +52,13 @@
 
   <h2>Download</h2>
   <p>
-    <a class="btn btn-primary" href="https://github.com/radiantTAB/Radiant-QuikQA-dist/releases/download/v1.1.0/RadiantQuikQA.exe">Download RadiantQuikQA.exe (v1.1.0, ~98 MB)</a>
+    <a class="btn btn-primary" href="https://github.com/radiantTAB/Radiant-QuikQA-dist/releases/download/v1.1.1/RadiantQuikQA.exe">Download RadiantQuikQA.exe (v1.1.1, ~98 MB)</a>
   </p>
   <p style="font-size:13px;font-family:var(--font-mono);color:var(--text-dim);word-break:break-all;">
-    SHA-256: 093958FBADF75F7DFB71DD8B28F24E07213DB01A88830F074A8E30485FC32F10
+    SHA-256: 2F57DAAAD1327B2E11817669F9F0A9FEF31AA7B11EF29F591FB85871AC0EA5A5
   </p>
   <p>
-    <a class="link-arrow" href="https://github.com/radiantTAB/Radiant-QuikQA-dist/releases/tag/v1.1.0">View release notes &amp; manual on GitHub &rarr;</a>
+    <a class="link-arrow" href="https://github.com/radiantTAB/Radiant-QuikQA-dist/releases/tag/v1.1.1">View release notes &amp; manual on GitHub &rarr;</a>
   </p>
 
   <h2>What's in it</h2>
@@ -66,7 +66,7 @@
     <li><strong>Winston-Lutz</strong> &mdash; MV / kV / CBCT isocenter and BB coincidence.</li>
     <li><strong>Picket Fence</strong> &mdash; MLC leaf positional accuracy (TG-142 monthly).</li>
     <li><strong>VMAT</strong> &mdash; DRGS and DRMLC MLC speed / dose-rate constancy.</li>
-    <li><strong>TG-142 MLC leaf-speed</strong> (new in 1.1.0) &mdash; log-based, no portal dosimetry required. Per-leaf RMS error, achieved leaf speed (floor check vs.&nbsp;nominal), max single-leaf error, error-at-speed, beam holds.</li>
+    <li><strong>TG-142 MLC leaf-speed</strong> (new in 1.1.0) &mdash; log-based, no portal dosimetry required. Per-leaf RMS error, max single-leaf error, error-at-speed, and beam holds (graded). Achieved leaf speed reported as informational alongside the nominal reference (since 1.1.1). Batch mode now produces a combined PDF (summary on page 1, full per-delivery analyses appended).</li>
     <li><strong>TG-51 dosimetry</strong> &mdash; photon and electron reference dosimetry with full chamber and electrometer catalogs.</li>
     <li><strong>DICOM anonymizer</strong> &mdash; tag stripping for safely sharing test data.</li>
     <li><strong>PDF tools</strong> &mdash; merge, split, rotate, watermark, page numbering, cover.</li>
@@ -93,10 +93,11 @@
   <h2>Version note</h2>
   <p>
     The bundled manual is <strong>V&nbsp;1.0.1</strong>; the binary is
-    <strong>v1.1.0</strong>. The 1.0.1 manual remains accurate for
-    every other module &mdash; only the new TG-142 MLC leaf-speed
-    addition is not yet documented in the PDF. A 1.1.0 manual update is
-    in progress.
+    <strong>v1.1.1</strong>. The 1.0.1 manual remains accurate for
+    every other module &mdash; the additions in 1.1.0 (TG-142 MLC
+    leaf-speed module) and the 1.1.1 refinements (achieved leaf speed
+    demoted to informational; richer batch report) are not yet
+    documented in the PDF. A refreshed manual is in progress.
   </p>
 
   <h2>License &amp; full disclaimer</h2>
@@ -113,7 +114,7 @@
     <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a>
     with a description, the version (right-click
     <code>RadiantQuikQA.exe</code> &rarr; <em>Properties</em> &rarr;
-    <em>Details</em> &mdash; should read <strong>1.1.0.0</strong>), and
+    <em>Details</em> &mdash; should read <strong>1.1.1.0</strong>), and
     only if relevant and <strong>fully de-identified</strong>, minimal
     reproduction data. <strong>Do not send PHI.</strong>
   </p>
