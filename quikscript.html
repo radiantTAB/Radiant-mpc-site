@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Products — Radiant Software Suite | Radiant Medical Physics Consulting</title>
-<meta name="description" content="The Radiant Software Suite — eleven focused applications for radiation oncology physics and independent consulting. Precision physics, in software.">
+<title>Radiant QuikScript — ESAPI Plugin Builder | Radiant Medical Physics Consulting</title>
+<meta name="description" content="Radiant QuikScript — an AI-prompt builder for Varian Eclipse ESAPI binary plugins. Describe the script, get a clinic-ready plugin; convert legacy .cs scripts; connect to ARIA.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -100,7 +100,7 @@ img{max-width:100%;display:block}
 .footer-meta a{color:var(--text-mute)}
 .footer-meta a:hover{color:var(--accent)}
 
-/* ---- Product-page layout (shared with the nine product pages) ---- */
+/* ---- Product-page layout (shared with the suite product pages) ---- */
 .prod-hero{padding:54px var(--pad-x) 56px;position:relative;z-index:2}
 .prod-hero-inner{max-width:var(--max-w);margin:0 auto}
 .crumb{font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-bottom:26px}
@@ -221,142 +221,136 @@ img{max-width:100%;display:block}
   </div>
 </nav>
 
-<!-- ===== Hero banner ===== -->
-<header class="hub-hero-band">
-  <div class="hub-hero">
-    <div class="eyebrow"><span class="eyebrow-dot"></span><span>The Radiant Software Suite</span></div>
-    <h1>Radiant Software Suite<em>Precision physics, in software.</em></h1>
-    <p>
-      Eleven focused applications for radiation oncology physics and the business
-      of independent consulting — each one born from a real workflow bottleneck
-      and built to run on your own machine.
-    </p>
+<!-- ===== Product hero ===== -->
+<header class="prod-hero">
+  <div class="prod-hero-inner">
+    <div class="crumb"><a href="products.html">Products</a> / Radiant QuikScript</div>
+    <div class="prod-hero-grid">
+      <div>
+        <span class="prod-tag">Clinical Tool · Windows Desktop</span>
+        <h1>Radiant QuikScript</h1>
+        <p class="prod-lede">
+          An AI-prompt script builder for Varian Eclipse v15.6. Describe what you
+          need in plain language and get a clean, well-structured ESAPI binary
+          plugin — or drop in a legacy single-file script and have it rebuilt with
+          a modern interface, richer outputs, and ARIA connectivity.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="mailto:info@Radiant-MPC.com?subject=Demo%20request%3A%20Radiant%20QuikScript"><svg class="ic"><use href="#i-mail"/></svg> Request a Demo</a>
+          <a class="btn btn-ghost" href="products.html"><svg class="ic"><use href="#i-arrow-left"/></svg> All Products</a>
+        </div>
+      </div>
+      <div class="shot">
+        <div class="shot-bar"><span class="shot-dot"></span><span class="shot-dot"></span><span class="shot-dot"></span></div>
+        <div class="shot-body">
+          <svg class="ic"><use href="#i-edit"/></svg>
+          <span class="shot-cap">QuikScript Builder</span>
+          <span class="shot-sub">Prompt-to-plugin workspace — generate, refine, compile, and package ESAPI plugins for Eclipse v15.6.</span>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <p><strong>Generates drafts — not validated for clinical use.</strong> QuikScript produces ESAPI plugin code as a starting point, not a finished clinical tool. Every generated or converted plugin must be independently reviewed, tested on non-clinical data, and approved by a Qualified Medical Physicist through the Eclipse script-approval and site software-commissioning process before any clinical use. Do not transmit PHI through this software.</p>
+    </div>
   </div>
 </header>
 
-<!-- ===== Clinical Tools ===== -->
+<!-- ===== Features ===== -->
 <section class="section">
   <div class="section-inner">
     <div class="section-head">
-      <div class="section-kicker"><svg class="ic"><use href="#i-shield"/></svg><span>Clinical Tools</span></div>
-      <h2>Built for the clinic.</h2>
-      <p>Software for the day-to-day work of radiation oncology physics — machine QA, planning support, ESAPI scripting, dose accumulation, shielding design, regulatory reference, and patient care.</p>
+      <div class="section-kicker"><svg class="ic"><use href="#i-cpu"/></svg><span>Features</span></div>
+      <h2>What QuikScript does.</h2>
+      <p>From a plain-language prompt to a compiled, clinic-ready Eclipse plugin — with a clear path to modernize the scripts you already run.</p>
     </div>
-    <div class="card-grid">
+    <div class="feature-grid">
 
-      <a class="prod-card" href="quikqa.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-target"/></svg></div>
-        <div class="card-tag">Windows Desktop</div>
-        <h3>Radiant QuikQA</h3>
-        <p>PyLinac-powered linac QA — Winston-Lutz, Picket Fence, VMAT, leaf-speed, and TG-51 dosimetry in one standalone Windows app.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-edit"/></svg></div>
+        <h3>Prompt-to-Script Builder</h3>
+        <p>Describe the check in plain language — "flag any PTV above 110% of prescription" — and QuikScript generates a complete Eclipse binary-plugin project, ready to compile.</p>
+      </div>
 
-      <a class="prod-card" href="quikbolus.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-cube"/></svg></div>
-        <div class="card-tag">Windows Desktop</div>
-        <h3>Radiant QuikBolus</h3>
-        <p>Turns a DICOM RT Structure Set into a watertight, 3D-printable bolus STL — no CAD step required.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-import"/></svg></div>
+        <h3>Legacy .cs Converter</h3>
+        <p>Drop in an existing single-file plugin script and QuikScript rebuilds it as a modern binary plugin — with a side-by-side diff so no clinical logic changes silently.</p>
+      </div>
 
-      <a class="prod-card" href="quikcalc.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-calc"/></svg></div>
-        <div class="card-tag">Windows Desktop</div>
-        <h3>Radiant QuikCalc</h3>
-        <p>Independent MU checks, radiobiology, and treatment-gap math — each producing a Radiant-branded PDF report.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-layers"/></svg></div>
+        <h3>Template &amp; Component Library</h3>
+        <p>Compose from curated building blocks — DVH metric extractors, structure-naming checks, plan-sum analysis, report sections — and save your own.</p>
+      </div>
 
-      <a class="prod-card" href="quikdose.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-gauge"/></svg></div>
-        <div class="card-tag">Eclipse Binary Plugin</div>
-        <h3>Radiant QuikDose</h3>
-        <p>EQD2 and BED dose accumulation for HDR brachytherapy and external-beam re-irradiation — two ESAPI binary plugins for Varian Eclipse v15.6.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-database"/></svg></div>
+        <h3>ARIA Connectivity</h3>
+        <p>A reusable layer for reading patient, course, plan, and structure data through the ESAPI ScriptContext — with a gated, read-only path to ARIA for everything else.</p>
+      </div>
 
-      <a class="prod-card" href="quikscript.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-edit"/></svg></div>
-        <div class="card-tag">Windows Desktop</div>
-        <h3>Radiant QuikScript</h3>
-        <p>An AI-prompt builder for Varian Eclipse ESAPI binary plugins — describe the script, get a clinic-ready plugin, and modernize legacy .cs scripts.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-printer"/></svg></div>
+        <h3>Modern Outputs</h3>
+        <p>Generated plugins ship with a real WPF interface plus Radiant-branded PDF reports, CSV export, and a timestamped run log.</p>
+      </div>
 
-      <a class="prod-card" href="quikshare.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-lock"/></svg></div>
-        <div class="card-tag">Windows Desktop</div>
-        <h3>Radiant QuikShare</h3>
-        <p>HIPAA-conscious, AES-256 encrypted DICOM transfer with OneDrive delivery and a full audit trail.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
-
-      <a class="prod-card" href="quikshield.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-shield"/></svg></div>
-        <div class="card-tag">Windows Desktop</div>
-        <h3>Radiant QuikShield</h3>
-        <p>NCRP 151 radiation shielding design for megavoltage therapy vaults, with fully cited, clinic-ready reports.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
-
-      <a class="prod-card" href="quikref.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-search"/></svg></div>
-        <div class="card-tag">Local Web App</div>
-        <h3>Radiant QuikRef</h3>
-        <p>Ask one question, get a synthesized answer across federal, state, and society radiation guidance — every claim cited.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
-
-      <a class="prod-card" href="quikcare.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-doc"/></svg></div>
-        <div class="card-tag">Local Web App</div>
-        <h3>Radiant QuikCARE</h3>
-        <p>Generates personalized, physician-signed radiation therapy patient education packets in seconds.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-check"/></svg></div>
+        <h3>Compile, Validate &amp; Package</h3>
+        <p>QuikScript builds the project locally, feeds any errors back for auto-repair, and hands you a ready-to-deploy <code>.esapi.dll</code> with an approval checklist.</p>
+      </div>
 
     </div>
   </div>
 </section>
 
-<!-- ===== Contractor Tools ===== -->
+<!-- ===== Who it's for ===== -->
 <section class="section alt">
   <div class="section-inner">
     <div class="section-head">
-      <div class="section-kicker"><svg class="ic"><use href="#i-chart"/></svg><span>Contractor Tools</span></div>
-      <h2>Built for the business.</h2>
-      <p>The back-office side of independent practice — bookkeeping and payroll that stay entirely on your own machine, with no cloud and no subscription.</p>
+      <div class="section-kicker"><svg class="ic"><use href="#i-users"/></svg><span>Who It's For</span></div>
+      <h2>Made for the scripting workstation.</h2>
     </div>
-    <div class="card-grid">
+    <div class="who-grid">
+      <div class="who-copy">
+        <p>QuikScript is built for the medical physicist who writes ESAPI scripts — for their own clinic or for client sites — and wants the speed of a single-file script with the polish of a binary plugin. Describe the task, and QuikScript handles the scaffolding, the WPF interface, the output layer, and the build configuration for Varian Eclipse v15.6.</p>
+        <p>It also gives a clean upgrade path for the scripts you already have: legacy <code>.cs</code> plugin scripts convert to structured binary-plugin projects with better interfaces, richer outputs, and ARIA connectivity — every change shown as a reviewable diff. Like every Radiant tool, QuikScript is distributed as an evaluation build: everything it generates is a draft for physicist review and formal approval.</p>
+      </div>
+      <div class="who-card">
+        <div class="feat-icon"><svg class="ic"><use href="#i-users"/></svg></div>
+        <h3>Best fit for</h3>
+        <ul>
+          <li>ESAPI script authors &amp; consultants</li>
+          <li>Clinics modernizing legacy scripts</li>
+          <li>Eclipse v15.6 plugin development</li>
+          <li>Chart QA &amp; plan-check automation</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
 
-      <a class="prod-card" href="quikflow.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-chart"/></svg></div>
-        <div class="card-tag">Installable PWA</div>
-        <h3>Radiant QuikFlow</h3>
-        <p>Income, expense, mileage, and P&amp;L tracking for the single-member consulting LLC — offline-first and installable.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
-
-      <a class="prod-card" href="quikpay.html">
-        <div class="card-icon"><svg class="ic"><use href="#i-dollar"/></svg></div>
-        <div class="card-tag">Windows Desktop</div>
-        <h3>Radiant QuikPay</h3>
-        <p>100% local payroll for the small consulting LLC — withholding, employer taxes, W-2s, and owner draws, no cloud.</p>
-        <span class="card-link">Learn More <svg class="ic"><use href="#i-arrow-right"/></svg></span>
-      </a>
-
+<!-- ===== Testimonial ===== -->
+<section class="section">
+  <div class="section-inner">
+    <div class="quote-card">
+      <svg class="ic q-mark"><use href="#i-quote"/></svg>
+      <p class="quote-text">A short, specific quote from a physicist who has built or converted plugins with QuikScript will appear here.</p>
+      <p class="quote-meta">— Name, Title · Institution</p>
+      <p class="quote-ph">Testimonial placeholder — used QuikScript? Share your experience at info@Radiant-MPC.com</p>
     </div>
   </div>
 </section>
 
 <!-- ===== CTA ===== -->
 <section class="cta-band">
-  <h2>Don't see your workflow?</h2>
-  <p>Radiant builds tools to fit clinical and consulting workflows that off-the-shelf software doesn't address. If it wastes physicist time, it's probably worth automating.</p>
+  <h2>Bring QuikScript into your scripting workflow</h2>
+  <p>Request a walkthrough tailored to the scripts and checks your program runs today — no obligation.</p>
   <div class="cta-actions">
-    <a class="btn btn-primary" href="mailto:info@Radiant-MPC.com?subject=Radiant%20Software%20Suite%20enquiry"><svg class="ic"><use href="#i-mail"/></svg> Request a Demo</a>
-    <a class="btn btn-ghost" href="contact.html">Get in touch</a>
+    <a class="btn btn-primary" href="mailto:info@Radiant-MPC.com?subject=Demo%20request%3A%20Radiant%20QuikScript"><svg class="ic"><use href="#i-mail"/></svg> Request a Demo</a>
+    <a class="btn btn-ghost" href="products.html"><svg class="ic"><use href="#i-arrow-left"/></svg> All Products</a>
   </div>
 </section>
 
