@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuikDose Calculator — Protected Area | Radiant Medical Physics Consulting</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Radiant QuikDose web calculator — EQD2/BED conversion, cumulative dose summation, and remaining-budget back-conversion for HDR brachytherapy and external-beam re-irradiation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ===== Radiant Software Suite — shared embedded stylesheet (light theme) ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-elev:#fafafa;--bg-card:#f4f4f5;
+  --line:#e6e6e8;--line-hi:#cdcdd1;
+  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
+  --accent:#d00008;--accent-2:#a80006;--accent-bright:#f03020;--accent-warm:#f86058;
+  --charcoal:#303030;
+  --font-display:'Montserrat',system-ui,sans-serif;
+  --font-body:'Montserrat',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --max-w:1180px;--pad-x:clamp(20px,5vw,64px);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:17px;font-weight:400;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(208,0,8,.035) 1px,transparent 0);background-size:32px 32px;pointer-events:none;z-index:0}
+a{color:var(--accent);text-decoration:none;transition:color .2s}
+a:hover{color:var(--accent-bright)}
+img{max-width:100%;display:block}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.svg-defs{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ---- Nav ---- */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:22px var(--pad-x);background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;gap:10px}
+.brand-logo{height:160px;width:auto;display:block}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{color:var(--text-mute);font-size:14px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{padding:9px 18px;border:1px solid var(--line-hi);border-radius:999px;color:var(--text)!important;transition:all .2s}
+.nav-cta:hover{border-color:var(--accent);color:var(--accent)!important;background:rgba(208,0,8,.06)}
+
+/* ---- Buttons ---- */
+.btn{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;font-family:var(--font-body);font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;transition:all .2s;border:1px solid transparent;cursor:pointer}
+.btn .ic{width:17px;height:17px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-2);color:#fff;transform:translateY(-1px);box-shadow:0 8px 24px rgba(208,0,8,.25)}
+.btn-ghost{color:var(--text);border-color:var(--line-hi)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---- Sections ---- */
+.section{padding:56px var(--pad-x) 80px;position:relative;z-index:2}
+.section-inner{max-width:var(--max-w);margin:0 auto}
+.section-head{margin-bottom:30px}
+.section-kicker{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);margin-bottom:16px}
+.section-kicker .ic{width:16px;height:16px}
+.section-head h2{font-family:var(--font-display);font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
+.section-head p{color:var(--text-mute);max-width:680px}
+
+/* ---- Footer ---- */
+.footer{padding:48px var(--pad-x);border-top:1px solid var(--line);background:var(--bg-elev);position:relative;z-index:2}
+.footer-inner{max-width:var(--max-w);margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:32px}
+.footer .brand-logo{height:80px}
+.footer-tag{color:var(--text-dim);font-size:13px;margin-top:6px}
+.footer-meta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:13px;color:var(--text-dim)}
+.footer-meta a{color:var(--text-mute)}
+.footer-meta a:hover{color:var(--accent)}
+
+.note{border:1px solid var(--line);border-left:3px solid var(--accent-warm);background:var(--bg-elev);padding:20px 24px;display:flex;gap:14px;align-items:flex-start;margin-bottom:30px}
+.note .ic{width:22px;height:22px;color:var(--accent-warm);margin-top:1px}
+.note p{font-size:14px;color:var(--text-mute);margin:0;line-height:1.6}
+.crumb{font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-bottom:26px}
+.crumb a{color:var(--text-mute)}
+
+/* ---- Password gate ---- */
+.gate-wrap{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 205px);padding:60px var(--pad-x);position:relative;z-index:2}
+.gate-card{width:100%;max-width:420px;background:var(--bg);border:1px solid var(--line);border-top:3px solid var(--accent);padding:40px 36px;text-align:center}
+.gate-lock{width:62px;height:62px;border-radius:14px;background:rgba(208,0,8,.07);display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.gate-lock .ic{width:30px;height:30px;color:var(--accent)}
+.gate-card h1{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.gate-card p{font-size:14px;color:var(--text-mute);margin-bottom:24px}
+.gate-form{display:flex;flex-direction:column;gap:12px}
+.gate-input{font-family:var(--font-body);font-size:15px;padding:13px 16px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text);width:100%}
+.gate-input:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+.gate-btn{justify-content:center;width:100%}
+.gate-error{font-size:13px;color:var(--accent);min-height:18px;font-weight:600}
+.gate-hint{font-size:12px;color:var(--text-dim);margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+
+/* ---- Calculator ---- */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:30px;flex-wrap:wrap}
+.tab{padding:13px 22px;font-family:var(--font-body);font-size:13.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--text-mute);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-panel[hidden]{display:none}
+.calc-layout{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:start}
+.panel-title{font-family:var(--font-display);font-size:19px;font-weight:700;margin-bottom:6px}
+.panel-sub{font-size:14px;color:var(--text-mute);margin-bottom:20px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
+.field .hint{display:block;font-weight:400;color:var(--text-dim);font-size:12px;margin-top:4px;line-height:1.45}
+.inp{font-family:var(--font-body);font-size:15px;padding:11px 14px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text);width:100%}
+.inp:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+.seg{display:inline-flex;border:1px solid var(--line-hi);border-radius:8px;overflow:hidden;margin-bottom:4px}
+.seg button{padding:10px 18px;font-family:var(--font-body);font-size:13px;font-weight:700;background:var(--bg-elev);border:none;border-right:1px solid var(--line-hi);cursor:pointer;color:var(--text-mute)}
+.seg button:last-child{border-right:none}
+.seg button.active{background:var(--accent);color:#fff}
+.chiprow{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.chip{padding:5px 11px;font-family:var(--font-mono);font-size:11.5px;border:1px solid var(--line-hi);border-radius:999px;background:var(--bg);cursor:pointer;color:var(--text-mute)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.result-card{background:var(--bg-elev);border:1px solid var(--line);border-left:3px solid var(--accent);padding:26px}
+.result-hero{text-align:center;padding:12px 0 20px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.result-hero .num{font-family:var(--font-display);font-size:46px;font-weight:800;line-height:1;color:var(--accent);letter-spacing:-.02em}
+.result-hero .num span{font-size:20px;font-weight:600;color:var(--text-mute);margin-left:4px}
+.result-hero .cap{font-family:var(--font-mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-top:10px}
+.result-row{display:flex;justify-content:space-between;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line)}
+.result-row:last-child{border-bottom:none}
+.result-row .lbl{font-size:14px;color:var(--text-mute)}
+.result-row .val{font-family:var(--font-mono);font-size:15px;font-weight:500;color:var(--text)}
+.course-table{width:100%;border-collapse:collapse;margin:6px 0 14px}
+.course-table th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);text-align:left;padding:8px 7px;border-bottom:1px solid var(--line);font-weight:500}
+.course-table td{padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.course-table .inp{padding:8px 10px;font-size:13.5px}
+.course-eqd2{font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--accent);white-space:nowrap}
+.btn-remove{width:28px;height:28px;border-radius:6px;border:1px solid var(--line-hi);background:var(--bg);color:var(--text-dim);cursor:pointer;font-size:13px;line-height:1}
+.btn-remove:hover{border-color:var(--accent);color:var(--accent)}
+.btn-add{display:inline-flex;align-items:center;gap:7px;padding:10px 18px;font-family:var(--font-body);font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border:1px dashed var(--line-hi);border-radius:8px;background:var(--bg);color:var(--text-mute);cursor:pointer}
+.btn-add:hover{border-color:var(--accent);color:var(--accent)}
+.totals{display:flex;flex-wrap:wrap;gap:14px;margin-top:18px}
+.total-box{flex:1;min-width:150px;background:var(--bg-elev);border:1px solid var(--line);border-top:3px solid var(--accent);padding:18px}
+.total-box .t-num{font-family:var(--font-display);font-size:30px;font-weight:800;color:var(--accent);line-height:1}
+.total-box .t-num span{font-size:15px;color:var(--text-mute);font-weight:600}
+.total-box .t-cap{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-top:8px}
+.linkbtn{background:none;border:none;font-family:var(--font-body);font-size:12.5px;font-weight:600;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+.method{margin-top:34px;border:1px solid var(--line);background:var(--bg-elev);padding:22px 24px}
+.method h3{font-family:var(--font-display);font-size:15px;font-weight:700;margin-bottom:10px}
+.method p{font-size:13px;color:var(--text-mute);margin-bottom:7px;line-height:1.6}
+.method code{font-family:var(--font-mono);font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--text)}
+.calc-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+.signout{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-mute);cursor:pointer;background:none;border:none;font-family:var(--font-body)}
+.signout:hover{color:var(--accent)}
+.signout .ic{width:15px;height:15px}
+
+@media(max-width:760px){
+  .calc-layout{grid-template-columns:1fr;gap:24px}
+  .table-scroll{overflow-x:auto}
+}
+@media(max-width:720px){
+  .nav-links{gap:16px}
+  .nav-links a:not(.nav-cta){display:none}
+  .brand-logo{height:96px}
+  .footer .brand-logo{height:54px}
+  .footer-inner{flex-direction:column;align-items:flex-start}
+  .footer-meta{align-items:flex-start}
+}
+@media print{
+  .nav,.footer,.tabs,.gate-wrap,.btn,.btn-add,.btn-remove,.calc-actions,.note,.no-print{display:none!important}
+  body::before{display:none}
+  .section{padding:0}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Shared SVG icon library ===== -->
+<svg class="svg-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M16 5l3 3"/></symbol>
+<symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6"/><path d="M9 12h0"/><path d="M12 12h0"/><path d="M15 12h0"/><path d="M9 16h0"/><path d="M12 16h0"/><path d="M15 16h0"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/></symbol>
+<symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4l-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h0"/></symbol>
+<symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H5"/><path d="M11 6l-6 6 6 6"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 19h16"/></symbol>
+</svg>
+
+<!-- ===== Nav ===== -->
+<nav class="nav">
+  <a href="index.html" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  </a>
+  <div class="nav-links">
+    <a href="services.html">Services</a>
+    <a href="products.html">Products</a>
+    <a href="about.html">About</a>
+    <a href="contact.html" class="nav-cta">Contact</a>
+  </div>
+</nav>
+
+<!-- ===== Password gate (shown until unlocked) ===== -->
+<div id="gate" class="gate-wrap">
+  <div class="gate-card">
+    <div class="gate-lock"><svg class="ic"><use href="#i-lock"/></svg></div>
+    <h1>QuikDose Calculator</h1>
+    <p>This tool is restricted to licensed Radiant QuikDose users. Enter the access password provided with your agreement.</p>
+    <form class="gate-form" id="gateForm" autocomplete="off">
+      <input type="password" id="gatePw" class="gate-input" placeholder="Access password" aria-label="Access password" required>
+      <button type="submit" class="btn btn-primary gate-btn"><svg class="ic"><use href="#i-key"/></svg> Unlock Calculator</button>
+      <div class="gate-error" id="gateError" role="alert"></div>
+    </form>
+    <p class="gate-hint">Need access? Email <a href="mailto:info@Radiant-MPC.com?subject=QuikDose%20access">info@Radiant-MPC.com</a>.</p>
+  </div>
+</div>
+
+<!-- ===== Calculator (revealed after unlock) ===== -->
+<main id="vault" hidden>
+  <section class="section">
+    <div class="section-inner">
+      <div class="crumb"><a href="products.html">Products</a> / <a href="quikdose.html">Radiant QuikDose</a> / Calculator</div>
+      <div class="section-head">
+        <div class="section-kicker"><svg class="ic"><use href="#i-calc"/></svg><span>QuikDose Web Calculator</span></div>
+        <h2>EQD2 / BED dose accumulation.</h2>
+        <p>Linear-quadratic radiobiology for HDR brachytherapy and external-beam re-irradiation — single-course conversion, multi-course cumulative summation, and remaining-budget back-conversion. Runs entirely in your browser.</p>
+      </div>
+
+      <div class="note">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <p><strong>Decision support only — not validated for clinical use.</strong> This calculator computes linear-quadratic EQD2/BED from the values you type; it does not read plan or dose data. Every result must be independently verified by a Qualified Medical Physicist before any clinical use. Built-in &alpha;/&beta; values are starting points — your clinic's policy takes precedence. Do not enter PHI; nothing is saved or transmitted.</p>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="single">Single Course</button>
+        <button class="tab" data-tab="cumulative">Cumulative EQD2</button>
+        <button class="tab" data-tab="budget">Remaining Budget</button>
+      </div>
+
+      <!-- ===== Tab 1: Single Course ===== -->
+      <div class="tab-panel" data-panel="single">
+        <div class="calc-layout">
+          <div>
+            <div class="panel-title">Single-course EQD2 / BED</div>
+            <div class="panel-sub">Convert one course to its 2 Gy-equivalent dose and biologically effective dose.</div>
+
+            <div class="field">
+              <label>Modality</label>
+              <div class="seg" id="sMode">
+                <button type="button" data-ab="3" data-dose="60" data-fx="30" class="active">External Beam</button>
+                <button type="button" data-ab="3" data-dose="28" data-fx="4">HDR Brachytherapy</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Total dose (Gy)</label>
+              <input class="inp" type="number" id="sDose" min="0" step="any" inputmode="decimal" value="60">
+            </div>
+
+            <div class="field">
+              <label>Number of fractions</label>
+              <input class="inp" type="number" id="sFx" min="1" step="1" inputmode="numeric" value="30">
+            </div>
+
+            <div class="field">
+              <label>&alpha;/&beta; ratio (Gy)</label>
+              <input class="inp" type="number" id="sAB" min="0.1" step="any" inputmode="decimal" value="3">
+              <span class="hint">Typical: ~3 Gy late-responding tissue / OARs, ~10 Gy tumor &amp; acute-responding tissue.</span>
+              <div class="chiprow">
+                <span class="chip" data-ab="2">&alpha;/&beta; 2</span>
+                <span class="chip" data-ab="3">&alpha;/&beta; 3</span>
+                <span class="chip" data-ab="10">&alpha;/&beta; 10</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="result-card">
+              <div class="result-hero">
+                <div class="num" id="sEQD2">—<span>Gy</span></div>
+                <div class="cap">EQD2 &mdash; 2 Gy-equivalent dose</div>
+              </div>
+              <div class="result-row"><span class="lbl">Dose per fraction</span><span class="val" id="sDpf">—</span></div>
+              <div class="result-row"><span class="lbl">BED (biologically effective dose)</span><span class="val" id="sBED">—</span></div>
+              <div class="result-row"><span class="lbl">EQD2</span><span class="val" id="sEQD2r">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Tab 2: Cumulative EQD2 ===== -->
+      <div class="tab-panel" data-panel="cumulative" hidden>
+        <div class="panel-title">Cumulative EQD2 across courses</div>
+        <div class="panel-sub">Sum prior and current courses — e.g. a prior external-beam course plus an HDR boost — for a re-irradiation review.</div>
+
+        <div class="field" style="max-width:320px">
+          <label>&alpha;/&beta; ratio (Gy) — for the endpoint being evaluated</label>
+          <input class="inp" type="number" id="cumAB" min="0.1" step="any" inputmode="decimal" value="3">
+          <span class="hint">EQD2 values can only be summed at a single &alpha;/&beta;. Use the &alpha;/&beta; of the specific OAR or target you are assessing.</span>
+        </div>
+
+        <div class="table-scroll">
+        <table class="course-table">
+          <thead>
+            <tr>
+              <th style="width:30%">Course label</th>
+              <th>Total dose (Gy)</th>
+              <th>Fractions</th>
+              <th>Recovery factor</th>
+              <th>EQD2 (Gy)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="courseRows"></tbody>
+        </table>
+        </div>
+        <button type="button" class="btn-add no-print" id="addCourse">+ Add course</button>
+
+        <div class="totals">
+          <div class="total-box">
+            <div class="t-num" id="cumCount">0</div>
+            <div class="t-cap">Courses included</div>
+          </div>
+          <div class="total-box">
+            <div class="t-num" id="cumEQD2">—<span> Gy</span></div>
+            <div class="t-cap">Cumulative EQD2</div>
+          </div>
+          <div class="total-box">
+            <div class="t-num" id="cumBED">—<span> Gy</span></div>
+            <div class="t-cap">Cumulative BED</div>
+          </div>
+        </div>
+        <p class="hint" style="margin-top:12px">Recovery factor (0–1) scales a course's contribution — use it to apply published normal-tissue recovery to prior courses (1.00 = full dose counted, no recovery). The current course is normally counted at 1.00.</p>
+      </div>
+
+      <!-- ===== Tab 3: Remaining Budget ===== -->
+      <div class="tab-panel" data-panel="budget" hidden>
+        <div class="calc-layout">
+          <div>
+            <div class="panel-title">Remaining EQD2 budget</div>
+            <div class="panel-sub">Back-convert the EQD2 left under a tolerance into a deliverable physical dose per fraction.</div>
+
+            <div class="field">
+              <label>EQD2 tolerance / limit (Gy)</label>
+              <input class="inp" type="number" id="bLimit" min="0" step="any" inputmode="decimal" value="50">
+              <span class="hint">The retreatment constraint for the endpoint — your clinic's policy value.</span>
+            </div>
+
+            <div class="field">
+              <label>EQD2 already delivered (Gy)</label>
+              <input class="inp" type="number" id="bDelivered" min="0" step="any" inputmode="decimal" value="0">
+              <span class="hint"><button type="button" class="linkbtn" id="useCum">Use cumulative EQD2 from the Cumulative tab</button></span>
+            </div>
+
+            <div class="field">
+              <label>&alpha;/&beta; ratio (Gy)</label>
+              <input class="inp" type="number" id="bAB" min="0.1" step="any" inputmode="decimal" value="3">
+            </div>
+
+            <div class="field">
+              <label>Remaining fractions planned</label>
+              <input class="inp" type="number" id="bFx" min="1" step="1" inputmode="numeric" value="5">
+            </div>
+          </div>
+
+          <div>
+            <div class="result-card">
+              <div class="result-hero">
+                <div class="num" id="bDpf">—<span>Gy</span></div>
+                <div class="cap">Deliverable dose per fraction</div>
+              </div>
+              <div class="result-row"><span class="lbl">Remaining EQD2 budget</span><span class="val" id="bBudget">—</span></div>
+              <div class="result-row"><span class="lbl">Total remaining physical dose</span><span class="val" id="bTotal">—</span></div>
+              <div class="result-row"><span class="lbl">EQD2 of that remaining course (check)</span><span class="val" id="bCheck">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Method -->
+      <div class="method">
+        <h3>Method</h3>
+        <p>Linear-quadratic model, with total dose <code>D</code> delivered in <code>n</code> fractions of <code>d = D / n</code>:</p>
+        <p><code>EQD2 = D &times; (d + &alpha;/&beta;) &divide; (2 + &alpha;/&beta;)</code></p>
+        <p><code>BED = D &times; (1 + d &divide; &alpha;/&beta;)</code></p>
+        <p>Back-conversion of a remaining EQD2 budget over <code>n</code> remaining fractions, with <code>e = budget &divide; n</code>:</p>
+        <p><code>d = [ &minus;(&alpha;/&beta;) + &radic;( (&alpha;/&beta;)&sup2; + 4&middot;e&middot;(2 + &alpha;/&beta;) ) ] &divide; 2</code></p>
+        <p>The same equations used by the QuikDose Eclipse plugins. This calculator does no spatial/voxel summation — for voxel-level cumulative EQD2 across dose grids, use the QuikDose EBRT binary plugin.</p>
+      </div>
+
+      <div class="calc-actions">
+        <button type="button" class="btn btn-primary no-print" id="printBtn"><svg class="ic"><use href="#i-printer"/></svg> Print Results</button>
+        <a class="btn btn-ghost no-print" href="downloads.html"><svg class="ic"><use href="#i-download"/></svg> Plugin Downloads</a>
+        <button type="button" class="signout no-print" id="signout"><svg class="ic"><use href="#i-lock"/></svg> Lock this area</button>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<!-- ===== Footer ===== -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="brand">
+        <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+      </div>
+      <p class="footer-tag">Medical Physics Consulting LLC</p>
+    </div>
+    <div class="footer-meta">
+      <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a>
+      <span>© 2026 Radiant Medical Physics Consulting LLC</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================================
+   QuikDose Calculator — access gate + radiobiology
+   ----------------------------------------------------------------------------
+   LIGHT CLIENT-SIDE GATE. Shares the password and session key with
+   downloads.html, so unlocking either page unlocks both for the session.
+   This is not strong security — for real protection put both pages behind
+   server-side auth (Cloudflare Access is recommended). See the project docs.
+
+   To change the password, update PW_HASH here AND in downloads.html to the
+   SHA-256 of the new password (see the comment in downloads.html).
+============================================================================ */
+(function () {
+  "use strict";
+
+  /* ---- Password gate ---- */
+  var PW_HASH = "ae11a04fd46be4240fa9f590f1ae0847b78d7e15278adc625467ca5aa187fa4f";
+  var KEY = "quikdose-unlocked";
+
+  var gate   = document.getElementById("gate");
+  var vault  = document.getElementById("vault");
+  var form   = document.getElementById("gateForm");
+  var pw     = document.getElementById("gatePw");
+  var errBox = document.getElementById("gateError");
+
+  function reveal() {
+    gate.hidden = true;
+    gate.style.display = "none";
+    vault.hidden = false;
+    recalcAll();
+  }
+
+  function sha256Hex(text) {
+    var data = new TextEncoder().encode(text);
+    return crypto.subtle.digest("SHA-256", data).then(function (buf) {
+      return Array.prototype.map
+        .call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, "0"); })
+        .join("");
+    });
+  }
+
+  if (sessionStorage.getItem(KEY) === "1") reveal();
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    errBox.textContent = "";
+    sha256Hex(pw.value).then(function (hash) {
+      if (hash === PW_HASH) {
+        sessionStorage.setItem(KEY, "1");
+        reveal();
+      } else {
+        errBox.textContent = "Incorrect password. Please try again.";
+        pw.value = "";
+        pw.focus();
+      }
+    }).catch(function () {
+      errBox.textContent = "This browser could not process the password. Use a current browser over HTTPS.";
+    });
+  });
+
+  document.getElementById("signout").addEventListener("click", function () {
+    sessionStorage.removeItem(KEY);
+    location.reload();
+  });
+
+  /* ---- Radiobiology (linear-quadratic) — mirrors the QuikDose plugin BioMath ---- */
+  function eqd2(totalGy, n, ab) {
+    if (!(n > 0) || !(totalGy > 0) || !(ab > 0)) return 0;
+    var d = totalGy / n;
+    return totalGy * (d + ab) / (2 + ab);
+  }
+  function bed(totalGy, n, ab) {
+    if (!(n > 0) || !(totalGy > 0) || !(ab > 0)) return 0;
+    var d = totalGy / n;
+    return totalGy * (1 + d / ab);
+  }
+  function backConvertDpf(remEQD2, remFx, ab) {
+    if (!(remFx > 0) || !(remEQD2 > 0) || !(ab > 0)) return 0;
+    var e = remEQD2 / remFx;
+    var disc = ab * ab + 4 * e * (2 + ab);
+    if (disc < 0) return 0;
+    return Math.max(0, (-ab + Math.sqrt(disc)) / 2);
+  }
+  function num(id) { return parseFloat(document.getElementById(id).value); }
+  function fmt(x, dp) { return isFinite(x) ? x.toFixed(dp) : "—"; }
+  function setNum(id, value, dp, unit) {
+    var el = document.getElementById(id);
+    el.innerHTML = isFinite(value)
+      ? fmt(value, dp) + (unit ? '<span>' + unit + '</span>' : '')
+      : '—' + (unit ? '<span>' + unit + '</span>' : '');
+  }
+
+  /* ---- Tabs ---- */
+  var tabs = document.querySelectorAll(".tab");
+  var panels = document.querySelectorAll(".tab-panel");
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () {
+      tabs.forEach(function (x) { x.classList.remove("active"); });
+      t.classList.add("active");
+      panels.forEach(function (p) {
+        p.hidden = (p.getAttribute("data-panel") !== t.getAttribute("data-tab"));
+      });
+    });
+  });
+
+  /* ---- Tab 1: Single course ---- */
+  function recalcSingle() {
+    var D = num("sDose"), n = num("sFx"), ab = num("sAB");
+    var dpf = (D > 0 && n > 0) ? D / n : NaN;
+    var e = eqd2(D, n, ab), b = bed(D, n, ab);
+    var ok = D > 0 && n > 0 && ab > 0;
+    setNum("sEQD2", ok ? e : NaN, 2, "Gy");
+    document.getElementById("sDpf").textContent = isFinite(dpf) ? fmt(dpf, 2) + " Gy" : "—";
+    document.getElementById("sBED").textContent = ok ? fmt(b, 2) + " Gy" : "—";
+    document.getElementById("sEQD2r").textContent = ok ? fmt(e, 2) + " Gy" : "—";
+  }
+  ["sDose", "sFx", "sAB"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", recalcSingle);
+  });
+  document.querySelectorAll("#sMode button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("#sMode button").forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+      document.getElementById("sAB").value = b.getAttribute("data-ab");
+      document.getElementById("sDose").value = b.getAttribute("data-dose");
+      document.getElementById("sFx").value = b.getAttribute("data-fx");
+      recalcSingle();
+    });
+  });
+  document.querySelectorAll(".chip[data-ab]").forEach(function (c) {
+    c.addEventListener("click", function () {
+      document.getElementById("sAB").value = c.getAttribute("data-ab");
+      recalcSingle();
+    });
+  });
+
+  /* ---- Tab 2: Cumulative ---- */
+  var courseBody = document.getElementById("courseRows");
+  var lastCumEQD2 = NaN;
+
+  function rowHTML(label, dose, fx) {
+    return '<tr>' +
+      '<td><input class="inp c-label" type="text" placeholder="e.g. Prior pelvis EBRT" value="' + label + '"></td>' +
+      '<td><input class="inp c-dose" type="number" min="0" step="any" inputmode="decimal" value="' + dose + '"></td>' +
+      '<td><input class="inp c-fx" type="number" min="1" step="1" inputmode="numeric" value="' + fx + '"></td>' +
+      '<td><input class="inp c-rec" type="number" min="0" max="1" step="0.05" inputmode="decimal" value="1.00"></td>' +
+      '<td class="course-eqd2 c-out">—</td>' +
+      '<td><button type="button" class="btn-remove no-print" aria-label="Remove course">&#10005;</button></td>' +
+      '</tr>';
+  }
+  function addCourse(label, dose, fx) {
+    courseBody.insertAdjacentHTML("beforeend", rowHTML(label, dose, fx));
+  }
+  function recalcCumulative() {
+    var ab = num("cumAB");
+    var rows = courseBody.querySelectorAll("tr");
+    var sumE = 0, sumB = 0, count = 0;
+    rows.forEach(function (r) {
+      var dose = parseFloat(r.querySelector(".c-dose").value);
+      var fx = parseFloat(r.querySelector(".c-fx").value);
+      var rec = parseFloat(r.querySelector(".c-rec").value);
+      if (!isFinite(rec)) rec = 1;
+      var valid = dose > 0 && fx > 0 && ab > 0;
+      var e = valid ? eqd2(dose, fx, ab) * rec : NaN;
+      var b = valid ? bed(dose, fx, ab) * rec : NaN;
+      r.querySelector(".c-out").textContent = valid ? fmt(e, 2) : "—";
+      if (valid) { sumE += e; sumB += b; count++; }
+    });
+    lastCumEQD2 = count > 0 ? sumE : NaN;
+    document.getElementById("cumCount").textContent = count;
+    setNum("cumEQD2", lastCumEQD2, 2, " Gy");
+    setNum("cumBED", count > 0 ? sumB : NaN, 2, " Gy");
+  }
+  courseBody.addEventListener("input", recalcCumulative);
+  courseBody.addEventListener("click", function (e) {
+    if (e.target.classList.contains("btn-remove")) {
+      e.target.closest("tr").remove();
+      recalcCumulative();
+    }
+  });
+  document.getElementById("cumAB").addEventListener("input", recalcCumulative);
+  document.getElementById("addCourse").addEventListener("click", function () {
+    addCourse("", "", "");
+    recalcCumulative();
+  });
+
+  /* ---- Tab 3: Remaining budget ---- */
+  function recalcBudget() {
+    var limit = num("bLimit"), delivered = num("bDelivered");
+    var ab = num("bAB"), fx = num("bFx");
+    var budget = (isFinite(limit) && isFinite(delivered)) ? limit - delivered : NaN;
+    var dpf = (budget > 0) ? backConvertDpf(budget, fx, ab) : (budget <= 0 ? 0 : NaN);
+    var total = (isFinite(dpf) && fx > 0) ? dpf * fx : NaN;
+    var check = (isFinite(total) && fx > 0) ? eqd2(total, fx, ab) : NaN;
+    setNum("bDpf", isFinite(dpf) ? dpf : NaN, 2, "Gy");
+    document.getElementById("bBudget").textContent = isFinite(budget) ? fmt(budget, 2) + " Gy" : "—";
+    document.getElementById("bTotal").textContent = isFinite(total) ? fmt(total, 2) + " Gy" : "—";
+    document.getElementById("bCheck").textContent = isFinite(check) ? fmt(check, 2) + " Gy" : "—";
+  }
+  ["bLimit", "bDelivered", "bAB", "bFx"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", recalcBudget);
+  });
+  document.getElementById("useCum").addEventListener("click", function () {
+    if (isFinite(lastCumEQD2)) {
+      document.getElementById("bDelivered").value = lastCumEQD2.toFixed(2);
+      recalcBudget();
+    }
+  });
+
+  document.getElementById("printBtn").addEventListener("click", function () { window.print(); });
+
+  /* ---- Init ---- */
+  function recalcAll() { recalcSingle(); recalcCumulative(); recalcBudget(); }
+  addCourse("Prior pelvis EBRT", "45", "25");
+  addCourse("HDR boost", "28", "4");
+  recalcAll();
+})();
+</script>
+
+</body>
+</html>
