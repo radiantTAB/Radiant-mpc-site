@@ -7,11 +7,13 @@
   "compatibility_date": "2025-09-01",
 
   // Serve every file in the repo as a static asset, except the backend
-  // source listed in .assetsignore. The Worker script handles /admin/api/*
-  // and falls through to these assets for everything else.
+  // source listed in .assetsignore. run_worker_first runs the Worker on
+  // every request (it handles the APIs and injects the customer-login
+  // control into HTML pages) before static assets are served.
   "assets": {
     "directory": ".",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
 
   // D1 database for the License Manager.
