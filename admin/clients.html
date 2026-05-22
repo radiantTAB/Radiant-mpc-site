@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Client Setup — Radiant Admin Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/radiant-logo.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-elev:#fafafa;--bg-card:#f4f4f5;
+  --line:#e6e6e8;--line-hi:#cdcdd1;
+  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
+  --accent:#d00008;--accent-2:#a80006;--accent-bright:#f03020;--accent-warm:#f86058;
+  --ok:#1a7f37;
+  --font-display:'Montserrat',system-ui,sans-serif;
+  --font-body:'Montserrat',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --max-w:1180px;--pad-x:clamp(20px,5vw,64px);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(208,0,8,.035) 1px,transparent 0);background-size:32px 32px;pointer-events:none;z-index:0}
+a{color:var(--accent);text-decoration:none;transition:color .2s}
+a:hover{color:var(--accent-bright)}
+img{max-width:100%;display:block}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.svg-defs{position:absolute;width:0;height:0;overflow:hidden}
+
+/* Nav */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:22px var(--pad-x);background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;gap:10px}
+.brand-logo{height:160px;width:auto;display:block}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{color:var(--text-mute);font-size:14px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.nav-links a:hover{color:var(--text)}
+.nav-links a.active{color:var(--accent)}
+.nav-cta{padding:9px 18px;border:1px solid var(--line-hi);border-radius:999px;color:var(--text)!important}
+.nav-cta:hover{border-color:var(--accent);color:var(--accent)!important;background:rgba(208,0,8,.06)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;font-family:var(--font-body);font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;transition:all .2s;border:1px solid transparent;cursor:pointer}
+.btn .ic{width:17px;height:17px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-2);color:#fff}
+.btn-ghost{color:var(--text);border-color:var(--line-hi);background:none}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.rowbtn{font-family:var(--font-body);font-size:12px;font-weight:600;padding:7px 12px;margin:2px 4px 2px 0;border:1px solid var(--line-hi);border-radius:6px;background:var(--bg);color:var(--text-mute);cursor:pointer;transition:all .15s}
+.rowbtn:hover{border-color:var(--accent);color:var(--accent)}
+.rowbtn-go{background:var(--accent);border-color:var(--accent);color:#fff}
+.rowbtn-go:hover{background:var(--accent-2);color:#fff}
+.rowbtn-danger:hover{border-color:var(--accent);background:var(--accent);color:#fff}
+
+/* Hero */
+.hub-hero-band{position:relative;z-index:2;background:var(--bg-elev);border-bottom:1px solid var(--line)}
+.hub-hero{max-width:var(--max-w);margin:0 auto;padding:54px var(--pad-x) 48px}
+.crumb{font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-bottom:18px}
+.crumb a{color:var(--text-mute)}
+.hub-hero h1{font-family:var(--font-display);font-weight:800;font-size:clamp(32px,5vw,48px);line-height:1.05;letter-spacing:-.025em}
+.hub-hero p{font-size:18px;color:var(--text-mute);margin-top:12px;max-width:660px}
+
+/* Layout */
+.section{padding:48px var(--pad-x) 80px;position:relative;z-index:2}
+.section-inner{max-width:var(--max-w);margin:0 auto}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent-warm);background:var(--bg-elev);padding:18px 22px;display:flex;gap:14px;align-items:flex-start;margin-bottom:32px}
+.note .ic{width:22px;height:22px;color:var(--accent-warm);margin-top:1px}
+.note p{font-size:14px;color:var(--text-mute);margin:0}
+.lm-card{background:var(--bg);border:1px solid var(--line);border-top:3px solid var(--accent);padding:30px;margin-bottom:32px}
+.lm-card>h2{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px}
+.lm-card>.sub{font-size:14px;color:var(--text-mute);margin-bottom:24px}
+
+/* Forms */
+.field{margin-bottom:18px}
+.field>label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:8px}
+.field input[type=text],.field input[type=email],.field input[type=date]{width:100%;max-width:440px;font-family:var(--font-body);font-size:15px;padding:11px 14px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text)}
+.field input:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;max-width:620px}
+.check{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--text);cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.msg{margin-top:12px;font-size:14px;font-weight:600;min-height:18px}
+.msg-ok{color:var(--ok)}
+.msg-err{color:var(--accent)}
+.muted{color:var(--text-dim);font-size:14px}
+
+/* Client + location cards */
+.client-card{border:1px solid var(--line);border-radius:10px;margin-bottom:20px;overflow:hidden}
+.client-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px 24px;background:var(--bg-elev);border-bottom:1px solid var(--line)}
+.client-name{font-family:var(--font-display);font-size:19px;font-weight:700}
+.client-sub{font-size:13px;color:var(--text-mute)}
+.locs{padding:8px 24px}
+.loc{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+.loc:last-child{border-bottom:none}
+.loc-editing{display:block}
+.loc-name{font-weight:700;font-size:15.5px;margin-bottom:6px}
+.loc-meta{font-size:13px;color:var(--text-mute);margin-top:6px}
+.loc-key{font-size:13px;margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.loc-actions{white-space:nowrap;flex-shrink:0}
+.loc-editing .loc-actions{margin-top:8px;white-space:normal}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.chip{font-family:var(--font-mono);font-size:11px;background:rgba(208,0,8,.07);color:var(--accent);padding:3px 9px;border-radius:999px}
+.add-loc{padding:14px 24px;background:var(--bg-elev);border-top:1px solid var(--line)}
+.badge{display:inline-block;font-family:var(--font-mono);font-size:11px;padding:3px 9px;border-radius:999px}
+.badge-ok{background:rgba(26,127,55,.1);color:var(--ok)}
+.badge-exp{background:rgba(208,0,8,.08);color:var(--accent)}
+.badge-rev{background:rgba(90,90,90,.16);color:#5a5a5a}
+
+/* Issued-key result */
+.result{margin-top:8px;margin-bottom:28px;border:1px solid var(--line);border-left:3px solid var(--ok);background:var(--bg-elev);padding:22px 24px}
+.result h3{font-family:var(--font-display);font-size:16px;font-weight:700;margin-bottom:6px}
+.result .meta{font-size:13px;color:var(--text-mute);margin-bottom:12px}
+.result textarea{width:100%;font-family:var(--font-mono);font-size:12.5px;line-height:1.5;padding:12px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg);color:var(--text);resize:vertical;margin-bottom:12px}
+
+.footer{padding:40px var(--pad-x);border-top:1px solid var(--line);background:var(--bg-elev);position:relative;z-index:2;font-size:13px;color:var(--text-dim);text-align:center}
+
+@media(max-width:720px){
+  .nav-links{gap:16px}
+  .nav-links a:not(.nav-cta){display:none}
+  .brand-logo{height:96px}
+  .loc{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.9"/><path d="M17.5 14.3A5.5 5.5 0 0 1 21 19.5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M16 5l3 3"/></symbol>
+</svg>
+
+<!-- Nav -->
+<nav class="nav">
+  <a href="../index.html" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="../radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  </a>
+  <div class="nav-links">
+    <a href="../services.html">Services</a>
+    <a href="../products.html">Products</a>
+    <a href="../about.html">About</a>
+    <a href="index.html" class="active">Admin</a>
+    <a href="../contact.html" class="nav-cta">Contact</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<header class="hub-hero-band">
+  <div class="hub-hero">
+    <div class="crumb"><a href="index.html">Admin Workspace</a> / Client Setup</div>
+    <h1>Client Setup</h1>
+    <p>Manage client organizations and their locations — the modules each location can use, the access window, and the license key for it.</p>
+  </div>
+</header>
+
+<section class="section">
+  <div class="section-inner">
+
+    <div class="note">
+      <svg class="ic"><use href="#i-lock"/></svg>
+      <p>Set up a client, add its locations, and choose each location's modules and access-end date. <strong>Issue key</strong> then signs a real Radiant license key for that location. This page must stay behind the admin login.</p>
+    </div>
+
+    <!-- Issued-key result -->
+    <div class="result" id="result" hidden>
+      <h3 id="resultTitle">License key</h3>
+      <div class="meta" id="resultMeta"></div>
+      <textarea id="resultKey" readonly rows="4" aria-label="License key"></textarea>
+      <button type="button" class="btn btn-ghost" id="copyBtn">
+        <svg class="ic"><use href="#i-copy"/></svg> Copy key
+      </button>
+    </div>
+
+    <!-- Add a client -->
+    <div class="lm-card">
+      <h2>Add a client</h2>
+      <div class="sub">Create a client organization, then add its locations below.</div>
+      <div class="field">
+        <label for="cName">Client / organization name</label>
+        <input type="text" id="cName" placeholder="e.g. Acme Radiation Oncology">
+      </div>
+      <div class="field">
+        <label for="cEmail">Contact email (optional)</label>
+        <input type="email" id="cEmail" placeholder="contact@example.com">
+      </div>
+      <div class="field">
+        <label for="cNotes">Notes (optional)</label>
+        <input type="text" id="cNotes" placeholder="Anything worth recording">
+      </div>
+      <button type="button" class="btn btn-primary" id="addClientBtn">
+        <svg class="ic"><use href="#i-users"/></svg> Add Client
+      </button>
+      <div class="msg" id="topMsg" role="status"></div>
+    </div>
+
+    <!-- Clients + locations -->
+    <div class="lm-card">
+      <h2>Clients &amp; locations</h2>
+      <div class="sub">Each location has its own modules, access window, and license key.</div>
+      <div id="clientList"><p class="muted">Loading…</p></div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="footer">© 2026 Radiant Medical Physics Consulting LLC · Admin</footer>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+async function api(path, opts){
+  const res = await fetch(path, opts);
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
+  return data;
+}
+
+function topMsg(text, ok){
+  var el = document.getElementById('topMsg');
+  el.textContent = text || '';
+  el.className = 'msg ' + (ok ? 'msg-ok' : 'msg-err');
+}
+
+var allProducts = [];
+var clients = [];
+var editingLocationId = null;
+var addingLocationFor = null;
+
+function findClient(id){
+  for (var i=0;i<clients.length;i++){ if (clients[i].id===id) return clients[i]; }
+  return null;
+}
+function findLocation(locId){
+  for (var i=0;i<clients.length;i++){
+    for (var j=0;j<clients[i].locations.length;j++){
+      if (clients[i].locations[j].id===locId) return clients[i].locations[j];
+    }
+  }
+  return null;
+}
+
+async function loadProducts(){
+  try { allProducts = (await api('/admin/api/products')).products; }
+  catch (e) { allProducts = []; }
+}
+
+async function loadClients(){
+  var wrap = document.getElementById('clientList');
+  try {
+    clients = (await api('/admin/api/clients')).clients;
+    renderClients();
+  } catch (e) {
+    wrap.innerHTML = '<p class="muted">Could not load clients — ' + esc(e.message) + '</p>';
+  }
+}
+
+function moduleChecks(key, selected){
+  selected = selected || [];
+  return allProducts.map(function(p){
+    var on = selected.indexOf(p.id) >= 0 ? ' checked' : '';
+    return '<label class="check"><input type="checkbox" class="mod-' + key + '" value="' +
+      esc(p.id) + '"' + on + '> ' + esc(p.name) + '</label>';
+  }).join('');
+}
+
+function locationForm(key, loc){
+  loc = loc || {name:'',modules:[],access_end:''};
+  return '<div class="field"><label>Location name</label>' +
+    '<input type="text" id="ln-' + key + '" value="' + esc(loc.name) + '" placeholder="e.g. Main Campus"></div>' +
+    '<div class="field"><label>Modules this location can access</label>' +
+    '<div class="checks">' + moduleChecks(key, loc.modules) + '</div></div>' +
+    '<div class="field"><label>Access ends</label>' +
+    '<input type="date" id="le-' + key + '" value="' + esc(loc.access_end||'') + '"></div>';
+}
+
+function readLocationForm(key){
+  var mods = Array.prototype.map.call(
+    document.querySelectorAll('.mod-' + key + ':checked'),
+    function(c){ return c.value; }
+  );
+  return {
+    name: (document.getElementById('ln-' + key).value || '').trim(),
+    modules: mods,
+    access_end: document.getElementById('le-' + key).value || ''
+  };
+}
+
+function renderLocation(loc){
+  if (loc.id === editingLocationId){
+    return '<div class="loc loc-editing">' + locationForm(loc.id, loc) +
+      '<div class="loc-actions">' +
+        '<button class="rowbtn rowbtn-go" onclick="saveLocation(\'' + loc.id + '\')">Save changes</button>' +
+        '<button class="rowbtn" onclick="cancelEdit()">Cancel</button>' +
+      '</div></div>';
+  }
+  var mods = loc.module_names.length
+    ? loc.module_names.map(function(n){ return '<span class="chip">' + esc(n) + '</span>'; }).join('')
+    : '<span class="muted">no modules selected</span>';
+  var keyLine;
+  if (loc.key){
+    var cls = loc.key.status === 'Active' ? 'badge-ok'
+      : (loc.key.status === 'Revoked' ? 'badge-rev' : 'badge-exp');
+    keyLine = '<span class="badge ' + cls + '">' + esc(loc.key.status) + '</span>' +
+      '<span class="muted">expires ' + esc(loc.key.expires) + '</span>' +
+      '<button class="rowbtn" onclick="viewKey(\'' + loc.id + '\')">View key</button>';
+  } else {
+    keyLine = '<span class="muted">No key issued yet.</span>';
+  }
+  return '<div class="loc">' +
+    '<div class="loc-body">' +
+      '<div class="loc-name">' + esc(loc.name) + '</div>' +
+      '<div class="chips">' + mods + '</div>' +
+      '<div class="loc-meta">Access ends: ' +
+        (loc.access_end ? esc(loc.access_end) : '<span class="muted">not set</span>') + '</div>' +
+      '<div class="loc-key">' + keyLine + '</div>' +
+    '</div>' +
+    '<div class="loc-actions">' +
+      '<button class="rowbtn rowbtn-go" onclick="issueKey(\'' + loc.id + '\')">Issue key</button>' +
+      '<button class="rowbtn" onclick="startEdit(\'' + loc.id + '\')">Edit</button>' +
+      '<button class="rowbtn rowbtn-danger" onclick="deleteLocation(\'' + loc.id + '\')">Delete</button>' +
+    '</div></div>';
+}
+
+function renderClients(){
+  var wrap = document.getElementById('clientList');
+  if (!clients.length){
+    wrap.innerHTML = '<p class="muted">No clients yet — add one above.</p>';
+    return;
+  }
+  wrap.innerHTML = clients.map(function(c){
+    var locs = c.locations.length
+      ? c.locations.map(renderLocation).join('')
+      : '<p class="muted" style="padding:14px 0">No locations yet.</p>';
+    var addBlock;
+    if (addingLocationFor === c.id){
+      addBlock = locationForm('new', null) +
+        '<button class="rowbtn rowbtn-go" onclick="addLocation(\'' + c.id + '\')">Add location</button>' +
+        '<button class="rowbtn" onclick="cancelAddLocation()">Cancel</button>';
+    } else {
+      addBlock = '<button class="rowbtn" onclick="startAddLocation(\'' + c.id + '\')">+ Add location</button>';
+    }
+    return '<div class="client-card">' +
+      '<div class="client-head">' +
+        '<div><div class="client-name">' + esc(c.name) + '</div>' +
+          (c.contact_email ? '<div class="client-sub">' + esc(c.contact_email) + '</div>' : '') +
+          (c.notes ? '<div class="client-sub">' + esc(c.notes) + '</div>' : '') +
+        '</div>' +
+        '<button class="rowbtn rowbtn-danger" onclick="deleteClient(\'' + c.id + '\')">Delete client</button>' +
+      '</div>' +
+      '<div class="locs">' + locs + '</div>' +
+      '<div class="add-loc">' + addBlock + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function startEdit(locId){ editingLocationId = locId; addingLocationFor = null; renderClients(); }
+function cancelEdit(){ editingLocationId = null; renderClients(); }
+function startAddLocation(clientId){ addingLocationFor = clientId; editingLocationId = null; renderClients(); }
+function cancelAddLocation(){ addingLocationFor = null; renderClients(); }
+
+async function addClient(){
+  var name = document.getElementById('cName').value.trim();
+  if (!name){ topMsg('Enter a client name.', false); return; }
+  try {
+    await api('/admin/api/clients', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({
+        name: name,
+        contact_email: document.getElementById('cEmail').value.trim(),
+        notes: document.getElementById('cNotes').value.trim()
+      })
+    });
+    document.getElementById('cName').value = '';
+    document.getElementById('cEmail').value = '';
+    document.getElementById('cNotes').value = '';
+    topMsg('Client added.', true);
+    loadClients();
+  } catch (e) { topMsg(e.message, false); }
+}
+
+async function deleteClient(id){
+  var c = findClient(id);
+  if (!confirm('Delete client "' + (c ? c.name : '') + '" and all its locations?\n\nIssued keys are kept, but lose their link to this client.')) return;
+  try { await api('/admin/api/clients/' + encodeURIComponent(id), {method:'DELETE'}); loadClients(); }
+  catch (e) { alert('Could not delete: ' + e.message); }
+}
+
+async function addLocation(clientId){
+  var f = readLocationForm('new');
+  if (!f.name){ alert('Enter a location name.'); return; }
+  try {
+    await api('/admin/api/clients/' + encodeURIComponent(clientId) + '/locations', {
+      method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(f)
+    });
+    addingLocationFor = null;
+    loadClients();
+  } catch (e) { alert('Could not add location: ' + e.message); }
+}
+
+async function saveLocation(locId){
+  var f = readLocationForm(locId);
+  if (!f.name){ alert('Enter a location name.'); return; }
+  try {
+    await api('/admin/api/locations/' + encodeURIComponent(locId), {
+      method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify(f)
+    });
+    editingLocationId = null;
+    loadClients();
+  } catch (e) { alert('Could not save location: ' + e.message); }
+}
+
+async function deleteLocation(locId){
+  var l = findLocation(locId);
+  if (!confirm('Delete location "' + (l ? l.name : '') + '"?')) return;
+  try { await api('/admin/api/locations/' + encodeURIComponent(locId), {method:'DELETE'}); loadClients(); }
+  catch (e) { alert('Could not delete: ' + e.message); }
+}
+
+async function issueKey(locId){
+  var l = findLocation(locId);
+  if (!confirm('Issue a license key for "' + (l ? l.name : '') + '"?\n\nThe key covers the location\'s current modules and runs until its access-end date.')) return;
+  try {
+    var data = await api('/admin/api/locations/' + encodeURIComponent(locId) + '/issue-key', {method:'POST'});
+    showResult(data.license, 'New license key');
+    loadClients();
+  } catch (e) { alert('Could not issue key: ' + e.message); }
+}
+
+function viewKey(locId){
+  var l = findLocation(locId);
+  if (l && l.key){
+    showResult({
+      customer: l.name, issued: l.key.issued, expires: l.key.expires,
+      product_names: l.module_names, key: l.key.key
+    }, 'License key — ' + l.name);
+  }
+}
+
+function showResult(license, title){
+  document.getElementById('resultTitle').textContent = title || 'License key';
+  document.getElementById('result').hidden = false;
+  document.getElementById('resultMeta').textContent =
+    (license.customer || '') + '  ·  ' + (license.issued || '') + '  →  ' +
+    (license.expires || '') + '  ·  ' + ((license.product_names || []).join(', '));
+  document.getElementById('resultKey').value = license.key;
+  document.getElementById('result').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+document.getElementById('addClientBtn').addEventListener('click', addClient);
+document.getElementById('copyBtn').addEventListener('click', function(){
+  var ta = document.getElementById('resultKey');
+  ta.select();
+  if (navigator.clipboard){ navigator.clipboard.writeText(ta.value); }
+  else { document.execCommand('copy'); }
+});
+
+(async function init(){
+  await loadProducts();
+  await loadClients();
+})();
+</script>
+
+</body>
+</html>

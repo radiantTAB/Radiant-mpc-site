@@ -1,15 +1,18 @@
 // index.js — Worker entry point for radiant-mpc.com.
 //
 // Routing:
-//   /api/revoked    -> PUBLIC revocation list (Radiant apps may check this)
-//   /admin/api/*    -> License Manager admin API (behind Cloudflare Access)
-//   everything else -> static assets (marketing site + admin pages)
+//   /api/revoked              -> PUBLIC revocation list (apps may check this)
+//   /admin/api/clients*       -> Client Setup API (behind Cloudflare Access)
+//   /admin/api/locations*     -> Client Setup API (behind Cloudflare Access)
+//   /admin/api/*              -> License Manager API (behind Cloudflare Access)
+//   everything else           -> static assets (marketing site + admin pages)
 //
 // Cloudflare Access gates all of /admin/* (pages and API). The public
 // /api/revoked endpoint is deliberately outside /admin/ so apps can reach it.
 
 import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
+import { handleClientsApi } from "./clients.js";
 
 export default {
   async fetch(request, env) {
@@ -24,7 +27,19 @@ export default {
       }
     }
 
-    // Admin API — Cloudflare Access gates everything under /admin/.
+    // Client Setup API — behind Access (/admin/* is gated).
+    if (
+      url.pathname.startsWith("/admin/api/clients") ||
+      url.pathname.startsWith("/admin/api/locations")
+    ) {
+      try {
+        return await handleClientsApi(request, env, url);
+      } catch (err) {
+        return json({ error: String((err && err.message) || err) }, 500);
+      }
+    }
+
+    // License Manager API — behind Access.
     if (url.pathname.startsWith("/admin/api/")) {
       try {
         return await handleApi(request, env, url);

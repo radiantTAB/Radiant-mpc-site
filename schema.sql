@@ -1,6 +1,8 @@
--- D1 schema for the Radiant License Manager.
+-- D1 schema for the Radiant admin workspace (License Manager + Client Setup).
 
--- ---- Fresh database: run this once in the D1 "Console" ----
+-- ============================================================
+-- FRESH DATABASE — run all of this once in the D1 "Console".
+-- ============================================================
 CREATE TABLE IF NOT EXISTS licenses (
   id          TEXT PRIMARY KEY,
   customer    TEXT NOT NULL,
@@ -10,12 +12,35 @@ CREATE TABLE IF NOT EXISTS licenses (
   created_at  TEXT NOT NULL,
   products    TEXT NOT NULL DEFAULT '',
   revoked     INTEGER NOT NULL DEFAULT 0,
-  revoked_at  TEXT
+  revoked_at  TEXT,
+  location_id TEXT
 );
 
--- ---- Existing database created before revocation was added ----
--- If the `licenses` table already exists without the revoked columns,
--- run these two statements once in the D1 Console to upgrade it:
---
---   ALTER TABLE licenses ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0;
---   ALTER TABLE licenses ADD COLUMN revoked_at TEXT;
+CREATE TABLE IF NOT EXISTS clients (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  contact_email TEXT,
+  notes         TEXT,
+  created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS locations (
+  id          TEXT PRIMARY KEY,
+  client_id   TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  modules     TEXT NOT NULL DEFAULT '',
+  access_end  TEXT,
+  notes       TEXT,
+  created_at  TEXT NOT NULL
+);
+
+-- ============================================================
+-- EXISTING DATABASE — upgrade steps. Run only what you have not
+-- run before.
+--   Revocation update (previous):
+--     ALTER TABLE licenses ADD COLUMN revoked INTEGER NOT NULL DEFAULT 0;
+--     ALTER TABLE licenses ADD COLUMN revoked_at TEXT;
+--   Client Setup update (this one):
+--     ALTER TABLE licenses ADD COLUMN location_id TEXT;
+--     ...plus the CREATE TABLE clients and CREATE TABLE locations above.
+-- ============================================================
