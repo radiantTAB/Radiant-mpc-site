@@ -9,6 +9,7 @@ Thumbs.db
 # Editor / IDE directories
 .vscode/
 .idea/
+.claude/
 
 # Editor swap & autosave files
 *.swp
