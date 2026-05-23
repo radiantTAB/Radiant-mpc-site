@@ -1,4 +1,37 @@
-RADIANT QUIKQA — DEMO NARRATION SCRIPT
-Approximately 60 seconds. Paste into a voice-over tool, or record in your own voice.
+RADIANT QUIKQA -- DEMO NARRATION SCRIPT
+Approximately 60 seconds. Mirrors the cadence of quiklog.mp4 and quikram.mp4.
 
-Radiant QuikQA is PyLinac-powered machine QA for radiation oncology physics — Winston-Lutz, Picket Fence, VMAT, TG-142 leaf-speed, and TG-51 dosimetry, all in one standalone Windows application. Winston-Lutz handles MV, kV, and CBCT isocenter and BB-coincidence with sub-millimeter reporting. Picket Fence checks MLC leaf positional accuracy for your TG-142 monthly tests. VMAT QA analyzes dose-rate and MLC-speed constancy from a single delivery. The TG-142 leaf-speed module works straight from machine logs — per-leaf RMS error and beam holds, with no portal dosimetry required. TG-51 dosimetry covers photon and electron reference calibration with full chamber and electrometer catalogs. A built-in DICOM anonymizer lets you share test data safely, and the PDF toolkit finishes your reports. It all runs from a single executable — no install, no Python. Radiant QuikQA — precision physics, in software.
+Radiant QuikQA is PyLinac-powered linac quality assurance for radiation oncology physics -- the full TG-142 program in one local web app. The TG-142 Monthly worksheet is the complete catalog with MPPG 8-b tolerances, switchable I-M-R-T or S-R-S class. Enter the deviation for each measured test, mark each functional check, and submit. QuikQA grades every row with a worst-of roll-up per group and overall, and renders a print-ready report. The Annual worksheet is the same flow at annual cadence, with an embedded TG-51 reference-dosimetry launcher -- open the photon or electron calculator, finish the absolute output cal, and transcribe the result back into the row. Every analysis module is PyLinac under the hood. Winston-Lutz takes the full M-V, k-V, or C-B-C-T image set and returns isocenter and B-B coincidence with the metrics table, the analysis plot, and a downloadable P-D-F. Radiant QuikQA. Linac QA, faster.
+
+
+SHOT-BY-SHOT STORYBOARD
+
+00:00-00:06  Hub / module picker -- TG-142 Monthly, Annual, Winston-Lutz,
+             Picket Fence, VMAT, leaf-speed cards visible.
+00:06-00:10  Hub scrolled to reveal the data-tools row (DICOM Anonymizer,
+             PDF Tools).
+00:10-00:18  TG-142 Monthly worksheet -- header filled (machine, performer,
+             energies), tolerances pre-populated from MPPG 8.b.
+00:18-00:24  Monthly worksheet scrolled to the dosimetry table with sample
+             deviations entered.
+00:24-00:32  Monthly QA result page -- worst-of roll-up, per-group counts.
+00:32-00:36  Result scrolled to the first grouped result table (PASS verdicts).
+00:36-00:42  TG-142 Annual worksheet scrolled to the TG-51 reference-dosimetry
+             launcher (links to TG-51 photon and electron calculators).
+00:42-00:48  TG-51 Photon calculator (the embedded sub-form, with breadcrumb
+             back to Annual QA).
+00:48-00:54  Winston-Lutz form -- DICOM upload, machine profile, tolerances.
+00:54-01:00  Winston-Lutz result page from a synthetic 4-image dataset --
+             metrics + PyLinac analysis plot.
+01:00-01:05  Close on the module hub.
+
+
+RECORDING NOTES
+
+* Captured by C:\demo_videos\make_quikqa_video.py against an isolated
+  QuikQA web instance on 127.0.0.1:5181 with a sandboxed data dir and a
+  fresh demo license key. No production data touched.
+* Winston-Lutz dataset is generated synthetically by PyLinac's
+  image_generator (4 cardinal gantry angles, 0.4 mm BB offset) so the
+  result page is real, not mocked.
+* Voice: Microsoft SAPI Zira at 170 wpm. No cloud TTS (Norton TLS).
