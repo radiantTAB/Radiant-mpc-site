@@ -1,14 +1,30 @@
-// index.js — Worker entry point for radiant-mpc.com.
+// index.js — Worker entry point for radiant-mpc.com + app.radiant-mpc.com.
 //
-// Routing:
-//   /api/revoked              -> PUBLIC revocation list (apps may check this)
+// Hostname split:
+//   radiant-mpc.com / www.radiant-mpc.com  -> marketing site only.
+//     Any user-area path (/app/, /portal/, /admin/, /apps/, /run.html)
+//     301-redirects to app.radiant-mpc.com.
+//   app.radiant-mpc.com  -> launcher + portal + admin + embedded apps.
+//     Paths are transparently rewritten into the /app/ shadow tree:
+//       /            -> /app/index.html (the launcher)
+//       /portal/*    -> /app/portal/*
+//       /admin/*     -> /app/admin/*
+//       /apps/*      -> /app/apps/*
+//     Shared static assets (customer-login.js, styles.css, radiant-logo.png,
+//     /assets/*, favicons) serve from their root path on either hostname.
+//
+// API routing (path-based, hostname-agnostic so customer-login.js on
+// marketing pages can still hit /portal/api/me, etc.):
+//   /api/revoked              -> PUBLIC revocation list
+//   /portal/api/*             -> Client portal API (own session auth)
 //   /admin/api/clients*       -> Client Setup API (behind Cloudflare Access)
 //   /admin/api/locations*     -> Client Setup API (behind Cloudflare Access)
 //   /admin/api/*              -> License Manager API (behind Cloudflare Access)
-//   everything else           -> static assets (marketing site + admin pages)
 //
-// Cloudflare Access gates all of /admin/* (pages and API). The public
-// /api/revoked endpoint is deliberately outside /admin/ so apps can reach it.
+// IMPORTANT: the Cloudflare Access policy that gates /admin/* must be
+// configured for BOTH hostnames (or the wildcard *.radiant-mpc.com). The
+// admin pages now live at app.radiant-mpc.com/admin/* — that hostname
+// must be covered or the License Manager UI will be public.
 
 import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
@@ -58,10 +74,75 @@ export default {
       }
     }
 
-    // Everything else: static assets.
-    return env.ASSETS.fetch(request);
+    // Everything else: static assets, with hostname-based routing.
+    return serveAssets(request, env, url);
   },
 };
+
+// Paths that always serve from their original root location, regardless
+// of hostname. Customer login + styles + logo need to load on marketing
+// AND on the app hostname; demo videos under /assets/ are shared too.
+function isSharedAsset(path) {
+  return (
+    path === "/customer-login.js" ||
+    path === "/styles.css" ||
+    path === "/radiant-logo.png" ||
+    path === "/favicon.ico" ||
+    path === "/favicon.png" ||
+    path === "/CNAME" ||
+    path.startsWith("/assets/")
+  );
+}
+
+// Paths owned by the app surface — on the marketing hostname they
+// 301-redirect to app.radiant-mpc.com (so old bookmarks/inbound links
+// still land somewhere sensible).
+function isAppPath(path) {
+  return (
+    path === "/run.html" ||
+    path.startsWith("/app/") ||
+    path.startsWith("/portal/") ||
+    path.startsWith("/admin/") ||
+    path.startsWith("/apps/")
+  );
+}
+
+async function serveAssets(request, env, url) {
+  const host = url.hostname;
+  const path = url.pathname;
+  const isAppHost = host === "app.radiant-mpc.com";
+
+  if (isAppHost) {
+    // Rewrite user-area paths into the /app/ shadow tree. Shared
+    // assets pass through unchanged.
+    if (isSharedAsset(path)) {
+      return env.ASSETS.fetch(request);
+    }
+    let newPath;
+    if (path === "/" || path === "") {
+      newPath = "/app/index.html";
+    } else if (path.startsWith("/app/")) {
+      newPath = path; // already under /app/
+    } else {
+      newPath = "/app" + path;
+    }
+    const rewritten = new URL(newPath + url.search, url);
+    return env.ASSETS.fetch(new Request(rewritten, request));
+  }
+
+  // Marketing hostname: redirect anything that belongs to the app
+  // surface over to app.radiant-mpc.com.
+  if (isAppPath(path)) {
+    // /run.html -> app launcher root; everything else keeps its path.
+    const target = path === "/run.html" ? "/" : path;
+    return Response.redirect(
+      "https://app.radiant-mpc.com" + target + url.search,
+      301
+    );
+  }
+
+  return env.ASSETS.fetch(request);
+}
 
 function json(data, status = 200, extraHeaders) {
   return new Response(JSON.stringify(data), {

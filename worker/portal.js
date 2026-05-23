@@ -138,10 +138,15 @@ export async function handlePortalApi(request, env, url) {
     )
       .bind(token, client.id, now.toISOString(), expires.toISOString())
       .run();
+    // Domain=.radiant-mpc.com lets the same session work on both
+    // radiant-mpc.com (where the Customer Login modal lives) and
+    // app.radiant-mpc.com (the launcher / portal pages). The Quik app
+    // subdomains (quikqa., quiklog., …) don't serve /portal/*, so
+    // Path=/portal still scopes the cookie there.
     const cookie =
       "portal_session=" +
       token +
-      "; HttpOnly; Secure; SameSite=Lax; Path=/portal; Max-Age=" +
+      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=" +
       SESSION_DAYS * 86400;
     return json({ ok: true }, 200, { "Set-Cookie": cookie });
   }
@@ -154,9 +159,10 @@ export async function handlePortalApi(request, env, url) {
         .bind(token)
         .run();
     }
+    // Same Domain/Path so the browser clears the right cookie.
     return json({ ok: true }, 200, {
       "Set-Cookie":
-        "portal_session=; HttpOnly; Secure; SameSite=Lax; Path=/portal; Max-Age=0",
+        "portal_session=; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=0",
     });
   }
 

@@ -11,14 +11,16 @@
 <link rel="icon" type="image/png" href="/radiant-logo.png">
 <!--
   ===================================================================
-  LAUNCH PORTAL
-  The Radiant Quik apps are currently standalone Windows programs, not
-  hosted web apps, so the "Launch ... · Soon" buttons below are disabled
-  placeholders. When an app is published as a hosted web app, swap its
-  <span> back to a link, e.g.:
-     <a class="btn btn-primary" href="https://quikqa.radiant-mpc.com/">...
-  NOTE: this page is no longer linked from the product pages. It can be
-  repurposed as a downloads hub or removed.
+  LAUNCH PORTAL — served at https://app.radiant-mpc.com/
+  The customer-facing launcher for the Radiant Software Suite. The
+  marketing site (radiant-mpc.com) drives prospects here via its
+  "Customer Login" controls. Nav links here are absolute URLs back to
+  the marketing site (Services/Products/About/Contact) because this
+  page lives on a different hostname.
+
+  When a "· Soon" app ships as a hosted web app, swap its <span> back
+  to a live link, e.g.
+     <a class="btn btn-primary" href="https://quikcalc.radiant-mpc.com/">...
   ===================================================================
 -->
 <style>
@@ -153,15 +155,15 @@ img{max-width:100%;display:block}
 
 <!-- ===== Nav ===== -->
 <nav class="nav">
-  <a href="index.html" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
-    <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  <a href="https://radiant-mpc.com/" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
   </a>
   <div class="nav-links">
-    <a href="services.html">Services</a>
-    <a href="products.html">Products</a>
-    <a href="about.html">About</a>
-    <a href="admin/index.html">Admin</a>
-    <a href="contact.html" class="nav-cta">Contact</a>
+    <a href="https://radiant-mpc.com/services.html">Services</a>
+    <a href="https://radiant-mpc.com/products.html">Products</a>
+    <a href="https://radiant-mpc.com/about.html">About</a>
+    <a href="/admin/">Admin</a>
+    <a href="https://radiant-mpc.com/contact.html" class="nav-cta">Contact</a>
   </div>
 </nav>
 
