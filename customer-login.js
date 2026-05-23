@@ -1,62 +1,61 @@
-/* customer-login.js — site-wide Customer Login / Logout control.
+/* customer-login.js — site-wide Sign In / Launch Apps control.
  *
- * Injected into every Radiant marketing page by the Worker. Adds a
- * session-aware control next to the logo: a "Customer Login" button that
- * opens a sign-in modal, or — when signed in — the client's name and a
- * "Log out" button. Uses the existing portal API (/portal/api/*); the
- * portal_session cookie persists the login across every page.
+ * Loaded by every Radiant marketing page (radiant-mpc.com/*) and by the
+ * launcher (app.radiant-mpc.com/). Probes /portal/api/me and injects a
+ * link-based control into the existing <nav class="nav"> .nav-links
+ * container. No modals, no in-page forms — every action navigates.
+ *
+ * State -> visible control:
+ *
+ *   Not signed in, on marketing host
+ *     [Sign In →]   (red pill, sends to app.radiant-mpc.com/portal/login.html)
+ *
+ *   Signed in, on marketing host
+ *     · Customer Name   [Launch Apps →]   [Log out]
+ *
+ *   Signed in, on app host (the launcher itself)
+ *     · Customer Name   [Log out]
+ *     (no "Launch Apps" — they're already there)
+ *
+ *   Not signed in, on app host
+ *     This shouldn't be reachable: the Worker gates app.radiant-mpc.com
+ *     behind portal login and redirects unauthenticated requests to the
+ *     sign-in page before this script ever runs. Defensive fallback is
+ *     the same "Sign In →" pill, so nothing breaks if the gate is ever
+ *     loosened.
  */
 (function () {
   "use strict";
   if (window.__radiantCustomerLogin) return;
   window.__radiantCustomerLogin = true;
 
+  var APP_BASE = "https://app.radiant-mpc.com";
+  var onAppHost = (location.hostname === "app.radiant-mpc.com");
+
   var STYLE = [
-    ".cl-wrap{display:flex;align-items:center;margin-right:auto;margin-left:24px}",
-    ".cl-btn{display:inline-flex;align-items:center;",
-      "font:600 13px/1 'Montserrat',system-ui,sans-serif;letter-spacing:.02em;",
-      "padding:9px 17px;border-radius:999px;border:1px solid #d00008;color:#d00008;",
-      "background:transparent;cursor:pointer;transition:background .15s,color .15s}",
-    ".cl-btn:hover{background:#d00008;color:#fff}",
-    ".cl-user{display:flex;align-items:center;gap:9px;",
-      "font:13px 'Montserrat',system-ui,sans-serif}",
+    ".cl-wrap{display:inline-flex;align-items:center;gap:14px;margin-left:18px}",
+    ".cl-pill{display:inline-flex;align-items:center;gap:7px;",
+      "padding:9px 18px;border-radius:999px;",
+      "font:700 13px/1 'Montserrat',system-ui,sans-serif;",
+      "letter-spacing:.04em;text-transform:uppercase;",
+      "transition:all .15s;text-decoration:none;cursor:pointer;border:1px solid transparent}",
+    ".cl-pill-primary{background:#d00008;color:#fff!important}",
+    ".cl-pill-primary:hover{background:#a80006;color:#fff!important;",
+      "transform:translateY(-1px);box-shadow:0 6px 18px rgba(208,0,8,.22)}",
+    ".cl-pill-ghost{background:transparent;color:#5a5a5a!important;border-color:#d8d8dc}",
+    ".cl-pill-ghost:hover{border-color:#d00008;color:#d00008!important}",
+    ".cl-user{display:inline-flex;align-items:center;gap:9px;",
+      "font:600 13px/1 'Montserrat',system-ui,sans-serif;color:#1a1a1a;",
+      "white-space:nowrap}",
     ".cl-dot{width:7px;height:7px;border-radius:50%;background:#1a7f37;flex:none}",
-    "a.cl-name{font-weight:700;color:#1a1a1a;text-decoration:none}",
-    "a.cl-name:hover{color:#d00008}",
-    ".cl-logout{font:600 12px 'Montserrat',system-ui,sans-serif;color:#5a5a5a;",
-      "background:none;border:1px solid #d8d8dc;border-radius:999px;",
-      "padding:6px 12px;cursor:pointer}",
-    ".cl-logout:hover{border-color:#d00008;color:#d00008}",
-    ".cl-modal{position:fixed;inset:0;z-index:99999;display:none;",
-      "align-items:center;justify-content:center;background:rgba(20,20,22,.55)}",
-    ".cl-modal.cl-open{display:flex}",
-    ".cl-card{background:#fff;width:90%;max-width:380px;border-radius:14px;",
-      "border-top:3px solid #d00008;padding:28px 30px 24px;",
-      "font-family:'Montserrat',system-ui,sans-serif;",
-      "box-shadow:0 24px 60px rgba(0,0,0,.3)}",
-    ".cl-card h2{margin:0;font-size:20px;font-weight:800;color:#1a1a1a}",
-    ".cl-card .cl-sub{margin:4px 0 18px;font-size:13px;color:#5a5a5a}",
-    ".cl-field{margin-bottom:13px}",
-    ".cl-field label{display:block;font-size:11px;font-weight:700;",
-      "text-transform:uppercase;letter-spacing:.05em;color:#5a5a5a;margin-bottom:5px}",
-    ".cl-field input{width:100%;box-sizing:border-box;",
-      "font:14px 'Montserrat',system-ui,sans-serif;padding:10px 12px;",
-      "border:1px solid #cdcdd1;border-radius:8px}",
-    ".cl-field input:focus{outline:none;border-color:#d00008}",
-    ".cl-submit{width:100%;font:700 13px 'Montserrat',system-ui,sans-serif;",
-      "text-transform:uppercase;letter-spacing:.04em;padding:12px;border:none;",
-      "border-radius:999px;background:#d00008;color:#fff;cursor:pointer;margin-top:4px}",
-    ".cl-submit:disabled{opacity:.6;cursor:not-allowed}",
-    ".cl-err{color:#d00008;font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}",
-    ".cl-x{float:right;font-size:22px;line-height:1;color:#9a9a9a;background:none;",
-      "border:none;cursor:pointer;margin:-4px -6px 0 0}",
-    ".cl-hint{margin-top:15px;padding-top:13px;border-top:1px solid #ececee;",
-      "font-size:11.5px;color:#9a9a9a;text-align:center}",
-    "@media(max-width:680px){.cl-wrap{margin-left:12px}",
-      ".cl-btn{padding:7px 12px;font-size:12px}}"
+    "@media(max-width:720px){",
+      ".cl-wrap{gap:9px;margin-left:10px}",
+      ".cl-pill{padding:7px 13px;font-size:11.5px}",
+      ".cl-user{font-size:12px}",
+      ".cl-user-name{display:none}}"
   ].join("");
 
-  var wrap = null, modal = null;
+  var wrap = null;
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
@@ -65,28 +64,26 @@
   }
 
   function renderLoggedOut() {
-    wrap.innerHTML = "";
-    var b = document.createElement("button");
-    b.type = "button";
-    b.className = "cl-btn";
-    b.textContent = "Customer Login";
-    b.addEventListener("click", openModal);
-    wrap.appendChild(b);
+    wrap.innerHTML =
+      '<a class="cl-pill cl-pill-primary" href="' + APP_BASE +
+      '/portal/login.html">Sign In</a>';
   }
 
   function renderLoggedIn(name) {
+    var launchBtn = onAppHost
+      ? ""
+      : '<a class="cl-pill cl-pill-primary" href="' + APP_BASE +
+        '/">Launch Apps</a>';
     wrap.innerHTML =
-      '<div class="cl-user">' +
-      '<span class="cl-dot"></span>' +
-      '<a class="cl-name" href="/portal/" title="Go to your portal">' +
-      esc(name) + "</a>" +
-      '<button type="button" class="cl-logout">Log out</button>' +
-      "</div>";
+      '<span class="cl-user"><span class="cl-dot"></span>' +
+      '<span class="cl-user-name">' + esc(name) + "</span></span>" +
+      launchBtn +
+      '<button type="button" class="cl-pill cl-pill-ghost cl-logout">Log out</button>';
     wrap.querySelector(".cl-logout").addEventListener("click", doLogout);
   }
 
   function refresh() {
-    fetch("/portal/api/me", { credentials: "same-origin" })
+    fetch("/portal/api/me", { credentials: "include" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (d && d.client && d.client.name) renderLoggedIn(d.client.name);
@@ -96,80 +93,18 @@
   }
 
   function doLogout() {
-    fetch("/portal/api/logout", { method: "POST", credentials: "same-origin" })
-      .then(function () { renderLoggedOut(); })
+    fetch("/portal/api/logout", { method: "POST", credentials: "include" })
+      .then(function () {
+        // On app host, logging out makes the page un-gated content
+        // unreachable — bounce to login so the user sees a sensible
+        // landing instead of the Worker's redirect-to-login flash.
+        if (onAppHost) {
+          location.href = APP_BASE + "/portal/login.html";
+        } else {
+          renderLoggedOut();
+        }
+      })
       .catch(function () { renderLoggedOut(); });
-  }
-
-  function buildModal() {
-    modal = document.createElement("div");
-    modal.className = "cl-modal";
-    modal.innerHTML =
-      '<div class="cl-card">' +
-      '<button class="cl-x" type="button" aria-label="Close">&times;</button>' +
-      "<h2>Customer Login</h2>" +
-      '<p class="cl-sub">Sign in to reach your licensed Radiant apps.</p>' +
-      "<form>" +
-      '<div class="cl-field"><label for="cl-email">Email</label>' +
-      '<input id="cl-email" type="email" autocomplete="username" required></div>' +
-      '<div class="cl-field"><label for="cl-pw">Password</label>' +
-      '<input id="cl-pw" type="password" autocomplete="current-password" required></div>' +
-      '<button class="cl-submit" type="submit">Sign In</button>' +
-      '<div class="cl-err"></div>' +
-      "</form>" +
-      '<div class="cl-hint">Need access? Contact Radiant Medical Physics.</div>' +
-      "</div>";
-    document.body.appendChild(modal);
-    modal.addEventListener("click", function (e) {
-      if (e.target === modal) closeModal();
-    });
-    modal.querySelector(".cl-x").addEventListener("click", closeModal);
-    modal.querySelector("form").addEventListener("submit", onSubmit);
-  }
-
-  function openModal() {
-    if (!modal) buildModal();
-    modal.querySelector(".cl-err").textContent = "";
-    modal.querySelector("form").reset();
-    modal.classList.add("cl-open");
-    modal.querySelector("#cl-email").focus();
-  }
-
-  function closeModal() {
-    if (modal) modal.classList.remove("cl-open");
-  }
-
-  function onSubmit(e) {
-    e.preventDefault();
-    var errEl = modal.querySelector(".cl-err");
-    var btn = modal.querySelector(".cl-submit");
-    errEl.textContent = "";
-    btn.disabled = true;
-    fetch("/portal/api/login", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        email: modal.querySelector("#cl-email").value.trim(),
-        password: modal.querySelector("#cl-pw").value
-      })
-    })
-      .then(function (r) {
-        return r.json().catch(function () { return {}; })
-          .then(function (j) { return { ok: r.ok, j: j }; });
-      })
-      .then(function (res) {
-        if (res.ok) { closeModal(); refresh(); }
-        else { errEl.textContent = (res.j && res.j.error) || "Sign-in failed."; }
-      })
-      .catch(function () { errEl.textContent = "Could not reach the server."; })
-      .then(function () { btn.disabled = false; });
-  }
-
-  function onKeydown(e) {
-    if (e.key === "Escape" && modal && modal.classList.contains("cl-open")) {
-      closeModal();
-    }
   }
 
   function mount() {
@@ -180,13 +115,17 @@
     style.textContent = STYLE;
     document.head.appendChild(style);
 
-    wrap = document.createElement("div");
+    // Inject at the END of the existing nav-links container so the
+    // control sits at the far-right of the nav, after the "Contact"
+    // CTA on marketing pages and after "Admin/Contact" on the launcher.
+    var navLinks = nav.querySelector(".nav-links");
+    wrap = document.createElement("span");
     wrap.className = "cl-wrap";
-    var brand = nav.querySelector(".brand");
-    if (brand) nav.insertBefore(wrap, brand.nextSibling);
-    else nav.insertBefore(wrap, nav.firstChild);
+    if (navLinks) navLinks.appendChild(wrap);
+    else nav.appendChild(wrap);
 
-    document.addEventListener("keydown", onKeydown);
+    // Render an optimistic Sign-In pill immediately so the nav doesn't
+    // visibly grow when the /me probe completes; refresh overwrites it.
     renderLoggedOut();
     refresh();
   }
