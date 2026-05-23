@@ -122,11 +122,13 @@ function isSharedAsset(path) {
 function isAppPath(path) {
   return (
     path === "/run.html" ||
-    path === "/downloads.html" ||  // moved under app/ -- gated like the rest
+    path === "/downloads.html" ||      // moved under app/ -- gated like the rest
+    path === "/users-guides.html" ||   // app-only listing of the per-product guides
     path.startsWith("/app/") ||
     path.startsWith("/portal/") ||
     path.startsWith("/admin/") ||
-    path.startsWith("/apps/")
+    path.startsWith("/apps/") ||
+    path.startsWith("/users-guides/")  // the PDFs themselves
   );
 }
 
