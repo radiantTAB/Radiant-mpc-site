@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Radiant QuikQA — Linac QA Suite | Radiant Medical Physics Consulting</title>
-<meta name="description" content="Radiant QuikQA — PyLinac-powered local web app for radiation oncology physics QA: Winston-Lutz, Picket Fence, VMAT, TG-142 MLC leaf-speed, TG-51 dosimetry, and DICOM tools.">
+<meta name="description" content="Radiant QuikQA — PyLinac-powered local web app for radiation oncology physics QA: guided TG-142 / MPPG 8.b & 9.a Monthly and Annual QA worksheets, Winston-Lutz, Picket Fence, VMAT, MLC leaf-speed, TG-51 reference dosimetry, and DICOM tools.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -231,13 +231,14 @@ img{max-width:100%;display:block}
         <span class="prod-tag">Clinical Tool · Local Web App</span>
         <h1>Radiant QuikQA</h1>
         <p class="prod-lede">
-          PyLinac-powered machine QA for radiation oncology physics —
-          Winston-Lutz, Picket Fence, VMAT, TG-142 MLC leaf-speed, and TG-51
-          dosimetry, all in one local web app.
+          PyLinac-powered machine QA for radiation oncology physics — guided
+          TG-142 and MPPG 8.b / 9.a Monthly and Annual QA worksheets, plus
+          automated Winston-Lutz, Picket Fence, VMAT, and MLC leaf-speed
+          analysis, all in one local web app.
         </p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="https://github.com/radiantTAB/Radiant_QuikQA_dist/releases" rel="noopener"><svg class="ic"><use href="#i-download"/></svg> Download</a>
-          <span class="btn btn-ghost" aria-disabled="true" title="Hosted web version coming soon" style="opacity:.5;cursor:not-allowed"><svg class="ic"><use href="#i-app"/></svg> Launch Web App · Soon</span>
+          <a class="btn btn-ghost" href="https://quikqa.radiant-mpc.com/" rel="noopener"><svg class="ic"><use href="#i-app"/></svg> Launch Web App</a>
           <a class="btn btn-ghost" href="mailto:info@Radiant-MPC.com?subject=Demo%20request%3A%20Radiant%20QuikQA"><svg class="ic"><use href="#i-mail"/></svg> Request a Demo</a>
         </div>
       </div>
@@ -262,9 +263,21 @@ img{max-width:100%;display:block}
     <div class="section-head">
       <div class="section-kicker"><svg class="ic"><use href="#i-gauge"/></svg><span>Features</span></div>
       <h2>What QuikQA does.</h2>
-      <p>One tool for the recurring machine-QA tests — each module produces a clean, reviewable PDF report.</p>
+      <p>Guided Monthly and Annual QA worksheets backed by automated analysis engines — every session produces a clean, reviewable PDF report.</p>
     </div>
     <div class="feature-grid">
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-clipboard"/></svg></div>
+        <h3>Monthly QA</h3>
+        <p>A guided TG-142 and MPPG 8.b monthly worksheet — output and profile constancy, mechanical, imaging, and safety checks — with live tolerance grading and one consolidated report.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-list"/></svg></div>
+        <h3>Annual QA</h3>
+        <p>The full TG-142 / MPPG 8.b &amp; 9.a annual program, with TG-51 photon and electron reference dosimetry — and complete chamber and electrometer catalogs — built right in.</p>
+      </div>
 
       <div class="feature">
         <div class="feat-icon"><svg class="ic"><use href="#i-target"/></svg></div>
@@ -291,12 +304,6 @@ img{max-width:100%;display:block}
       </div>
 
       <div class="feature">
-        <div class="feat-icon"><svg class="ic"><use href="#i-calc"/></svg></div>
-        <h3>TG-51 Dosimetry</h3>
-        <p>Photon and electron reference dosimetry with full chamber and electrometer catalogs.</p>
-      </div>
-
-      <div class="feature">
         <div class="feat-icon"><svg class="ic"><use href="#i-doc"/></svg></div>
         <h3>DICOM Anonymizer &amp; PDF Tools</h3>
         <p>Strip identifying tags to share test data safely, then merge, split, rotate, watermark, and number QA reports.</p>
@@ -315,7 +322,7 @@ img{max-width:100%;display:block}
     </div>
     <div class="who-grid">
       <div class="who-copy">
-        <p>QuikQA is built for the clinical medical physicist responsible for linear-accelerator commissioning and routine quality assurance. It consolidates the monthly and annual machine-QA workflow — Winston-Lutz, Picket Fence, VMAT, MLC leaf-speed, and TG-51 reference dosimetry — into a single tool that runs locally in your browser, right on the QA workstation.</p>
+        <p>QuikQA is built for the clinical medical physicist responsible for linear-accelerator commissioning and routine quality assurance. It consolidates the monthly and annual machine-QA workflow into guided TG-142 and MPPG 8.b / 9.a worksheets — backed by automated Winston-Lutz, Picket Fence, VMAT, and MLC leaf-speed analysis and TG-51 reference dosimetry — in a single tool that runs locally in your browser, right on the QA workstation.</p>
         <p>Because it runs as a local web app with no Python install and no ESAPI dependency, it drops cleanly into a physics workflow without IT involvement — it is local-first, so nothing is sent to the cloud. QuikQA is distributed as an evaluation build, so every tolerance and output must be reviewed and approved by a Qualified Medical Physicist before operational use.</p>
       </div>
       <div class="who-card">

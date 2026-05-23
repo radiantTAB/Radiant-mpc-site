@@ -1,0 +1,22 @@
+RADIANT QUIKLOG — DEMO NARRATION SCRIPT
+Approximately 60 seconds. Paste into a voice-over tool, or record in your own voice.
+
+Radiant QuikLog is an equipment master and calibration tracker for radiation oncology — linacs, CT simulators, HDR units, ion chambers, electrometers, well chambers, and survey meters, all in one inventory. Per asset, QuikLog records manufacturer and model, serial number, location, date of first use, last calibration, and the calibration interval. The inventory view sorts every asset by what's due first, with overdue items at the top. Due-soon warnings are color-coded — green for OK, amber for due within your configured lead time, red for overdue — and you decide the lead time per institution. Every calibration event is logged against the asset with the cal date, the next-due date, the person who performed it, and the ADCL or vendor cert number — a full audit trail per piece of equipment. Two printable reports finish the workflow: the full inventory PDF for the binder, and the due-in-next-N-days filter for surveys and JCAHO visits. QuikLog runs locally on the QA workstation — SQLite, no cloud, no IT involvement. Radiant QuikLog — your equipment master, one click away.
+
+
+SHOT-BY-SHOT STORYBOARD (~60 s total)
+
+00:00–00:08  Title card or QuikLog dashboard splash. "Equipment master and calibration tracker..."
+00:08–00:18  Inventory dashboard. Show the summary cards (OK / Due Soon / Overdue / No Date) and the color-coded asset table sorted with overdue first.
+00:18–00:28  Hover/click into "+ Add Asset" form. Quickly cycle the type dropdown to show the asset types. Type a model + S/N + location. Save.
+00:28–00:38  Open an asset detail page. Show last-cal / next-due / interval and the calibration history table. Click "+ Record calibration", fill date + cert # + performed-by, save. New row appears.
+00:38–00:48  Back to dashboard — the asset's status colour updates. Click "Due in Next 60 Days" report; show the filtered table.
+00:48–00:60  Print preview / Save as PDF. Closing brand card: "Radiant QuikLog — your equipment master, one click away."
+
+
+RECORDING NOTES
+
+* Target 1080p, 60–70 second total, MP4 H.264 (matches the other suite videos).
+* Pre-seed the local DB with 8–12 assets, several deliberately due-soon and overdue, so the dashboard reads at a glance.
+* Use the eval deployment at https://quiklog.radiant-mpc.com/ (or local 127.0.0.1:5050) — both look identical.
+* No PHI. No real patient identifiers. Asset S/Ns and location names can be realistic but generic.

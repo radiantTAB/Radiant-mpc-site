@@ -1,0 +1,22 @@
+RADIANT QUIKRAM — DEMO NARRATION SCRIPT
+Approximately 60 seconds. Paste into a voice-over tool, or record in your own voice.
+
+Radiant QuikRAM is HDR and radioactive-materials management for radiation oncology — source inventory with automatic isotope decay correction, the full HDR Source Exchange QA worksheet, a well-chamber inventory with ADCL calibration values, a TG-43 line-source dose calculator, and printable date-AKS-activity decay tables, all in one local web app. Per source, QuikRAM records the manufacturer cal and decay-corrects the air-kerma strength to today using the isotope's published half-life. The HDR Source Exchange workflow walks you through every section of the quarterly QA — ODH 3701 acceptance checks, chamber constancy on the prior source, new source calibration, timer accuracy and reproducibility, timer linearity with an auto-computed R-squared plot, the source housing survey, and a source-positioning film upload — and rolls everything up into a summary that flags each test against editable tolerances. Print a date-by-date decay table for the source binder, or run a TG-43 dose calculation as an independent reference check. Radiant QuikRAM — HDR program management, precision physics in software.
+
+
+SHOT-BY-SHOT STORYBOARD (~60 s total)
+
+00:00–00:08  Title or QuikRAM dashboard splash. "HDR and radioactive-materials management..."
+00:08–00:18  Sources dashboard. Show summary cards (OK / Exchange Due / Overdue / No Date / Inactive) and the source table with isotope + cal date + decay-corrected % remaining.
+00:18–00:30  Click a source row → detail page. Show current Sk (decayed to today) + the % remaining. Briefly highlight the linked source-model card and chamber.
+00:30–00:42  "+ Record HDR Source Exchange" — scroll through the four sections (ODH checks → chamber constancy → new source cal → timer + survey). Linger 2 s on the timer-linearity table and the auto-rendered SVG chart with R² = 1.0000.
+00:42–00:50  Open the printable QA Report (pages 17–20 layout). Smooth scroll past the summary table.
+00:50–00:60  Click "Decay Table" in the nav. Show the daily date / AKS / activity table for 180 days. Close on "Radiant QuikRAM — HDR program management, precision physics in software."
+
+
+RECORDING NOTES
+
+* Target 1080p, 60–70 second total, MP4 H.264 (matches the other suite videos).
+* Pre-seed the local DB with at least one source model (Nucletron mHDR-v2 or similar — TG-43 params filled), one OUT and one IN source (with realistic cal dates and Sk), one well chamber (HDR1000+ style with N_cal), and one fully-filled HDR Source Exchange so the QA report renders with PASS verdicts and the linearity SVG has the R² readout populated.
+* Use the eval deployment at https://quikram.radiant-mpc.com/ once DNS is live, or local 127.0.0.1:5070 — both look identical.
+* No PHI. No real patient identifiers. Source serial numbers can be realistic but generic.
