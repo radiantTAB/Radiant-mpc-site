@@ -79,6 +79,14 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     var data = {};
     try { data = await res.json(); } catch (ex) {}
     if (res.ok) {
+      // Forced first-login password change short-circuits everything.
+      if (data.must_change_password) {
+        var qsForChange = new URLSearchParams(location.search).get('next');
+        var target = '/portal/change-password.html';
+        if (qsForChange) target += '?next=' + encodeURIComponent(qsForChange);
+        location.href = target;
+        return;
+      }
       // Respect ?next=<path> when the Worker bounced us here. Must be
       // a same-origin path (starts with "/" and not "//") to block
       // open-redirect abuse; otherwise fall back to the portal home.

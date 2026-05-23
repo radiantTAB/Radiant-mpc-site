@@ -30,12 +30,28 @@ import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
 import { handleClientsApi } from "./clients.js";
 import { handlePortalApi, sessionClient, readCookie } from "./portal.js";
+import {
+  handleAdminAuth,
+  adminSession,
+  ensureAdminSchema,
+  requireAdmin,
+} from "./admin-auth.js";
+
+// Admin API endpoints that the admin-auth module handles directly
+// (login, logout, me, change-password). These are PUBLIC for login and
+// then self-gated for the others -- they don't go through requireAdmin.
+const ADMIN_AUTH_PATHS = new Set([
+  "/admin/api/login",
+  "/admin/api/logout",
+  "/admin/api/me",
+  "/admin/api/change-password",
+]);
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    // Public revocation list — not behind Access.
+    // Public revocation list -- not gated.
     if (url.pathname === "/api/revoked") {
       try {
         return await handleRevokedList(env);
@@ -44,7 +60,7 @@ export default {
       }
     }
 
-    // Client portal API — public-facing, with its own session auth.
+    // Client portal API -- has its own email + password session auth.
     if (url.pathname.startsWith("/portal/api/")) {
       try {
         return await handlePortalApi(request, env, url);
@@ -53,21 +69,27 @@ export default {
       }
     }
 
-    // Client Setup API — behind Access (/admin/* is gated).
-    if (
-      url.pathname.startsWith("/admin/api/clients") ||
-      url.pathname.startsWith("/admin/api/locations")
-    ) {
+    // Admin auth endpoints (login / logout / me / change-password).
+    // Routed BEFORE requireAdmin so the login endpoint is reachable.
+    if (ADMIN_AUTH_PATHS.has(url.pathname)) {
       try {
-        return await handleClientsApi(request, env, url);
+        return await handleAdminAuth(request, env, url);
       } catch (err) {
         return json({ error: String((err && err.message) || err) }, 500);
       }
     }
 
-    // License Manager API — behind Access.
+    // Everything else under /admin/api/* requires a signed-in admin.
     if (url.pathname.startsWith("/admin/api/")) {
+      const denied = await requireAdmin(request, env);
+      if (denied) return denied;
       try {
+        if (
+          url.pathname.startsWith("/admin/api/clients") ||
+          url.pathname.startsWith("/admin/api/locations")
+        ) {
+          return await handleClientsApi(request, env, url);
+        }
         return await handleApi(request, env, url);
       } catch (err) {
         return json({ error: String((err && err.message) || err) }, 500);
@@ -108,15 +130,16 @@ function isAppPath(path) {
   );
 }
 
-// Paths on the app hostname that DO NOT require portal/Access auth.
-// Everything else under app.radiant-mpc.com is gated by checkAppAuth().
+// Paths on the app hostname that DO NOT require the customer-portal
+// gate. /admin/* has its OWN gate (admin login -- see gateAdmin below),
+// so it is exempt from the portal check.
 //   /portal/login.html         -- the login page itself
 //   /portal/api/login          -- POST endpoint that creates the session
 //   /portal/api/me             -- session probe used by customer-login.js
 //                                 (returns 401 JSON when no session; the
 //                                 caller-side JS handles that, so we must
 //                                 NOT redirect it to login.html)
-//   /admin/*                   -- Cloudflare Access handles its own auth
+//   /admin/*                   -- separately gated by admin login
 //   shared static assets       -- styles/logo/customer-login.js/assets/
 function isAuthExempt(path) {
   return (
@@ -125,6 +148,15 @@ function isAuthExempt(path) {
     path === "/portal/api/me" ||
     path.startsWith("/admin/") ||
     isSharedAsset(path)
+  );
+}
+
+// Admin-page paths that DO NOT themselves require an admin session
+// (because they ARE the login surface).
+function isAdminAuthExempt(path) {
+  return (
+    path === "/admin/login.html" ||
+    path === "/admin/change-password.html"
   );
 }
 
@@ -161,9 +193,28 @@ async function serveAssets(request, env, url) {
   const isAppHost = host === "app.radiant-mpc.com";
 
   if (isAppHost) {
-    // Auth gate: require portal login (or Cloudflare Access cookie)
-    // for everything except the login page itself + a small allow-list.
-    if (!isAuthExempt(path)) {
+    // Admin pages: own gate, independent of the customer-portal gate.
+    if (path.startsWith("/admin/") && !isAdminAuthExempt(path)) {
+      await ensureAdminSchema(env);
+      const a = await adminSession(request, env);
+      if (!a) {
+        const next = encodeURIComponent(path + url.search);
+        return Response.redirect(
+          "https://app.radiant-mpc.com/admin/login.html?next=" + next,
+          302
+        );
+      }
+      // Signed in but on the default seed credentials -- bounce to the
+      // change-password screen until that is fixed, so the admin UI is
+      // never reachable while the well-known default is still active.
+      if (a.must_change_password && path !== "/admin/change-password.html") {
+        return Response.redirect(
+          "https://app.radiant-mpc.com/admin/change-password.html",
+          302
+        );
+      }
+    } else if (!isAuthExempt(path)) {
+      // Customer-portal gate for the rest of the app surface.
       const ok = await checkAppAuth(request, env);
       if (!ok) {
         const next = encodeURIComponent(path + url.search);
@@ -337,6 +388,34 @@ async function handleApi(request, env, url) {
     const changes = res && res.meta ? res.meta.changes : undefined;
     if (changes === 0) return json({ error: "No license found with that id." }, 404);
     return json({ ok: true, id, revoked: revoking });
+  }
+
+  // DELETE /admin/api/licenses/<id> -- only allowed when the license is
+  // already expired or revoked. Active keys must be revoked first.
+  const md = path.match(/^\/admin\/api\/licenses\/([^/]+)$/);
+  if (md && method === "DELETE") {
+    if (!env.DB) return json({ error: "Database is not connected yet." }, 500);
+    const id = md[1];
+    const row = await env.DB.prepare(
+      "SELECT expires, revoked FROM licenses WHERE id = ?"
+    )
+      .bind(id)
+      .first();
+    if (!row) return json({ error: "No license found with that id." }, 404);
+    const today = todayISO();
+    const eligible = row.revoked || row.expires < today;
+    if (!eligible) {
+      return json(
+        {
+          error:
+            "Only expired or revoked licenses can be deleted. " +
+            "Revoke this key first if you want to remove it.",
+        },
+        400
+      );
+    }
+    await env.DB.prepare("DELETE FROM licenses WHERE id = ?").bind(id).run();
+    return json({ ok: true, id, deleted: true });
   }
 
   return json({ error: "Not found." }, 404);

@@ -119,8 +119,13 @@ export async function handlePortalApi(request, env, url) {
     if (!email || !password) {
       return json({ error: "Enter your email and password." }, 400);
     }
+    // must_change_password may not exist yet on the clients table on
+    // very old DBs -- the admin-auth migration adds it, but coalesce
+    // here too for safety.
     const client = await env.DB.prepare(
-      "SELECT id, password_hash FROM clients " +
+      "SELECT id, password_hash, " +
+        "COALESCE(must_change_password, 0) AS must_change_password " +
+        "FROM clients " +
         "WHERE lower(contact_email) = ? AND password_hash IS NOT NULL"
     )
       .bind(email)
@@ -148,7 +153,50 @@ export async function handlePortalApi(request, env, url) {
       token +
       "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=" +
       SESSION_DAYS * 86400;
-    return json({ ok: true }, 200, { "Set-Cookie": cookie });
+    return json(
+      { ok: true, must_change_password: !!client.must_change_password },
+      200,
+      { "Set-Cookie": cookie }
+    );
+  }
+
+  // ---- POST /portal/api/change-password ----
+  // Lets a signed-in customer rotate their own password. Required for
+  // the first-login flow (must_change_password=1 forces this).
+  if (path === "/portal/api/change-password" && method === "POST") {
+    const session = await sessionClient(request, env);
+    if (!session) return json({ error: "Not signed in." }, 401);
+    const body = await request.json().catch(() => ({}));
+    const current = String(body.current_password || "");
+    const next = String(body.new_password || "");
+    if (next.length < 8) {
+      return json(
+        { error: "New password must be at least 8 characters." },
+        400
+      );
+    }
+    const row = await env.DB.prepare(
+      "SELECT password_hash FROM clients WHERE id = ?"
+    )
+      .bind(session.id)
+      .first();
+    if (!row || !(await verifyPassword(current, row.password_hash))) {
+      return json({ error: "Current password is incorrect." }, 401);
+    }
+    if (next === current) {
+      return json(
+        { error: "New password must differ from the current password." },
+        400
+      );
+    }
+    const newHash = await hashPassword(next);
+    await env.DB.prepare(
+      "UPDATE clients SET password_hash = ?, must_change_password = 0 " +
+        "WHERE id = ?"
+    )
+      .bind(newHash, session.id)
+      .run();
+    return json({ ok: true });
   }
 
   // ---- POST /portal/api/logout ----

@@ -43,6 +43,25 @@ CREATE TABLE IF NOT EXISTS portal_sessions (
   expires_at  TEXT NOT NULL
 );
 
+-- Admin login replaces the Cloudflare Access gate that used to protect
+-- /admin/*. Single-row default seed: username RMPCAdmin / "Password 1"
+-- with must_change_password=1 so it can't be left on the default key.
+CREATE TABLE IF NOT EXISTS admin_users (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  username             TEXT NOT NULL UNIQUE,
+  password_hash        TEXT NOT NULL,
+  must_change_password INTEGER NOT NULL DEFAULT 1,
+  created_at           TEXT NOT NULL,
+  last_login_at        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token       TEXT PRIMARY KEY,
+  admin_id    INTEGER NOT NULL,
+  created_at  TEXT NOT NULL,
+  expires_at  TEXT NOT NULL
+);
+
 -- ============================================================
 -- EXISTING DATABASE — upgrade steps. Run only what you have not
 -- run before.
@@ -55,4 +74,9 @@ CREATE TABLE IF NOT EXISTS portal_sessions (
 --   Client Portal update:
 --     ALTER TABLE clients ADD COLUMN password_hash TEXT;
 --     ...plus CREATE TABLE portal_sessions above.
+--   Forced-password-change + admin auth update:
+--     ALTER TABLE clients ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 1;
+--     ...plus CREATE TABLE admin_users + admin_sessions above.
+--     The Worker also runs these as CREATE IF NOT EXISTS / try-ALTER
+--     on every admin-auth call, so the migration is self-healing.
 -- ============================================================

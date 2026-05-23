@@ -133,6 +133,10 @@ export async function handleClientsApi(request, env, url) {
   }
 
   // ---- POST /admin/api/clients/<id>/password : set or clear portal login ----
+  // Whenever an admin sets (or resets) a customer password, force the
+  // customer to change it themselves on next sign-in. Clearing the
+  // password also clears the flag so it doesn't linger on a disabled
+  // account.
   m = path.match(/^\/admin\/api\/clients\/([^/]+)\/password$/);
   if (m && method === "POST") {
     const body = await request.json().catch(() => ({}));
@@ -145,9 +149,10 @@ export async function handleClientsApi(request, env, url) {
       hash = await hashPassword(password);
     }
     const res = await env.DB.prepare(
-      "UPDATE clients SET password_hash = ? WHERE id = ?"
+      "UPDATE clients SET password_hash = ?, must_change_password = ? " +
+        "WHERE id = ?"
     )
-      .bind(hash, m[1])
+      .bind(hash, hash ? 1 : 0, m[1])
       .run();
     if (res && res.meta && res.meta.changes === 0)
       return json({ error: "Client not found." }, 404);

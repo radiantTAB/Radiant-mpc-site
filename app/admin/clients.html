@@ -135,17 +135,25 @@ img{max-width:100%;display:block}
 
 <!-- Nav -->
 <nav class="nav">
-  <a href="../index.html" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
-    <img src="../radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  <a href="/" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
   </a>
   <div class="nav-links">
-    <a href="../services.html">Services</a>
-    <a href="../products.html">Products</a>
-    <a href="../about.html">About</a>
-    <a href="index.html" class="active">Admin</a>
-    <a href="../contact.html" class="nav-cta">Contact</a>
+    <a href="/">&larr; Launcher</a>
+    <a href="/admin/index.html">Admin Home</a>
+    <a href="/admin/clients.html" class="active">Client Setup</a>
+    <a href="/admin/license-manager.html">License Manager</a>
+    <button type="button" class="nav-cta" onclick="adminSignOut()"
+      style="font:inherit;cursor:pointer;background:transparent">Sign Out</button>
   </div>
 </nav>
+<script>
+function adminSignOut(){
+  fetch('/admin/api/logout', { method:'POST', credentials:'include' })
+    .then(function(){ location.href = '/admin/login.html'; })
+    .catch(function(){ location.href = '/admin/login.html'; });
+}
+</script>
 
 <!-- Hero -->
 <header class="hub-hero-band">
