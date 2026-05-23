@@ -100,6 +100,7 @@ function isSharedAsset(path) {
 function isAppPath(path) {
   return (
     path === "/run.html" ||
+    path === "/downloads.html" ||  // moved under app/ -- gated like the rest
     path.startsWith("/app/") ||
     path.startsWith("/portal/") ||
     path.startsWith("/admin/") ||
