@@ -147,7 +147,9 @@ function isAppPath(path) {
 function isAuthExempt(path) {
   return (
     path === "/portal/login.html" ||
+    path === "/portal/login" ||
     path === "/portal/request-trial.html" ||
+    path === "/portal/request-trial" ||
     path === "/portal/api/login" ||
     path === "/portal/api/me" ||
     path === "/portal/api/trial-request" ||
@@ -244,7 +246,27 @@ async function serveAssets(request, env, url) {
       newPath = "/app" + path;
     }
     const rewritten = new URL(newPath + url.search, url);
-    return env.ASSETS.fetch(new Request(rewritten, request));
+    const resp = await env.ASSETS.fetch(new Request(rewritten, request));
+    // Cloudflare's auto-trailing-slash html_handling redirects /foo.html
+    // to /foo. Because we rewrote the request into the /app/ shadow tree
+    // before fetching, the Location header on that 3xx contains the /app/
+    // prefix -- which would leak into the browser URL bar and immediately
+    // bounce off the customer-portal gate. Strip the prefix so the user
+    // stays on clean public paths.
+    if (resp.status >= 300 && resp.status < 400) {
+      const loc = resp.headers.get("Location");
+      if (loc && loc.startsWith("/app/")) {
+        const stripped = loc.substring(4) || "/";
+        const h = new Headers(resp.headers);
+        h.set("Location", stripped);
+        return new Response(resp.body, {
+          status: resp.status,
+          statusText: resp.statusText,
+          headers: h,
+        });
+      }
+    }
+    return resp;
   }
 
   // Marketing hostname: redirect anything that belongs to the app
