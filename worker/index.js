@@ -107,6 +107,7 @@ export default {
 function isSharedAsset(path) {
   return (
     path === "/customer-login.js" ||
+    path === "/trial-banner.js" ||
     path === "/styles.css" ||
     path === "/radiant-logo.png" ||
     path === "/favicon.ico" ||
@@ -146,8 +147,10 @@ function isAppPath(path) {
 function isAuthExempt(path) {
   return (
     path === "/portal/login.html" ||
+    path === "/portal/request-trial.html" ||
     path === "/portal/api/login" ||
     path === "/portal/api/me" ||
+    path === "/portal/api/trial-request" ||
     path.startsWith("/admin/") ||
     isSharedAsset(path)
   );

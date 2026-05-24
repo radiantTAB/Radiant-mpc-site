@@ -4,11 +4,19 @@
 // for. Mounted at /portal/api/* — NOT behind Cloudflare Access (that gate
 // is admin-only); the portal has its own email + password session auth.
 //
-//   POST /portal/api/login    { email, password }  -> sets a session cookie
-//   GET  /portal/api/me                            -> the client's apps
-//   POST /portal/api/logout                        -> clears the session
+//   POST /portal/api/login         { email, password }       -> sets a session cookie
+//   GET  /portal/api/me                                      -> the client's apps
+//   POST /portal/api/logout                                  -> clears the session
+//   POST /portal/api/trial-request { email, name, practice } -> creates a 14-day trial
+//                                                               client + signed license
+//                                                               + session in one shot
 
-import { PRODUCT_NAMES } from "./products.js";
+import { PRODUCT_NAMES, PRODUCT_IDS } from "./products.js";
+import { signLicense } from "./license-core.js";
+
+// 14-day trial length. Drives both the issued license expiry and the
+// success-page expiry message.
+const TRIAL_DAYS = 14;
 
 const SESSION_DAYS = 30;
 
@@ -197,6 +205,166 @@ export async function handlePortalApi(request, env, url) {
       .bind(newHash, session.id)
       .run();
     return json({ ok: true });
+  }
+
+  // ---- POST /portal/api/trial-request ----
+  // Public, unauthenticated. Creates a fresh trial client (with a 14-day
+  // signed license for the full product set) and signs the visitor in via
+  // the same portal_session cookie that /portal/api/login uses, so they
+  // can land in the launcher immediately. A generated password is returned
+  // in the JSON body once so the visitor can save it for future sign-ins.
+  if (path === "/portal/api/trial-request" && method === "POST") {
+    if (!env.LICENSE_SIGNING_KEY) {
+      return json(
+        { error: "Trial signup is temporarily unavailable. Please email info@Radiant-MPC.com." },
+        500
+      );
+    }
+    const body = await request.json().catch(() => ({}));
+    const email = String(body.email || "").trim().toLowerCase();
+    const name = String(body.name || "").trim();
+    const practice = String(body.practice || "").trim();
+    // Honeypot field: humans won't fill `website`; bots usually do.
+    if (String(body.website || "").trim()) {
+      // Pretend success so the bot moves on without retrying.
+      return json({ ok: true, email, expires: null, password: null });
+    }
+    if (!email || !email.includes("@") || email.length > 254) {
+      return json({ error: "Please provide a valid email address." }, 400);
+    }
+    if (!name || name.length > 200) {
+      return json({ error: "Please provide your name." }, 400);
+    }
+    if (!practice || practice.length > 200) {
+      return json({ error: "Please provide the name of your practice or clinic." }, 400);
+    }
+
+    // Refuse if this email already has an account. This blocks the
+    // common abuse of repeatedly requesting trials to extend access,
+    // and avoids stomping a real customer's record. Existing users go
+    // to /portal/login.html instead.
+    const existing = await env.DB.prepare(
+      "SELECT id FROM clients WHERE lower(contact_email) = ?"
+    )
+      .bind(email)
+      .first();
+    if (existing) {
+      return json(
+        {
+          error:
+            "An account already exists for this email. Sign in at /portal/login.html " +
+            "or email info@Radiant-MPC.com if you need help recovering access.",
+        },
+        409
+      );
+    }
+
+    // Generate a random 16-char hex password. Easy to type, no ambiguous
+    // characters. Customer can change it later via /portal/api/change-password.
+    const password = bytesToHex(crypto.getRandomValues(new Uint8Array(8)));
+    const passwordHash = await hashPassword(password);
+
+    const clientId = "cli_" + bytesToHex(crypto.getRandomValues(new Uint8Array(6)));
+    const locationId = "loc_" + bytesToHex(crypto.getRandomValues(new Uint8Array(6)));
+    const nowIso = new Date().toISOString();
+
+    // 1) Client row. We omit must_change_password from the INSERT because
+    //    that column is added by a later ALTER (see admin-auth.js
+    //    ensureAdminSchema and schema.sql notes) and may not exist on a
+    //    very fresh DB. Letting the column default to 1 means a trial
+    //    user who re-signs-in via /portal/login.html will be bounced to
+    //    change-password.html, which is the appropriate behavior for an
+    //    auto-generated password.
+    await env.DB.prepare(
+      "INSERT INTO clients " +
+        "(id, name, contact_email, notes, password_hash, created_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?)"
+    )
+      .bind(
+        clientId,
+        practice,
+        email,
+        "Self-service trial. Contact: " + name,
+        passwordHash,
+        nowIso
+      )
+      .run();
+
+    // 2) Location row -- /portal/api/me joins licenses to the client through
+    //    locations, so this is required for the trial-license to appear in
+    //    the launcher.
+    await env.DB.prepare(
+      "INSERT INTO locations (id, client_id, name, modules, access_end, notes, created_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?)"
+    )
+      .bind(
+        locationId,
+        clientId,
+        "Trial sandbox",
+        PRODUCT_IDS.join(","),
+        null,
+        "Auto-created by /portal/api/trial-request",
+        nowIso
+      )
+      .run();
+
+    // 3) Issue and store the signed 14-day license for the full product set.
+    let lic;
+    try {
+      lic = await signLicense(env.LICENSE_SIGNING_KEY, practice, TRIAL_DAYS, PRODUCT_IDS);
+    } catch (err) {
+      // Roll back the client + location rows so the email can retry.
+      await env.DB.prepare("DELETE FROM locations WHERE id = ?").bind(locationId).run();
+      await env.DB.prepare("DELETE FROM clients WHERE id = ?").bind(clientId).run();
+      return json(
+        { error: "Could not issue trial license: " + String((err && err.message) || err) },
+        500
+      );
+    }
+    await env.DB.prepare(
+      "INSERT INTO licenses " +
+        "(id, customer, issued, expires, key, created_at, products, location_id) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    )
+      .bind(
+        lic.id,
+        lic.customer,
+        lic.issued,
+        lic.expires,
+        lic.key,
+        nowIso,
+        lic.products.join(","),
+        locationId
+      )
+      .run();
+
+    // 4) Portal session so the customer is signed in immediately. Same
+    //    cookie attributes as /portal/api/login.
+    const sessionToken = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+    const sessionExpires = new Date(Date.now() + SESSION_DAYS * 86400000);
+    await env.DB.prepare(
+      "INSERT INTO portal_sessions (token, client_id, created_at, expires_at) " +
+        "VALUES (?, ?, ?, ?)"
+    )
+      .bind(sessionToken, clientId, nowIso, sessionExpires.toISOString())
+      .run();
+    const cookie =
+      "portal_session=" +
+      sessionToken +
+      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=" +
+      SESSION_DAYS * 86400;
+
+    return json(
+      {
+        ok: true,
+        email: email,
+        password: password,
+        expires: lic.expires,
+        practice: practice,
+      },
+      200,
+      { "Set-Cookie": cookie }
+    );
   }
 
   // ---- POST /portal/api/logout ----
