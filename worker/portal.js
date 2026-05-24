@@ -153,13 +153,15 @@ export async function handlePortalApi(request, env, url) {
       .run();
     // Domain=.radiant-mpc.com lets the same session work on both
     // radiant-mpc.com (where the Customer Login modal lives) and
-    // app.radiant-mpc.com (the launcher / portal pages). The Quik app
-    // subdomains (quikqa., quiklog., …) don't serve /portal/*, so
-    // Path=/portal still scopes the cookie there.
+    // app.radiant-mpc.com (the launcher / portal pages). Path=/ is
+    // required because the launcher root (app.radiant-mpc.com/) and the
+    // embedded apps (/apps/...) are NOT under /portal -- with Path=/portal
+    // the cookie would not be sent for those requests and the auth gate
+    // would bounce signed-in customers back to login.
     const cookie =
       "portal_session=" +
       token +
-      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=" +
+      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/; Max-Age=" +
       SESSION_DAYS * 86400;
     return json(
       { ok: true, must_change_password: !!client.must_change_password },
@@ -351,7 +353,7 @@ export async function handlePortalApi(request, env, url) {
     const cookie =
       "portal_session=" +
       sessionToken +
-      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=" +
+      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/; Max-Age=" +
       SESSION_DAYS * 86400;
 
     return json(
@@ -375,11 +377,19 @@ export async function handlePortalApi(request, env, url) {
         .bind(token)
         .run();
     }
-    // Same Domain/Path so the browser clears the right cookie.
-    return json({ ok: true }, 200, {
-      "Set-Cookie":
-        "portal_session=; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=0",
-    });
+    // Same Domain/Path so the browser clears the right cookie. We also
+    // emit a Path=/portal clear so any stale cookie from the previous
+    // narrower-path scheme is wiped from the browser too.
+    const headers = new Headers({ "content-type": "application/json; charset=utf-8" });
+    headers.append(
+      "Set-Cookie",
+      "portal_session=; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/; Max-Age=0"
+    );
+    headers.append(
+      "Set-Cookie",
+      "portal_session=; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/portal; Max-Age=0"
+    );
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
   }
 
   // ---- GET /portal/api/me ----
