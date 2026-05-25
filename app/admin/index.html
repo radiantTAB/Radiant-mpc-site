@@ -115,6 +115,7 @@ a.prod-card:hover .card-link .ic{transform:translateX(4px)}
 <symbol id="i-grid" viewBox="0 0 24 24"><path d="M3 9h18"/><path d="M6 4v16"/><path d="M12 4v16"/><path d="M18 4v16"/></symbol>
 <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12h0"/></symbol>
 <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></symbol>
+<symbol id="i-headset" viewBox="0 0 24 24"><path d="M4 14a8 8 0 0 1 16 0"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></symbol>
 </svg>
 
 <!-- ===== Nav ===== -->
@@ -179,6 +180,23 @@ function adminSignOut(){
         <h3>Client Setup</h3>
         <p>Manage client organizations and their locations, the modules each location can access, and the time window of that access.</p>
         <span class="card-link">Open Client Setup <svg class="ic"><use href="#i-arrow-right"/></svg></span>
+      </a>
+
+      <!-- Remote Support card.
+           SWAP POINTS when Zoho Assist (or another provider) is configured:
+             1. href      -> your tech console URL, e.g. https://assist.zoho.com/app/dashboard.do
+             2. is-soon   -> remove the class so opacity goes back to 100%
+             3. soon-tag  -> change to "soon-tag soon-tag--live" and text "Available"
+             4. card-link -> change "Set up Remote Support" to "Start Remote Session"
+           If we later move to API-driven session creation, replace the <a> with a
+           <button> that POSTs to a new /admin/api/remote-support endpoint that
+           proxies the provider's "create session" API and returns the join URL. -->
+      <a class="prod-card is-soon" href="https://assist.zoho.com/" target="_blank" rel="noopener">
+        <div class="card-icon"><svg class="ic"><use href="#i-headset"/></svg></div>
+        <span class="soon-tag">Setup pending</span>
+        <h3>Remote Support</h3>
+        <p>Start a screen-share or remote-control session with a customer to help them install Radiant apps, walk through workflows, or debug issues. Provider: Zoho Assist (Standard tier or via Zoho One). Sign up at the linked dashboard, then update the link target in this card.</p>
+        <span class="card-link">Set up Remote Support <svg class="ic"><use href="#i-arrow-right"/></svg></span>
       </a>
 
     </div>
