@@ -47,10 +47,44 @@ const ADMIN_AUTH_PATHS = new Set([
   "/admin/api/change-password",
 ]);
 
+// Defensive HTTP headers applied to every response that leaves the
+// Worker. HSTS forces HTTPS on this and all subdomains for a year
+// (Cloudflare handles cert + redirect; the header just tells the
+// browser to refuse plain HTTP forever after first contact). The rest
+// are low-cost hardening signals that legitimate-site reputation
+// scanners (Norton SafeWeb, Google Safe Browsing) positively weight.
+const SECURITY_HEADERS = {
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "interest-cohort=()",
+};
+
+function withSecurityHeaders(resp) {
+  if (!resp || typeof resp !== "object") return resp;
+  // Don't try to mutate immutable responses (e.g. opaque redirects);
+  // copy into a new Response so we can set headers.
+  const h = new Headers(resp.headers);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    if (!h.has(k)) h.set(k, v);
+  }
+  return new Response(resp.body, {
+    status: resp.status,
+    statusText: resp.statusText,
+    headers: h,
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const resp = await handle(request, env, url);
+    return withSecurityHeaders(resp);
+  },
+};
 
+async function handle(request, env, url) {
     // Public revocation list -- not gated.
     if (url.pathname === "/api/revoked") {
       try {
@@ -98,8 +132,7 @@ export default {
 
     // Everything else: static assets, with hostname-based routing.
     return serveAssets(request, env, url);
-  },
-};
+}
 
 // Paths that always serve from their original root location, regardless
 // of hostname. Customer login + styles + logo need to load on marketing

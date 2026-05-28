@@ -1,0 +1,9 @@
+# Security policy for radiant-mpc.com -- RFC 9116
+# See https://www.rfc-editor.org/rfc/rfc9116
+
+Contact: mailto:tbernath@radiant-mpc.com
+Expires: 2027-05-27T00:00:00Z
+Preferred-Languages: en
+Canonical: https://radiant-mpc.com/.well-known/security.txt
+Policy: https://radiant-mpc.com/security.html
+Acknowledgments: https://radiant-mpc.com/security.html#thanks

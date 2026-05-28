@@ -1,0 +1,21 @@
+# humanstxt.org -- the humans behind the site
+# https://radiant-mpc.com/
+
+/* TEAM */
+Owner / Medical Physicist: Todd Bernath
+Site: https://radiant-mpc.com/
+Contact: tbernath@radiant-mpc.com
+Location: United States
+
+/* SITE */
+Last update: 2026/05/27
+Standards: HTML5, CSS3
+Built with: Cloudflare Workers, GitHub Pages
+Brand: Montserrat + JetBrains Mono · #d00008 / #303030
+
+/* PRODUCTS */
+QuikBolus  -- DICOM-driven bolus generator + mold-design workflow
+QuikQA     -- TG-142 + TG-51 + log-file QA toolkit
+QuikDose   -- Dose-calculation helpers
+QuikCalc   -- General medical-physics calculator suite
+QuikFlow   -- Practice business income + expense tracker

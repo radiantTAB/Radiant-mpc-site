@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security &mdash; Radiant Medical Physics Consulting</title>
+<meta name="description" content="Security policy and responsible-disclosure contact for Radiant Medical Physics Consulting LLC and its software products.">
+<meta name="robots" content="index, follow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/radiant-logo.png">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .legal{max-width:780px;margin:0 auto;padding:50px 24px 64px;line-height:1.65;color:#303030}
+  .legal h1{margin:0 0 6px;font-size:34px;letter-spacing:-.01em}
+  .legal .eyebrow{font-family:var(--mono);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#d00008;margin-bottom:14px}
+  .legal h2{margin:36px 0 12px;font-size:20px;font-weight:700;color:#1a1a1a}
+  .legal p{margin:0 0 14px}
+  .legal ul{margin:0 0 14px;padding-left:22px}
+  .legal li{margin:0 0 8px}
+  .legal .meta{font-family:var(--mono);font-size:12px;color:#5a5a5a;margin:2px 0 30px}
+  .legal a{color:#d00008}
+  .legal code{font-family:var(--mono);font-size:13px;background:#f6f6f8;padding:2px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  </a>
+  <div class="nav-links">
+    <a href="services.html">Services</a>
+    <a href="products.html">Products</a>
+    <a href="about.html">About</a>
+    <a href="contact.html" class="nav-cta">Contact</a>
+  </div>
+</nav>
+
+<main class="legal">
+  <div class="eyebrow">Security</div>
+  <h1>Security policy</h1>
+  <p class="meta">Last updated: 2026-05-27</p>
+
+  <h2>Responsible disclosure</h2>
+  <p>If you've discovered a security issue in any of our products or
+  on our website, please email <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a>
+  with the details. Include reproduction steps where possible. We
+  acknowledge new reports within five business days and aim to confirm
+  remediation within thirty days for non-critical findings.</p>
+
+  <p>Please:</p>
+  <ul>
+    <li>Test only on accounts you own.</li>
+    <li>Do not attempt to access, modify, or destroy any other user's
+    data.</li>
+    <li>Do not run denial-of-service tests.</li>
+    <li>Give us a reasonable window to remediate before public
+    disclosure.</li>
+  </ul>
+
+  <p>Our machine-readable security contact is published per RFC 9116
+  at <code>/.well-known/security.txt</code>.</p>
+
+  <h2>How our stack is hardened</h2>
+  <ul>
+    <li><strong>Edge</strong>: All web traffic terminates HTTPS at
+    Cloudflare with Universal SSL. HTTP requests are 301-redirected to
+    HTTPS. HSTS is asserted on every response.</li>
+    <li><strong>Static surface</strong>: The marketing site
+    (<a href="https://radiant-mpc.com/">radiant-mpc.com</a>) is built
+    from a public GitHub repository and served via GitHub Pages.</li>
+    <li><strong>Customer portal &amp; admin</strong>: Authentication
+    runs in a Cloudflare Worker against a D1 database. Sessions use
+    HttpOnly, Secure, SameSite=Lax cookies. Admin pages are
+    additionally gated behind administrator login with forced
+    initial-password change.</li>
+    <li><strong>License keys</strong>: Issued via the admin console
+    and signed with a Cloudflare-managed signing key. Revocation is
+    enforced both server-side and via a public revocation list that
+    licensed products poll.</li>
+    <li><strong>PHI</strong>: No protected health information is
+    accepted by our products. Users confirm de-identification before
+    each upload; the products operate on de-identified DICOM only.</li>
+  </ul>
+
+  <h2 id="thanks">Acknowledgments</h2>
+  <p>This page will publicly thank reporters of valid issues (with
+  their permission). No reports to acknowledge yet.</p>
+
+  <h2>Contact</h2>
+  <p>Security contact: <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a></p>
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="brand">
+        <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+      </div>
+      <p class="footer-tag">Medical Physics Consulting LLC</p>
+    </div>
+    <div class="footer-meta">
+      <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a>
+      <span>&copy; 2026 Radiant Medical Physics Consulting LLC</span>
+      <span><a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a></span>
+    </div>
+  </div>
+</footer>
+
+<script src="/customer-login.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Sensitive surfaces -- not for indexing
+Disallow: /admin/
+Disallow: /portal/login
+Disallow: /portal/api/
+Disallow: /admin/api/
+
+Sitemap: https://radiant-mpc.com/sitemap.xml
