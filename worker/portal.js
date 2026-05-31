@@ -25,6 +25,10 @@ const SESSION_DAYS = 30;
 const HOSTED_APPS = {
   quikflow: "/apps/quikflow/",
   quikbolus: "https://quikbolus.radiant-mpc.com/",
+  quikqa: "https://quikqa.radiant-mpc.com/",
+  quiklog: "https://quiklog.radiant-mpc.com/",
+  quikram: "https://quikram.radiant-mpc.com/",
+  quikshare: "https://quikshare.radiant-mpc.com/",
 };
 
 function json(data, status = 200, headers) {
