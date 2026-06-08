@@ -601,3 +601,64 @@ a:hover { color: var(--accent-bright); }
   .contact-row .value { text-align: left; }
   .about-photo { float: none; margin: 0 0 32px; width: min(60%, 240px); }
 }
+
+/* ==================  DARK MODE  ==================
+   Toggled by theme-toggle.js setting html[data-theme="dark"].
+   Brand crimson accents stay the same; surfaces + text invert. */
+html[data-theme="dark"] {
+  --bg:        #0b0c10;
+  --bg-elev:   #111319;
+  --bg-card:   #171a22;
+  --line:      #262a33;
+  --line-hi:   #353a45;
+
+  --text:      #f3f4f6;
+  --text-mute: #aeb2bd;
+  --text-dim:  #7e8390;
+
+  --accent:        #f0271d;   /* slightly brighter crimson reads better on dark */
+  --accent-2:      #d00008;
+  --accent-bright: #ff4a3d;
+  --accent-warm:   #f86058;
+}
+html[data-theme="dark"] .nav {
+  background: rgba(11, 12, 16, 0.82);
+  border-bottom-color: var(--line);
+}
+/* red-dot page texture: lift it a touch so it reads on the dark canvas */
+html[data-theme="dark"] body::before {
+  background-image: radial-gradient(circle at 1px 1px, rgba(240, 39, 29, 0.06) 1px, transparent 0);
+}
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .btn-primary:hover { color: #ffffff; }
+
+/* ==================  THEME TOGGLE BUTTON  ================== */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-hi);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-mute);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--accent); }
+.theme-toggle svg { width: 16px; height: 16px; display: block; }
+.theme-toggle .ico-dark { display: inline; }
+.theme-toggle .ico-light { display: none; }
+html[data-theme="dark"] .theme-toggle .ico-dark { display: none; }
+html[data-theme="dark"] .theme-toggle .ico-light { display: inline; }
+.theme-toggle .tt-label::after { content: "Dark"; }
+html[data-theme="dark"] .theme-toggle .tt-label::after { content: "Light"; }
+@media (max-width: 720px) {
+  .theme-toggle .tt-label { display: none; }
+  .theme-toggle { padding: 8px; }
+}
