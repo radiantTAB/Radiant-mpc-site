@@ -28,6 +28,7 @@ const HOSTED_APPS = {
   quikqa: "https://quikqa.radiant-mpc.com/",
   quiklog: "https://quiklog.radiant-mpc.com/",
   quikram: "https://quikram.radiant-mpc.com/",
+  quikprep: "https://quikprep.radiant-mpc.com/",
   quikshare: "https://quikshare.radiant-mpc.com/",
   quikshield: "https://quikshield.radiant-mpc.com/",
   quikcare: "https://quikcare.radiant-mpc.com/",

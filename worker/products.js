@@ -13,6 +13,7 @@ export const RADIANT_PRODUCTS = [
   ["quikcare", "QuikCare"],
   ["quiklog", "QuikLog"],
   ["quikram", "QuikRAM"],
+  ["quikprep", "QuikPrep"],
   ["quikflow", "QuikFlow"],
   ["quikpay", "QuikPay"],
   // QuikDose / QuikScript are coming later — add them here when ready.
