@@ -20,6 +20,10 @@ import { hashPassword } from "./portal.js";
 const SESSION_DAYS = 14; // hard cap (absolute lifetime) of an admin session row
 const IDLE_MINUTES = 30; // idle timeout -- re-login required after inactivity
 const IDLE_MS = IDLE_MINUTES * 60 * 1000;
+// Any admin session created before this instant is rejected (force re-login
+// for sessions issued before the session-cookie change). Bump to "now" to
+// invalidate every existing admin login at once.
+const SESSION_EPOCH = "2026-06-11T23:34:45Z";
 const DEFAULT_USERNAME = "RMPCAdmin";
 const DEFAULT_PASSWORD = "Password 1";
 const MIN_PASSWORD_LEN = 8;
@@ -134,7 +138,7 @@ export async function adminSession(request, env) {
   const token = readCookieFromRequest(request, "admin_session");
   if (!token) return null;
   const row = await env.DB.prepare(
-    "SELECT s.admin_id, s.expires_at, s.last_seen, u.username, u.must_change_password " +
+    "SELECT s.admin_id, s.created_at, s.expires_at, s.last_seen, u.username, u.must_change_password " +
       "FROM admin_sessions s JOIN admin_users u ON u.id = s.admin_id " +
       "WHERE s.token = ?"
   )
@@ -142,6 +146,13 @@ export async function adminSession(request, env) {
     .first();
   if (!row) return null;
   const now = Date.now();
+  // Pre-epoch sessions (issued before the session-cookie change) are dead.
+  if (row.created_at && row.created_at < SESSION_EPOCH) {
+    await env.DB.prepare("DELETE FROM admin_sessions WHERE token = ?")
+      .bind(token)
+      .run();
+    return null;
+  }
   if (row.expires_at < new Date(now).toISOString()) {
     await env.DB.prepare("DELETE FROM admin_sessions WHERE token = ?")
       .bind(token)

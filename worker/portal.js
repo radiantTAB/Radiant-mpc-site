@@ -28,6 +28,13 @@ const SESSION_DAYS = 30;
 const IDLE_MINUTES = 30;
 const IDLE_MS = IDLE_MINUTES * 60 * 1000;
 
+// Session epoch. Any session row created BEFORE this instant is rejected --
+// this force-logs-out every client who was already signed in when the
+// session-cookie + idle change shipped (their browsers still carry the old
+// persistent 30-day cookie, which closing the browser would not drop). Bump
+// this to "now" whenever you need to invalidate every existing login at once.
+const SESSION_EPOCH = "2026-06-11T23:34:45Z";
+
 // Lazy one-time guard to add the last_seen column used for idle tracking.
 let _portalSchemaReady = false;
 async function ensurePortalSchema(env) {
@@ -137,13 +144,20 @@ export async function sessionClient(request, env) {
   if (!token) return null;
   await ensurePortalSchema(env);
   const row = await env.DB.prepare(
-    "SELECT s.client_id, s.expires_at, s.last_seen, c.name FROM portal_sessions s " +
+    "SELECT s.client_id, s.created_at, s.expires_at, s.last_seen, c.name FROM portal_sessions s " +
       "JOIN clients c ON c.id = s.client_id WHERE s.token = ?"
   )
     .bind(token)
     .first();
   if (!row) return null;
   const now = Date.now();
+  // Pre-epoch sessions (issued before the session-cookie change) are dead.
+  if (row.created_at && row.created_at < SESSION_EPOCH) {
+    await env.DB.prepare("DELETE FROM portal_sessions WHERE token = ?")
+      .bind(token)
+      .run();
+    return null;
+  }
   // Hard expiry (absolute cap).
   if (row.expires_at < new Date(now).toISOString()) {
     await env.DB.prepare("DELETE FROM portal_sessions WHERE token = ?")
