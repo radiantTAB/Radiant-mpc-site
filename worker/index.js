@@ -140,6 +140,7 @@ async function handle(request, env, url) {
 function isSharedAsset(path) {
   return (
     path === "/customer-login.js" ||
+    path === "/session-guard.js" ||
     path === "/trial-banner.js" ||
     path === "/styles.css" ||
     path === "/bold.css" ||

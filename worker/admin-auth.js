@@ -18,7 +18,7 @@
 import { hashPassword } from "./portal.js";
 
 const SESSION_DAYS = 14; // hard cap (absolute lifetime) of an admin session row
-const IDLE_MINUTES = 30; // idle timeout -- re-login required after inactivity
+const IDLE_MINUTES = 15; // idle timeout -- re-login required after inactivity
 const IDLE_MS = IDLE_MINUTES * 60 * 1000;
 // Any admin session created before this instant is rejected (force re-login
 // for sessions issued before the session-cookie change). Bump to "now" to

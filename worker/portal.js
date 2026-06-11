@@ -25,7 +25,7 @@ const SESSION_DAYS = 30;
 // Idle timeout: a session is invalidated after this many minutes with no
 // activity. Enforced lazily on the next request through the gate, so an
 // idle client is bounced to login the moment they come back.
-const IDLE_MINUTES = 30;
+const IDLE_MINUTES = 15;
 const IDLE_MS = IDLE_MINUTES * 60 * 1000;
 
 // Session epoch. Any session row created BEFORE this instant is rejected --
