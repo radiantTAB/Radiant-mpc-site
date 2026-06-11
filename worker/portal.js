@@ -18,7 +18,36 @@ import { signLicense } from "./license-core.js";
 // success-page expiry message.
 const TRIAL_DAYS = 14;
 
+// Hard cap on a session row's lifetime (server-side). The browser cookie
+// itself is now a SESSION cookie (no Max-Age) so it is discarded when the
+// browser fully closes -- forcing a fresh login on relaunch.
 const SESSION_DAYS = 30;
+// Idle timeout: a session is invalidated after this many minutes with no
+// activity. Enforced lazily on the next request through the gate, so an
+// idle client is bounced to login the moment they come back.
+const IDLE_MINUTES = 30;
+const IDLE_MS = IDLE_MINUTES * 60 * 1000;
+
+// Lazy one-time guard to add the last_seen column used for idle tracking.
+let _portalSchemaReady = false;
+async function ensurePortalSchema(env) {
+  if (_portalSchemaReady || !env.DB) return;
+  try {
+    await env.DB.prepare(
+      "ALTER TABLE portal_sessions ADD COLUMN last_seen TEXT"
+    ).run();
+  } catch (_) {
+    // Column already exists -- fine.
+  }
+  _portalSchemaReady = true;
+}
+
+// Session cookie attributes shared by login + trial-request. No Max-Age /
+// Expires => the browser treats it as a session cookie and drops it when the
+// browser closes. Domain=.radiant-mpc.com so it works on both the marketing
+// host and app.radiant-mpc.com; Path=/ so it accompanies every app request.
+const SESSION_COOKIE_ATTRS =
+  "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/";
 
 // Apps that are hosted web apps a client can launch in a browser.
 // Anything not listed is a desktop app (download + key).
@@ -106,24 +135,44 @@ function todayISO() {
 export async function sessionClient(request, env) {
   const token = readCookie(request, "portal_session");
   if (!token) return null;
+  await ensurePortalSchema(env);
   const row = await env.DB.prepare(
-    "SELECT s.client_id, s.expires_at, c.name FROM portal_sessions s " +
+    "SELECT s.client_id, s.expires_at, s.last_seen, c.name FROM portal_sessions s " +
       "JOIN clients c ON c.id = s.client_id WHERE s.token = ?"
   )
     .bind(token)
     .first();
   if (!row) return null;
-  if (row.expires_at < new Date().toISOString()) {
+  const now = Date.now();
+  // Hard expiry (absolute cap).
+  if (row.expires_at < new Date(now).toISOString()) {
     await env.DB.prepare("DELETE FROM portal_sessions WHERE token = ?")
       .bind(token)
       .run();
     return null;
+  }
+  // Idle timeout: too long since the last activity -> invalidate.
+  const last = row.last_seen ? Date.parse(row.last_seen) : null;
+  if (last && now - last > IDLE_MS) {
+    await env.DB.prepare("DELETE FROM portal_sessions WHERE token = ?")
+      .bind(token)
+      .run();
+    return null;
+  }
+  // Throttled activity touch (avoid a write on every single request).
+  if (!last || now - last > 60000) {
+    await env.DB.prepare(
+      "UPDATE portal_sessions SET last_seen = ? WHERE token = ?"
+    )
+      .bind(new Date(now).toISOString(), token)
+      .run();
   }
   return { id: row.client_id, name: row.name };
 }
 
 export async function handlePortalApi(request, env, url) {
   if (!env.DB) return json({ error: "Database is not connected." }, 500);
+  await ensurePortalSchema(env);
   const path = url.pathname;
   const method = request.method;
 
@@ -154,23 +203,14 @@ export async function handlePortalApi(request, env, url) {
     const now = new Date();
     const expires = new Date(now.getTime() + SESSION_DAYS * 86400000);
     await env.DB.prepare(
-      "INSERT INTO portal_sessions (token, client_id, created_at, expires_at) " +
-        "VALUES (?, ?, ?, ?)"
+      "INSERT INTO portal_sessions (token, client_id, created_at, expires_at, last_seen) " +
+        "VALUES (?, ?, ?, ?, ?)"
     )
-      .bind(token, client.id, now.toISOString(), expires.toISOString())
+      .bind(token, client.id, now.toISOString(), expires.toISOString(), now.toISOString())
       .run();
-    // Domain=.radiant-mpc.com lets the same session work on both
-    // radiant-mpc.com (where the Customer Login modal lives) and
-    // app.radiant-mpc.com (the launcher / portal pages). Path=/ is
-    // required because the launcher root (app.radiant-mpc.com/) and the
-    // embedded apps (/apps/...) are NOT under /portal -- with Path=/portal
-    // the cookie would not be sent for those requests and the auth gate
-    // would bounce signed-in customers back to login.
-    const cookie =
-      "portal_session=" +
-      token +
-      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/; Max-Age=" +
-      SESSION_DAYS * 86400;
+    // SESSION cookie (no Max-Age) so it is dropped on browser close and the
+    // client must sign in again on relaunch. See SESSION_COOKIE_ATTRS.
+    const cookie = "portal_session=" + token + SESSION_COOKIE_ATTRS;
     return json(
       { ok: true, must_change_password: !!client.must_change_password },
       200,
@@ -353,16 +393,13 @@ export async function handlePortalApi(request, env, url) {
     const sessionToken = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
     const sessionExpires = new Date(Date.now() + SESSION_DAYS * 86400000);
     await env.DB.prepare(
-      "INSERT INTO portal_sessions (token, client_id, created_at, expires_at) " +
-        "VALUES (?, ?, ?, ?)"
+      "INSERT INTO portal_sessions (token, client_id, created_at, expires_at, last_seen) " +
+        "VALUES (?, ?, ?, ?, ?)"
     )
-      .bind(sessionToken, clientId, nowIso, sessionExpires.toISOString())
+      .bind(sessionToken, clientId, nowIso, sessionExpires.toISOString(), nowIso)
       .run();
-    const cookie =
-      "portal_session=" +
-      sessionToken +
-      "; HttpOnly; Secure; SameSite=Lax; Domain=.radiant-mpc.com; Path=/; Max-Age=" +
-      SESSION_DAYS * 86400;
+    // SESSION cookie (no Max-Age) -- dropped on browser close.
+    const cookie = "portal_session=" + sessionToken + SESSION_COOKIE_ATTRS;
 
     return json(
       {

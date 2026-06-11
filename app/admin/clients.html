@@ -12,11 +12,11 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#ffffff;--bg-elev:#fafafa;--bg-card:#f4f4f5;
-  --line:#e6e6e8;--line-hi:#cdcdd1;
-  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
-  --accent:#d00008;--accent-2:#a80006;--accent-bright:#f03020;--accent-warm:#f86058;
-  --ok:#1a7f37;
+  --bg:#070709;--bg-elev:#0e0f14;--bg-card:#15171f;
+  --line:rgba(255,255,255,.08);--line-hi:rgba(255,255,255,.16);
+  --text:#f6f7f9;--text-mute:#b0b3bd;--text-dim:#777b87;
+  --accent:#f0271d;--accent-2:#d00008;--accent-bright:#ff4a3d;--accent-warm:#f86058;
+  --charcoal:#15171f;--ok:#3fb950;
   --font-display:'Montserrat',system-ui,sans-serif;
   --font-body:'Montserrat',system-ui,sans-serif;
   --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
@@ -32,7 +32,7 @@ img{max-width:100%;display:block}
 .svg-defs{position:absolute;width:0;height:0;overflow:hidden}
 
 /* Nav */
-.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:22px var(--pad-x);background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:22px var(--pad-x);background:rgba(7,7,9,.7);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .brand{display:inline-flex;align-items:center;gap:10px}
 .brand-logo{height:160px;width:auto;display:block}
 .nav-links{display:flex;align-items:center;gap:32px}
@@ -122,6 +122,19 @@ img{max-width:100%;display:block}
   .brand-logo{height:96px}
   .loc{flex-direction:column}
 }
+
+/* --- Bold dark surface polish (appended) --- */
+.card,.lm-card,.client-card,.dl-card,.guide-card,.gate-card,.result,.creds,.notice,.app-head,.client-head{background:var(--bg-card)!important}
+.field input,.field textarea,.field select,.gate-input,.inp,input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],textarea,select{background:rgba(255,255,255,.04);color:var(--text);border-color:var(--line-hi)}
+.field input:focus,.gate-input:focus,.inp:focus,input:focus,textarea:focus,select:focus{background:rgba(255,255,255,.07);border-color:var(--accent);outline:none}
+table th{color:var(--text-dim)}
+
+
+/* --- dark contrast corrections --- */
+.notice,.warn{background:rgba(240,196,116,.10)!important;border:1px solid rgba(240,196,116,.35)!important;color:#f0d28a!important}
+.notice a,.warn a{color:#ffd98a!important}
+code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!important;border-color:var(--line-hi)!important;color:var(--text)!important}
+
 </style>
 </head>
 <body>
@@ -136,7 +149,7 @@ img{max-width:100%;display:block}
 <!-- Nav -->
 <nav class="nav">
   <a href="/" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
-    <img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+    <img src="/radiant-logo-black.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
   </a>
   <div class="nav-links">
     <a href="/">&larr; Launcher</a>

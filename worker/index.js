@@ -142,7 +142,10 @@ function isSharedAsset(path) {
     path === "/customer-login.js" ||
     path === "/trial-banner.js" ||
     path === "/styles.css" ||
+    path === "/bold.css" ||
+    path === "/bold.js" ||
     path === "/radiant-logo.png" ||
+    path === "/radiant-logo-black.png" ||
     path === "/favicon.ico" ||
     path === "/favicon.png" ||
     path === "/CNAME" ||

@@ -9,47 +9,28 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" href="/radiant-logo.png">
+<link rel="stylesheet" href="/bold.css">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#ffffff;--bg-elev:#fafafa;--line:#e6e6e8;--line-hi:#cdcdd1;
-  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
-  --accent:#d00008;--accent-2:#a80006;
-}
-body{background:var(--bg-elev);color:var(--text);
-  font-family:'Montserrat',system-ui,sans-serif;font-size:16px;line-height:1.6;
-  -webkit-font-smoothing:antialiased;min-height:100vh;
-  display:flex;align-items:center;justify-content:center;padding:40px 20px}
-body::before{content:'';position:fixed;inset:0;
-  background-image:radial-gradient(circle at 1px 1px,rgba(208,0,8,.04) 1px,transparent 0);
-  background-size:32px 32px;pointer-events:none}
-img{max-width:100%;display:block}
-.card{position:relative;width:100%;max-width:400px;background:var(--bg);
-  border:1px solid var(--line);border-top:3px solid var(--accent);
-  padding:40px 36px;text-align:center}
-.logo{height:120px;width:auto;margin:0 auto 18px}
-h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
-.sub{font-size:14px;color:var(--text-mute);margin-bottom:28px}
-.tag{display:inline-block;font:600 10.5px 'JetBrains Mono',monospace;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
-  background:rgba(208,0,8,.07);padding:4px 10px;border-radius:4px;margin-bottom:16px}
+/* Admin sign-in — Bold · Radiant Field (inherits bold.css dark tokens) */
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;
+  background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(240,39,29,.12),transparent 60%),var(--bg)}
+.card{position:relative;width:100%;max-width:420px;background:linear-gradient(180deg,var(--bg-2),var(--bg-3));
+  border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:18px;padding:40px 36px;text-align:center;
+  box-shadow:0 40px 90px -40px rgba(0,0,0,.95)}
+.logo{height:96px;width:auto;margin:0 auto 18px}
+h1{font-family:var(--font-display);font-size:24px;font-weight:900;letter-spacing:-.02em;color:#fff;text-transform:uppercase}
+.sub{font-size:14px;color:var(--ink-2);margin-bottom:28px}
+.tag{display:inline-block;font:600 10.5px 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);background:rgba(240,39,29,.12);border:1px solid rgba(240,39,29,.35);padding:4px 10px;border-radius:6px;margin-bottom:16px}
 .field{margin-bottom:16px;text-align:left}
-.field label{display:block;font-size:12px;font-weight:700;
-  text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);
-  margin-bottom:7px}
-.field input{width:100%;font-family:inherit;font-size:15px;padding:12px 14px;
-  border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text)}
-.field input:focus{outline:none;border-color:var(--accent);background:var(--bg)}
-.btn{display:inline-flex;align-items:center;justify-content:center;width:100%;
-  gap:8px;padding:13px 24px;font-size:14px;font-weight:700;letter-spacing:.05em;
-  text-transform:uppercase;border-radius:999px;border:1px solid transparent;
-  cursor:pointer;transition:background .2s;margin-top:6px;
-  background:var(--accent);color:#fff}
-.btn:hover{background:var(--accent-2)}
+.field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin-bottom:7px}
+.field input{width:100%;font-family:var(--font-body);font-size:15px;padding:12px 14px;border:1px solid var(--line-hi);border-radius:8px;background:rgba(255,255,255,.04);color:var(--text)}
+.field input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,.07)}
+.card .btn{width:100%;justify-content:center;margin-top:6px;background:var(--red);color:#fff;border-color:transparent}
+.card .btn:hover{background:#ff3a30;color:#fff;transform:translateY(-2px);box-shadow:0 16px 40px -10px rgba(240,39,29,.75)}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .msg{margin-top:14px;font-size:13.5px;font-weight:600;min-height:18px;color:var(--accent)}
-.hint{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);
-  font-size:12.5px;color:var(--text-dim)}
+.hint{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-3)}
 </style>
 </head>
 <body>

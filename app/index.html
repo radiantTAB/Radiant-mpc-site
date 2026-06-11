@@ -23,115 +23,7 @@
      <a class="btn btn-primary" href="https://quikcalc.radiant-mpc.com/">...
   ===================================================================
 -->
-<style>
-/* ===== Radiant Software Suite — shared embedded stylesheet (light theme) ===== */
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#ffffff;--bg-elev:#fafafa;--bg-card:#f4f4f5;
-  --line:#e6e6e8;--line-hi:#cdcdd1;
-  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
-  --accent:#d00008;--accent-2:#a80006;--accent-bright:#f03020;--accent-warm:#f86058;
-  --charcoal:#303030;
-  --font-display:'Montserrat',system-ui,sans-serif;
-  --font-body:'Montserrat',system-ui,sans-serif;
-  --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
-  --max-w:1180px;--pad-x:clamp(20px,5vw,64px);
-}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:17px;font-weight:400;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(208,0,8,.035) 1px,transparent 0);background-size:32px 32px;pointer-events:none;z-index:0}
-a{color:var(--accent);text-decoration:none;transition:color .2s}
-a:hover{color:var(--accent-bright)}
-img{max-width:100%;display:block}
-.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-.svg-defs{position:absolute;width:0;height:0;overflow:hidden}
-
-/* ---- Nav ---- */
-.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:22px var(--pad-x);background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.brand{display:inline-flex;align-items:center;gap:10px}
-.brand-logo{height:160px;width:auto;display:block}
-.nav-links{display:flex;align-items:center;gap:32px}
-.nav-links a{color:var(--text-mute);font-size:14px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
-.nav-links a:hover{color:var(--text)}
-.nav-links a.active{color:var(--accent)}
-.nav-cta{padding:9px 18px;border:1px solid var(--line-hi);border-radius:999px;color:var(--text)!important;transition:all .2s}
-.nav-cta:hover{border-color:var(--accent);color:var(--accent)!important;background:rgba(208,0,8,.06)}
-
-/* ---- Buttons ---- */
-.btn{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;font-family:var(--font-body);font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;transition:all .2s;border:1px solid transparent;cursor:pointer}
-.btn .ic{width:17px;height:17px}
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:var(--accent-2);color:#fff;transform:translateY(-1px);box-shadow:0 8px 24px rgba(208,0,8,.25)}
-.btn-ghost{color:var(--text);border-color:var(--line-hi)}
-.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
-
-/* ---- Hub hero banner ---- */
-.hub-hero-band{position:relative;z-index:2;background:var(--bg-elev);border-bottom:1px solid var(--line);overflow:hidden}
-.hub-hero{max-width:860px;margin:0 auto;text-align:center;padding:88px var(--pad-x) 78px}
-.eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-mute);margin-bottom:28px}
-.eyebrow-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px rgba(208,0,8,.4)}
-.hub-hero h1{font-family:var(--font-display);font-weight:800;font-size:clamp(38px,6vw,66px);line-height:1.05;letter-spacing:-.025em;margin-bottom:24px}
-.hub-hero h1 em{display:block;font-style:italic;color:var(--accent);font-weight:500;font-size:.62em;margin-top:10px}
-.hub-hero p{font-size:20px;color:var(--text-mute);line-height:1.55;max-width:660px;margin:0 auto}
-
-/* ---- Sections ---- */
-.section{padding:80px var(--pad-x);position:relative;z-index:2}
-.section.alt{background:var(--bg-elev);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.section-inner{max-width:var(--max-w);margin:0 auto}
-.section-head{margin-bottom:40px}
-.section-kicker{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);margin-bottom:16px}
-.section-kicker .ic{width:16px;height:16px}
-.section-head h2{font-family:var(--font-display);font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
-.section-head p{color:var(--text-mute);max-width:640px}
-
-/* ---- Card grid ---- */
-.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px}
-.prod-card{display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--line);border-top:3px solid var(--accent);padding:30px;transition:all .3s}
-.section.alt .prod-card{background:var(--bg)}
-.prod-card:hover{border-color:var(--line-hi);border-top-color:var(--accent-warm);transform:translateY(-3px);box-shadow:0 14px 32px rgba(48,48,48,.09)}
-.card-icon{width:54px;height:54px;border-radius:12px;background:rgba(208,0,8,.07);display:flex;align-items:center;justify-content:center;margin-bottom:20px}
-.card-icon .ic{width:27px;height:27px;color:var(--accent)}
-.prod-card h3{font-family:var(--font-display);font-size:21px;font-weight:700;margin-bottom:10px;color:var(--text)}
-.prod-card>p{font-size:14.5px;color:var(--text-mute);line-height:1.55;margin-bottom:22px;flex:1}
-
-/* ---- Launch portal additions ---- */
-.note{border:1px solid var(--line);border-left:3px solid var(--accent-warm);background:var(--bg-elev);padding:20px 24px;display:flex;gap:14px;align-items:flex-start;margin-bottom:42px}
-.note .ic{width:22px;height:22px;color:var(--accent-warm);margin-top:1px}
-.note p{font-size:14px;color:var(--text-mute);margin:0;line-height:1.6}
-.app-card{scroll-margin-top:130px}
-.app-card:target{border-top-color:var(--accent-bright);box-shadow:0 0 0 2px rgba(208,0,8,.55),0 14px 32px rgba(208,0,8,.18)}
-.app-meta{display:inline-flex;align-items:center;gap:7px;margin-bottom:14px;font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--text-dim)}
-.lic-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.app-card .btn{margin-top:auto;width:100%;justify-content:center}
-
-/* ---- CTA band ---- */
-.cta-band{background:var(--charcoal);color:#fff;text-align:center;padding:84px var(--pad-x);position:relative;z-index:2}
-.cta-band h2{font-family:var(--font-display);font-size:clamp(28px,4vw,42px);font-weight:700;color:#fff;margin-bottom:16px;letter-spacing:-.02em}
-.cta-band p{color:rgba(255,255,255,.72);max-width:540px;margin:0 auto 32px}
-.cta-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.cta-band .btn-ghost{color:#fff;border-color:rgba(255,255,255,.32)}
-.cta-band .btn-ghost:hover{border-color:#fff;color:#fff;background:rgba(255,255,255,.08)}
-
-/* ---- Footer ---- */
-.footer{padding:48px var(--pad-x);border-top:1px solid var(--line);background:var(--bg-elev);position:relative;z-index:2}
-.footer-inner{max-width:var(--max-w);margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:32px}
-.footer .brand-logo{height:80px}
-.footer-tag{color:var(--text-dim);font-size:13px;margin-top:6px}
-.footer-meta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:13px;color:var(--text-dim)}
-.footer-meta a{color:var(--text-mute)}
-.footer-meta a:hover{color:var(--accent)}
-
-/* ---- Responsive ---- */
-@media(max-width:720px){
-  .nav-links{gap:16px}
-  .nav-links a:not(.nav-cta){display:none}
-  .brand-logo{height:96px}
-  .footer .brand-logo{height:54px}
-  .footer-inner{flex-direction:column;align-items:flex-start}
-  .footer-meta{align-items:flex-start}
-  .hub-hero,.section{padding-left:var(--pad-x);padding-right:var(--pad-x)}
-}
-</style>
+<link rel="stylesheet" href="/bold.css">
 </head>
 <body>
 
@@ -156,7 +48,7 @@ img{max-width:100%;display:block}
 <!-- ===== Nav ===== -->
 <nav class="nav">
   <a href="https://radiant-mpc.com/" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
-    <img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+    <img src="/radiant-logo-black.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
   </a>
   <div class="nav-links">
     <a href="https://radiant-mpc.com/services.html">Services</a>
@@ -317,7 +209,7 @@ img{max-width:100%;display:block}
   <div class="footer-inner">
     <div class="footer-brand">
       <div class="brand">
-        <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+        <img src="/radiant-logo-black.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
       </div>
       <p class="footer-tag">Medical Physics Consulting LLC</p>
     </div>

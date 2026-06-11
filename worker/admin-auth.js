@@ -17,7 +17,9 @@
 
 import { hashPassword } from "./portal.js";
 
-const SESSION_DAYS = 14; // admin sessions shorter than the portal's 30
+const SESSION_DAYS = 14; // hard cap (absolute lifetime) of an admin session row
+const IDLE_MINUTES = 30; // idle timeout -- re-login required after inactivity
+const IDLE_MS = IDLE_MINUTES * 60 * 1000;
 const DEFAULT_USERNAME = "RMPCAdmin";
 const DEFAULT_PASSWORD = "Password 1";
 const MIN_PASSWORD_LEN = 8;
@@ -97,6 +99,15 @@ export async function ensureAdminSchema(env) {
     // column already exists -- fine.
   }
 
+  // last_seen on admin_sessions drives the idle timeout. Guarded ALTER.
+  try {
+    await env.DB.prepare(
+      "ALTER TABLE admin_sessions ADD COLUMN last_seen TEXT"
+    ).run();
+  } catch (_) {
+    // column already exists -- fine.
+  }
+
   // Lazy seed of the default admin user if nothing is there yet.
   const row = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM admin_users"
@@ -123,18 +134,33 @@ export async function adminSession(request, env) {
   const token = readCookieFromRequest(request, "admin_session");
   if (!token) return null;
   const row = await env.DB.prepare(
-    "SELECT s.admin_id, s.expires_at, u.username, u.must_change_password " +
+    "SELECT s.admin_id, s.expires_at, s.last_seen, u.username, u.must_change_password " +
       "FROM admin_sessions s JOIN admin_users u ON u.id = s.admin_id " +
       "WHERE s.token = ?"
   )
     .bind(token)
     .first();
   if (!row) return null;
-  if (row.expires_at < new Date().toISOString()) {
+  const now = Date.now();
+  if (row.expires_at < new Date(now).toISOString()) {
     await env.DB.prepare("DELETE FROM admin_sessions WHERE token = ?")
       .bind(token)
       .run();
     return null;
+  }
+  // Idle timeout.
+  const last = row.last_seen ? Date.parse(row.last_seen) : null;
+  if (last && now - last > IDLE_MS) {
+    await env.DB.prepare("DELETE FROM admin_sessions WHERE token = ?")
+      .bind(token)
+      .run();
+    return null;
+  }
+  // Throttled activity touch.
+  if (!last || now - last > 60000) {
+    await env.DB.prepare("UPDATE admin_sessions SET last_seen = ? WHERE token = ?")
+      .bind(new Date(now).toISOString(), token)
+      .run();
   }
   return {
     id: row.admin_id,
@@ -143,17 +169,14 @@ export async function adminSession(request, env) {
   };
 }
 
-function sessionCookie(token, maxAgeSeconds) {
-  // Path=/ so the cookie accompanies requests to product pages and the
-  // launcher (admin should pass through the customer-portal gate too,
-  // for demo/training access). Domain is intentionally omitted -- admin
-  // login lives only on app.radiant-mpc.com, never on customer-facing
-  // subdomains.
+function sessionCookie(token) {
+  // SESSION cookie (no Max-Age) so it is discarded when the browser closes,
+  // forcing a fresh admin login on relaunch. Path=/ so the cookie also
+  // accompanies launcher / product requests (admin passes the customer
+  // gate for demo/training). Domain is intentionally omitted -- admin login
+  // lives only on app.radiant-mpc.com.
   return (
-    "admin_session=" +
-    token +
-    "; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=" +
-    maxAgeSeconds
+    "admin_session=" + token + "; HttpOnly; Secure; SameSite=Lax; Path=/"
   );
 }
 
@@ -188,10 +211,10 @@ export async function handleAdminAuth(request, env, url) {
     const now = new Date();
     const expires = new Date(now.getTime() + SESSION_DAYS * 86400000);
     await env.DB.prepare(
-      "INSERT INTO admin_sessions (token, admin_id, created_at, expires_at) " +
-        "VALUES (?, ?, ?, ?)"
+      "INSERT INTO admin_sessions (token, admin_id, created_at, expires_at, last_seen) " +
+        "VALUES (?, ?, ?, ?, ?)"
     )
-      .bind(token, u.id, now.toISOString(), expires.toISOString())
+      .bind(token, u.id, now.toISOString(), expires.toISOString(), now.toISOString())
       .run();
     await env.DB.prepare(
       "UPDATE admin_users SET last_login_at = ? WHERE id = ?"
@@ -202,7 +225,7 @@ export async function handleAdminAuth(request, env, url) {
     return json(
       { ok: true, must_change_password: !!u.must_change_password },
       200,
-      { "Set-Cookie": sessionCookie(token, SESSION_DAYS * 86400) }
+      { "Set-Cookie": sessionCookie(token) }
     );
   }
 
@@ -217,7 +240,10 @@ export async function handleAdminAuth(request, env, url) {
     // Emit both a Path=/ and a Path=/admin clear so any stale cookie
     // from the previous narrower-path scheme is also wiped from the browser.
     const headers = new Headers({ "content-type": "application/json; charset=utf-8" });
-    headers.append("Set-Cookie", sessionCookie("", 0));
+    headers.append(
+      "Set-Cookie",
+      "admin_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
+    );
     headers.append(
       "Set-Cookie",
       "admin_session=; HttpOnly; Secure; SameSite=Lax; Path=/admin; Max-Age=0"

@@ -4,97 +4,177 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Radiant Medical Physics Consulting</title>
-<meta name="description" content="Independent medical physics consulting — Eclipse/ESAPI scripting, portal dosimetry commissioning, plan QA, and regulatory support for radiation oncology programs.">
+<meta name="description" content="Independent medical physics consulting — Eclipse/ESAPI scripting, portal dosimetry commissioning, plan QA, and regulatory support for radiation oncology programs — plus the Radiant Quik software suite.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" href="/radiant-logo.png">
-<link rel="stylesheet" href="styles.css">
-<script src="theme-toggle.js"></script>
+<link rel="stylesheet" href="bold.css">
 </head>
 <body>
 
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="left"><span class="dot"></span>Now accepting Q3 2026 consulting engagements — Ohio &amp; remote</span>
+    <span><a href="https://app.radiant-mpc.com" class="nav-login">Client login ↗</a> &nbsp;·&nbsp; <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a></span>
+  </div>
+</div>
+
 <!-- Nav -->
 <nav class="nav">
-  <a href="index.html" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
-    <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  <a class="brand" href="index.html" aria-label="Radiant Medical Physics Consulting LLC">
+    <img class="brand-logo" src="radiant-logo-black.png" alt="Radiant Medical Physics Consulting LLC">
   </a>
   <div class="nav-links">
-    <a href="services.html">Services</a>
-    <a href="products.html">Products</a>
+    <a href="#services">Services</a>
+    <a href="#suite">Suite</a>
     <a href="about.html">About</a>
+    <a href="products.html">Products</a>
     <a href="contact.html" class="nav-cta">Contact</a>
   </div>
 </nav>
 
-<!-- Hero -->
-<header class="hero">
-  <div class="hero-grid">
-    <div class="hero-eyebrow">
-      <span class="eyebrow-dot"></span>
-      <span>Radiant Medical Physics Consulting LLC</span>
-    </div>
-    <h1 class="hero-title">
-      Precision physics<br>
-      <em>where it counts.</em>
-    </h1>
-    <p class="hero-sub">
-      Independent consulting for radiation oncology programs — Eclipse scripting,
-      portal dosimetry commissioning, plan QA, and regulatory support from a
-      board-certified medical physicist.
-    </p>
+<!-- HERO with live canvas -->
+<header class="hero" id="top">
+  <canvas id="field" aria-hidden="true"></canvas>
+  <div class="inner">
+    <h1 class="mega"><span class="l1">Precision</span><span class="l2">Radiant.</span></h1>
+    <p class="hero-sub">Board-certified medical physics consulting for radiation oncology — Eclipse scripting,
+      portal-dosimetry commissioning, plan QA and regulatory support — plus the Radiant <b>Quik</b> software suite.</p>
     <div class="hero-cta">
-      <a href="services.html" class="btn btn-primary">Services</a>
-      <a href="https://app.radiant-mpc.com/portal/request-trial.html" class="btn btn-ghost">Try the suite free →</a>
-      <a href="contact.html" class="btn btn-ghost">Get in touch</a>
+      <a href="#services" class="btn btn-primary">
+        Explore consulting
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>
+      </a>
+      <a href="products.html" class="btn btn-ghost">Browse the suite</a>
     </div>
+    <div class="hint">↓ scroll — board-certified · TG-307 · ESAPI 15.6</div>
   </div>
-
-  <!-- Decorative isodose lines -->
-  <img class="hero-logo" src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" aria-hidden="true">
 </header>
 
-<!-- Capabilities strip -->
-<section class="capabilities">
-  <div class="cap-row">
-    <div class="cap">
-      <div class="cap-num">01</div>
-      <h3>ESAPI Scripting</h3>
-      <p>Custom Eclipse plugins for chart QA, contour checks, plan analysis, and workflow automation.</p>
+<!-- Product marquee (live scroll) -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track" id="mtrack"></div>
+</div>
+
+<!-- Stats (count-up) -->
+<section class="stats">
+  <div class="stats-inner">
+    <div class="stat"><div class="num" data-to="20" data-suffix="+">0</div><div class="lbl">Years clinical physics</div></div>
+    <div class="stat"><div class="num" data-to="13">0</div><div class="lbl">Quik suite tools</div></div>
+    <div class="stat"><div class="num" data-text="TG-307">TG-307</div><div class="lbl">PSQA commissioning</div></div>
+    <div class="stat"><div class="num" data-to="4" data-suffix="×">0</div><div class="lbl">Linac platforms</div></div>
+  </div>
+</section>
+
+<!-- Services -->
+<section class="block" id="services">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="kicker">What Radiant does</div>
+      <h2 class="sec-title">Work you can <em>hand off.</em></h2>
+      <p class="sec-lede">Every engagement ends in something usable — a script that runs in your environment,
+        commissioning docs ready for surveyors, or a plan-QA report that passes audit.</p>
     </div>
-    <div class="cap">
-      <div class="cap-num">02</div>
-      <h3>Portal Dosimetry</h3>
-      <p>Commissioning, baseline, and ongoing VMAT PSQA per AAPM TG-307. TrueBeam and iX experience.</p>
-    </div>
-    <div class="cap">
-      <div class="cap-num">03</div>
-      <h3>Plan QA &amp; Review</h3>
-      <p>Independent chart checks, SBRT plan review, reirradiation analysis with EQD2/BED tracking.</p>
-    </div>
-    <div class="cap">
-      <div class="cap-num">04</div>
-      <h3>Regulatory Support</h3>
-      <p>QMP credentialing pathways (Ohio OAC 3701:1-58/67), MPPG 9.a/9.b compliance, policy review.</p>
+    <div class="svc-grid">
+      <article class="svc reveal"><div class="ic-box"><svg class="ic" viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></div>
+        <h3>ESAPI Scripting &amp; Eclipse Automation</h3><p>Custom C# plugins for the Eclipse Scripting API — scripts or compiled DLLs, deployed and version-controlled.</p>
+        <ul><li>Physics chart-check hub + contour check</li><li>Optimization analyzer (QUANTEC / TG-101)</li><li>Portal-dosimetry batch QA into ARIA</li></ul></article>
+
+      <article class="svc reveal"><div class="ic-box"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></div>
+        <h3>Portal Dosimetry &amp; PSQA Commissioning</h3><p>End-to-end VMAT pre-treatment QA commissioning aligned with AAPM TG-307 — baseline, DLG, gamma, constancy.</p>
+        <ul><li>Surveyor-ready commissioning manual</li><li>Daily / weekly / monthly QA SOPs</li><li>TrueBeam &amp; iX experience</li></ul></article>
+
+      <article class="svc reveal"><div class="ic-box"><svg class="ic" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <h3>Plan QA, SBRT &amp; Reirradiation</h3><p>Independent reviews with BED/EQD2 cumulative-dose tracking and OAR analysis against published consensus.</p>
+        <ul><li>Structured findings reports</li><li>HDR brachytherapy chart checks</li><li>GYN dose-tracking workflows</li></ul></article>
+
+      <article class="svc reveal"><div class="ic-box"><svg class="ic" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Regulatory &amp; Credentialing</h3><p>Ohio QMP credentialing navigation (OAC 3701:1-58 &amp; 3701:1-67), MPPG 9.a/9.b documentation, policy review.</p>
+        <ul><li>Provisional-pathway guidance</li><li>Policy &amp; procedure audit</li></ul></article>
+
+      <article class="svc reveal"><div class="ic-box"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8l2.8-2.8M17 7l2.8-2.8"/></svg></div>
+        <h3>Custom &amp; Hourly Engagements</h3><p>Second-opinion plan reviews, ESAPI troubleshooting, vendor-correspondence review, or full QA-program audits.</p>
+        <ul><li>Flexible hourly support</li><li>QA program audits</li></ul></article>
+
+      <article class="svc reveal"><div class="ic-box"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <h3>The Radiant Quik Suite</h3><p>A growing toolkit of focused desktop &amp; web apps for the radiation-oncology physics workflow.</p>
+        <ul><li>13 products, shared workflow</li><li>Local &amp; networked deployment</li></ul></article>
     </div>
   </div>
 </section>
 
-<!-- Approach -->
-<section class="approach">
-  <div class="approach-inner">
-    <div class="approach-label">Approach</div>
-    <h2 class="approach-title">
-      Twenty years of clinical physics,<br>
-      sharpened on real problems.
-    </h2>
-    <p class="approach-body">
-      Radiant is built around one principle: consulting work should leave your
-      program measurably better than it found it. That means deliverables you
-      can actually use — scripts that run in your environment, commissioning
-      documentation you can hand to surveyors, plan-QA reports that pass audit.
-    </p>
-    <a href="about.html" class="link-arrow">Read more about Radiant →</a>
+<!-- Split: the suite -->
+<section class="block split" id="suite">
+  <div class="wrap">
+    <div class="grid">
+      <div class="reveal">
+        <div class="kicker">The Radiant Quik Suite</div>
+        <h2>One workflow.<br>Thirteen tools.</h2>
+        <p>A growing toolkit built straight out of clinical practice — QA, logging, bolus design, scripting,
+          shielding and more. Each tool is focused, fast, and made to fit how a physics program actually runs.</p>
+        <div class="cta">
+          <a href="products.html" class="btn btn-primary">Browse the suite</a>
+          <a href="https://app.radiant-mpc.com" class="btn btn-ghost nav-login-btn">Client login ↗</a>
+        </div>
+      </div>
+      <div class="browser reveal">
+        <div class="bar"><i></i><i></i><i></i>
+          <span class="u"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>app.radiant-mpc.com</span>
+        </div>
+        <div class="screen">
+          <a class="app-row" href="quikqa.html"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><b><span class="q">Quik</span>QA</b><span>view ↗</span></a>
+          <a class="app-row" href="quiklog.html"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><b><span class="q">Quik</span>Log</b><span>view ↗</span></a>
+          <a class="app-row" href="quikscript.html"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg></span><b><span class="q">Quik</span>Script</b><span>view ↗</span></a>
+          <a class="app-row" href="quikshield.html"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg></span><b><span class="q">Quik</span>Shield</b><span>view ↗</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- About -->
+<section class="block" id="about">
+  <div class="wrap">
+    <div class="sec-head reveal"><div class="kicker">The approach</div>
+      <h2 class="sec-title">Twenty years, <em>sharpened.</em></h2></div>
+    <div class="reveal" style="max-width:820px">
+      <p style="color:var(--ink-2);font-size:18px;line-height:1.7;margin-bottom:18px">Radiant is the practice of
+        <b style="color:#fff">Todd Bernath, MS</b> — an Ohio-based medical physicist whose path into the field started
+        on the treatment floor. B.S. in Radiation Therapy (Indiana University, 1995); practicing clinical medical
+        physics since 2006.</p>
+      <p style="color:var(--ink-2);font-size:18px;line-height:1.7;margin-bottom:26px">Since 2021 he has provided PRN
+        physics coverage for a regional Ohio health network, performing weekly chart checks across four Elekta Versa HD
+        linacs. In 2024 he founded Radiant Medical Physics Consulting, LLC.</p>
+      <p style="border-left:3px solid var(--red);padding-left:22px;font-size:21px;font-style:italic;color:#fff;line-height:1.5">
+        "Consulting work should leave your program measurably better than it found it."</p>
+      <p style="margin-top:30px"><a href="about.html" class="link-arrow">Read more about Radiant →</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- Products -->
+<section class="block" style="background:rgba(255,255,255,.02);border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="sec-head center reveal"><div class="kicker">The Quik Suite</div>
+      <h2 class="sec-title">Built from <em>practice.</em></h2>
+      <p class="sec-lede" style="margin-left:auto;margin-right:auto">Focused tools for the radiation oncology physics workflow.</p></div>
+    <div class="prod-grid reveal" id="prodgrid"></div>
+    <p style="text-align:center;margin-top:36px" class="reveal"><a href="products.html" class="btn btn-primary">See all products →</a></p>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="block cta-band" id="contact">
+  <div class="wrap">
+    <h2>Let's scope it.</h2>
+    <p>Tell me about your program and what you need delivered.</p>
+    <div class="hero-cta">
+      <a href="mailto:tbernath@radiant-mpc.com" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>Email Radiant</a>
+      <a href="contact.html" class="btn btn-ghost">Get in touch</a>
+    </div>
   </div>
 </section>
 
@@ -102,19 +182,35 @@
 <footer class="footer">
   <div class="footer-inner">
     <div class="footer-brand">
-      <div class="brand">
-        <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
-      </div>
-      <p class="footer-tag">Medical Physics Consulting LLC</p>
+      <a class="brand" href="index.html"><img class="brand-logo" src="radiant-logo-black.png" alt="Radiant Medical Physics Consulting LLC"></a>
+      <p class="footer-tag">Independent medical physics consulting + the Radiant Quik suite. Ohio &amp; remote.</p>
     </div>
     <div class="footer-meta">
+      <a href="https://app.radiant-mpc.com" class="nav-login">Client login ↗</a>
       <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a>
       <span>© 2026 Radiant Medical Physics Consulting LLC</span>
-      <span><a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a></span>
+      <span><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="security.html">Security</a></span>
     </div>
   </div>
 </footer>
 
-<script src="/customer-login.js" defer></script>
+<script>
+window.RADIANT_PRODUCTS = [
+  {tag:'QA',         name:'QuikQA',     href:'quikqa.html',     blurb:'Automated machine &amp; patient QA reporting.'},
+  {tag:'Logging',    name:'QuikLog',    href:'quiklog.html',    blurb:'Equipment &amp; calibration tracking.'},
+  {tag:'RAM',        name:'QuikRAM',    href:'quikram.html',    blurb:'Radioactive-materials management.'},
+  {tag:'Bolus',      name:'QuikBolus',  href:'quikbolus.html',  blurb:'3D-printable bolus from RT structures.'},
+  {tag:'Calc',       name:'QuikCalc',   href:'quikcalc.html',   blurb:'Independent MU / dose calculation.'},
+  {tag:'Dose',       name:'QuikDose',   href:'quikdose.html',   blurb:'EQD2 / BED dose accumulation.'},
+  {tag:'Scripting',  name:'QuikScript', href:'quikscript.html', blurb:'AI-assisted ESAPI plugin builder.'},
+  {tag:'Share',      name:'QuikShare',  href:'quikshare.html',  blurb:'Encrypted clinical file sharing.'},
+  {tag:'Shielding',  name:'QuikShield', href:'quikshield.html', blurb:'NCRP-151 shielding &amp; barriers.'},
+  {tag:'Reference',  name:'QuikRef',    href:'quikref.html',    blurb:'Cited physics regulatory reference.'},
+  {tag:'Care',       name:'QuikCARE',   href:'quikcare.html',   blurb:'Patient-education packet generator.'},
+  {tag:'Workflow',   name:'QuikFlow',   href:'quikflow.html',   blurb:'Consulting bookkeeping &amp; P&amp;L.'},
+  {tag:'Billing',    name:'QuikPay',    href:'quikpay.html',    blurb:'Local payroll for the small LLC.'}
+];
+</script>
+<script src="bold.js" defer></script>
 </body>
 </html>
