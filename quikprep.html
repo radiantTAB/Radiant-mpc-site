@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radiant QuikPrep — State Radiation-Inspection Readiness | Radiant Medical Physics Consulting</title>
+<meta name="description" content="Radiant QuikPrep — a local-first radiation-inspection readiness and document-repository tool: track your state's radiation rules against your evidence, run an inspection-day checklist, and generate gap and readiness reports.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/radiant-logo.png">
+<link rel="stylesheet" href="/bold.css">
+</head>
+<body>
+
+<!-- ===== Shared SVG icon library ===== -->
+<svg class="svg-defs" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 11h6"/><path d="M9 15h6"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M11 6h10"/><path d="M11 12h10"/><path d="M11 18h10"/><path d="M3 6l1.5 1.5L7 5"/><path d="M3 12l1.5 1.5L7 11"/><path d="M3 18l1.5 1.5L7 17"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4l-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h0"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/></symbol>
+<symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></symbol>
+<symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="7"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.9"/><path d="M17.5 14.3A5.5 5.5 0 0 1 21 19.5"/></symbol>
+<symbol id="i-app" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 19h16"/></symbol>
+<symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M20 12H5"/><path d="M11 6l-6 6 6 6"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></symbol>
+</svg>
+
+<!-- ===== Nav ===== -->
+<nav class="nav">
+  <a href="index.html" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  </a>
+  <div class="nav-links">
+    <a href="services.html">Services</a>
+    <a href="products.html" class="active">Products</a>
+    <a href="about.html">About</a>
+    <a href="contact.html" class="nav-cta">Contact</a>
+  </div>
+</nav>
+
+<!-- ===== Product hero ===== -->
+<header class="prod-hero">
+  <div class="prod-hero-inner">
+    <div class="crumb"><a href="products.html">Products</a> / Radiant QuikPrep</div>
+    <div class="prod-hero-grid">
+      <div>
+        <span class="prod-tag">Clinical Tool · Local Web App</span>
+        <h1>Radiant QuikPrep</h1>
+        <p class="prod-lede">
+          Walk into your next state radiation inspection ready. QuikPrep maps
+          your jurisdiction's radiation rules against the evidence you hold,
+          runs an inspection-day checklist rule by rule, and produces gap and
+          readiness reports &mdash; all on your own workstation.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="assets/quikprep-flyer.pdf" target="_blank" rel="noopener"><svg class="ic"><use href="#i-doc"/></svg> Download Flyer</a>
+          <a class="btn btn-ghost" href="https://app.radiant-mpc.com/portal/request-trial.html">Start free 14-day trial →</a>
+        </div>
+      </div>
+      <div class="shot">
+        <div class="shot-bar"><span class="shot-dot"></span><span class="shot-dot"></span><span class="shot-dot"></span></div>
+        <div class="shot-body">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <div class="shot-cap">Radiant QuikPrep</div>
+          <div class="shot-sub">Product screenshot to be added — drop an image in here.</div>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <p><strong>Evaluation / testing use only &mdash; not a medical device.</strong> Radiant QuikPrep is a readiness and record-keeping aid. The rule library is a starting point that must be reviewed against the regulations in force in your jurisdiction by a Qualified Medical Physicist or Radiation Safety Officer. Do not transmit PHI through this software.</p>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Features ===== -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-head">
+      <div class="section-kicker"><svg class="ic"><use href="#i-clipboard"/></svg><span>Features</span></div>
+      <h2>What QuikPrep does.</h2>
+      <p>From a binder of scattered evidence to a single, inspection-ready picture of where you stand.</p>
+    </div>
+    <div class="feature-grid">
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-list"/></svg></div>
+        <h3>Rule Library</h3>
+        <p>Your state's radiation regulations pre-loaded and organized by chapter and rule &mdash; shipping with Ohio OAC 3701:1 (6 chapters, 104 rules) and built to add more jurisdictions.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-clipboard"/></svg></div>
+        <h3>Obligation Tracking</h3>
+        <p>Every rule mapped to a status, an owner, and the documents that satisfy it &mdash; so you can see at a glance what's met, what's pending, and what's at risk.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-database"/></svg></div>
+        <h3>Document Repository</h3>
+        <p>One home for licenses, survey reports, calibration certs, policies, and training records &mdash; stored with metadata and linked to the rules they support.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-shield"/></svg></div>
+        <h3>Inspection Mode</h3>
+        <p>Walk the inspector's checklist live, rule by rule, pulling up the supporting document for each &mdash; no scrambling through a filing cabinet mid-visit.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-printer"/></svg></div>
+        <h3>Gap &amp; Readiness Reports</h3>
+        <p>A PDF gap analysis of unmet or expiring obligations plus an overall readiness score &mdash; cleanly formatted and ready for the binder or leadership.</p>
+      </div>
+
+      <div class="feature">
+        <div class="feat-icon"><svg class="ic"><use href="#i-alert"/></svg></div>
+        <h3>Findings &amp; Corrective Actions</h3>
+        <p>Log inspection findings and track corrective and preventive actions to closure, with owners and due dates &mdash; a documented trail between visits.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== Who it's for ===== -->
+<section class="section alt">
+  <div class="section-inner">
+    <div class="section-head">
+      <div class="section-kicker"><svg class="ic"><use href="#i-users"/></svg><span>Who It's For</span></div>
+      <h2>Made for inspection day.</h2>
+    </div>
+    <div class="who-grid">
+      <div class="who-copy">
+        <p>QuikPrep is built for the Radiation Safety Officer, QA lead, or clinical physicist who owns regulatory readiness &mdash; the person who, when the state inspector calls, has to know in minutes whether every license, survey, calibration, and policy is current and where it lives.</p>
+        <p>It replaces the pre-inspection fire drill with a structured, always-current record: the rules that apply to you, the evidence for each, and the gaps that still need attention. Everything runs locally on a single SQLite database &mdash; no cloud, no IT project &mdash; so your regulatory record stays where you work.</p>
+      </div>
+      <div class="who-card">
+        <div class="feat-icon"><svg class="ic"><use href="#i-users"/></svg></div>
+        <h3>Best fit for</h3>
+        <ul>
+          <li>Radiation Safety Officers</li>
+          <li>Clinical &amp; QA medical physicists</li>
+          <li>Regulatory &amp; accreditation prep</li>
+          <li>Multi-site practices tracking many obligations</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CTA ===== -->
+<section class="cta-band">
+  <h2>Be ready before the inspector calls</h2>
+  <p>Request a walkthrough tailored to your jurisdiction's rules and your current evidence &mdash; no obligation.</p>
+  <div class="cta-actions">
+    <a class="btn btn-primary" href="https://app.radiant-mpc.com/portal/request-trial.html">Start free 14-day trial →</a>
+    <a class="btn btn-ghost" href="products.html"><svg class="ic"><use href="#i-arrow-left"/></svg> All Products</a>
+  </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="brand">
+        <img src="radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+      </div>
+      <p class="footer-tag">Medical Physics Consulting LLC</p>
+    </div>
+    <div class="footer-meta">
+      <a href="https://app.radiant-mpc.com" class="nav-login">Client login ↗</a>
+      <a href="mailto:tbernath@radiant-mpc.com">tbernath@radiant-mpc.com</a>
+      <span>© 2026 Radiant Medical Physics Consulting LLC</span>
+      <span><a href="privacy.html">Privacy</a> &middot; <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a></span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
