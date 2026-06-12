@@ -196,11 +196,17 @@ function isAuthExempt(path) {
 }
 
 // Admin-page paths that DO NOT themselves require an admin session
-// (because they ARE the login surface).
+// (because they ARE the login surface). Both the .html form AND the
+// extensionless form must be listed: Cloudflare's html_handling 307-redirects
+// /admin/login.html -> /admin/login, and without exempting the extensionless
+// form too the gate bounces it back to /admin/login.html -> redirect loop.
+// (The portal equivalent /portal/login is already exempt in isAuthExempt.)
 function isAdminAuthExempt(path) {
   return (
     path === "/admin/login.html" ||
-    path === "/admin/change-password.html"
+    path === "/admin/login" ||
+    path === "/admin/change-password.html" ||
+    path === "/admin/change-password"
   );
 }
 
