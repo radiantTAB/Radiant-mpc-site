@@ -52,8 +52,61 @@ async function ensureQuikbolusDefaultsColumn(env) {
   }
 }
 
+// Facility-profile columns on the clients table: mailing address, main
+// phone + primary contact, and the clinic's R&V / TPS / linac vendors.
+// All stored as TEXT (free-form, may be empty).
+const CLIENT_PROFILE_COLUMNS = [
+  "address_street",
+  "address_city",
+  "address_state",
+  "address_zip",
+  "phone",
+  "contact_name",
+  "contact_title",
+  "rv_vendor",
+  "tps_vendor",
+  "linac_vendor",
+  "linac_models",
+  "num_linacs",
+];
+
+// Self-healing migration for the profile columns. Runs once per isolate
+// (the flag short-circuits later calls); each ALTER is wrapped so the
+// "duplicate column" error after the first deploy is ignored.
+let _profileColumnsEnsured = false;
+async function ensureClientProfileColumns(env) {
+  if (_profileColumnsEnsured) return;
+  for (const col of CLIENT_PROFILE_COLUMNS) {
+    try {
+      await env.DB.prepare(
+        "ALTER TABLE clients ADD COLUMN " + col + " TEXT"
+      ).run();
+    } catch (_) {
+      // Already exists -- ignore.
+    }
+  }
+  _profileColumnsEnsured = true;
+}
+
+// Pull the profile fields out of a request body, trimmed to strings.
+function readClientProfile(body) {
+  const out = {};
+  for (const col of CLIENT_PROFILE_COLUMNS) {
+    out[col] = String(body[col] == null ? "" : body[col]).trim();
+  }
+  return out;
+}
+
+// Build the profile object returned to the client UI from a DB row.
+function clientProfileOf(row) {
+  const out = {};
+  for (const col of CLIENT_PROFILE_COLUMNS) out[col] = row[col] || "";
+  return out;
+}
+
 export async function handleClientsApi(request, env, url) {
   if (!env.DB) return json({ error: "Database is not connected yet." }, 500);
+  await ensureClientProfileColumns(env);
   const path = url.pathname;
   const method = request.method;
 
@@ -165,6 +218,7 @@ export async function handleClientsApi(request, env, url) {
         contact_email: c.contact_email || "",
         notes: c.notes || "",
         has_login: !!c.password_hash,
+        profile: clientProfileOf(c),
         locations: locsByClient[c.id] || [],
       })),
     });
@@ -176,22 +230,57 @@ export async function handleClientsApi(request, env, url) {
     const name = String(body.name || "").trim();
     if (!name) return json({ error: "Client name is required." }, 400);
     const id = newId();
+    const prof = readClientProfile(body);
+    const cols = ["id", "name", "contact_email", "notes", "created_at"].concat(
+      CLIENT_PROFILE_COLUMNS
+    );
+    const vals = [
+      id,
+      name,
+      String(body.contact_email || "").trim(),
+      String(body.notes || "").trim(),
+      new Date().toISOString(),
+    ].concat(CLIENT_PROFILE_COLUMNS.map((c) => prof[c]));
     await env.DB.prepare(
-      "INSERT INTO clients (id, name, contact_email, notes, created_at) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO clients (" +
+        cols.join(", ") +
+        ") VALUES (" +
+        cols.map(() => "?").join(", ") +
+        ")"
     )
-      .bind(
-        id,
-        name,
-        String(body.contact_email || "").trim(),
-        String(body.notes || "").trim(),
-        new Date().toISOString()
-      )
+      .bind(...vals)
       .run();
     return json({ ok: true, id });
   }
 
-  // ---- DELETE /admin/api/clients/<id> : delete client + its locations ----
+  // ---- PUT /admin/api/clients/<id> : edit a client's details + profile ----
   let m = path.match(/^\/admin\/api\/clients\/([^/]+)$/);
+  if (m && method === "PUT") {
+    const body = await request.json().catch(() => ({}));
+    const name = String(body.name || "").trim();
+    if (!name) return json({ error: "Client name is required." }, 400);
+    const prof = readClientProfile(body);
+    const setCols = ["name = ?", "contact_email = ?", "notes = ?"].concat(
+      CLIENT_PROFILE_COLUMNS.map((c) => c + " = ?")
+    );
+    const vals = [
+      name,
+      String(body.contact_email || "").trim(),
+      String(body.notes || "").trim(),
+    ]
+      .concat(CLIENT_PROFILE_COLUMNS.map((c) => prof[c]))
+      .concat([m[1]]);
+    const res = await env.DB.prepare(
+      "UPDATE clients SET " + setCols.join(", ") + " WHERE id = ?"
+    )
+      .bind(...vals)
+      .run();
+    if (res && res.meta && res.meta.changes === 0)
+      return json({ error: "Client not found." }, 404);
+    return json({ ok: true });
+  }
+
+  // ---- DELETE /admin/api/clients/<id> : delete client + its locations ----
   if (m && method === "DELETE") {
     await env.DB.prepare("DELETE FROM locations WHERE client_id = ?").bind(m[1]).run();
     await env.DB.prepare("DELETE FROM clients WHERE id = ?").bind(m[1]).run();

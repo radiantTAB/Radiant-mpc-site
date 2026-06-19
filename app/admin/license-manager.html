@@ -72,8 +72,8 @@ img{max-width:100%;display:block}
 /* Form */
 .field{margin-bottom:20px}
 .field>label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:8px}
-.field input[type=text],.field input[type=number]{width:100%;max-width:440px;font-family:var(--font-body);font-size:15px;padding:11px 14px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text)}
-.field input:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+.field input[type=text],.field input[type=number],.field select{width:100%;max-width:440px;font-family:var(--font-body);font-size:15px;padding:11px 14px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text)}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent);background:var(--bg)}
 .checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;max-width:600px}
 .check{display:flex;align-items:center;gap:9px;font-size:14.5px;color:var(--text);cursor:pointer}
 .check input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
@@ -142,7 +142,7 @@ code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!importan
   <div class="nav-links">
     <a href="/">&larr; Launcher</a>
     <a href="/admin/index.html">Admin Home</a>
-    <a href="/admin/clients.html">Client Setup</a>
+    <a href="/admin/clients.html">Client Manager</a>
     <a href="/admin/license-manager.html" class="active">License Manager</a>
     <button type="button" class="nav-cta" onclick="adminSignOut()"
       style="font:inherit;cursor:pointer;background:transparent">Sign Out</button>
@@ -180,8 +180,20 @@ function adminSignOut(){
 
       <form id="issueForm" autocomplete="off">
         <div class="field">
-          <label for="customer">Customer / organization</label>
-          <input type="text" id="customer" required placeholder="e.g. Acme Radiation Oncology">
+          <label for="clientSelect">Client</label>
+          <select id="clientSelect">
+            <option value="">Loading clients…</option>
+          </select>
+        </div>
+        <div class="field" id="locationField" hidden>
+          <label for="locationSelect">Location (optional — pre-fills its modules)</label>
+          <select id="locationSelect">
+            <option value="">— whole client / choose manually —</option>
+          </select>
+        </div>
+        <div class="field" id="customerField" hidden>
+          <label for="customer">Customer / organization name</label>
+          <input type="text" id="customer" placeholder="e.g. Acme Radiation Oncology">
         </div>
         <div class="field">
           <label for="days">Trial length (days)</label>
@@ -261,6 +273,99 @@ async function loadProducts(){
   } catch (e) {
     wrap.innerHTML = '<span class="muted">Could not load products — ' + esc(e.message) + '</span>';
   }
+}
+
+// --- Client picker -------------------------------------------------------
+// The issue form is driven by a client dropdown (clients created in Client
+// Manager) with an "— type a new name —" escape hatch for one-off keys.
+var clientsById = {};
+
+async function loadClientOptions(){
+  var sel = document.getElementById('clientSelect');
+  try {
+    var data = await api('/admin/api/clients');
+    clientsById = {};
+    (data.clients || []).forEach(function(c){ clientsById[c.id] = c; });
+    var opts = '<option value="">— select a client —</option>';
+    opts += (data.clients || []).map(function(c){
+      return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>';
+    }).join('');
+    opts += '<option value="__new__">— type a new name —</option>';
+    sel.innerHTML = opts;
+  } catch (e) {
+    sel.innerHTML = '<option value="__new__">— type a new name —</option>';
+  }
+}
+
+function checkOnlyProducts(ids){
+  ids = ids || [];
+  document.querySelectorAll('input[name=product]').forEach(function(c){
+    c.checked = ids.indexOf(c.value) >= 0;
+  });
+}
+
+function onClientChange(){
+  var sel = document.getElementById('clientSelect');
+  var custField = document.getElementById('customerField');
+  var locField = document.getElementById('locationField');
+  var locSel = document.getElementById('locationSelect');
+  var val = sel.value;
+
+  // Free-text one-off.
+  if (val === '__new__'){
+    custField.hidden = false;
+    locField.hidden = true;
+    document.getElementById('customer').value = '';
+    document.getElementById('customer').focus();
+    return;
+  }
+  custField.hidden = true;
+
+  var c = clientsById[val];
+  if (!c){ locField.hidden = true; return; }
+
+  // Populate this client's locations (if any) so they can pre-fill modules.
+  var locs = c.locations || [];
+  if (locs.length){
+    locSel.innerHTML = '<option value="">— whole client / choose manually —</option>' +
+      locs.map(function(l){
+        return '<option value="' + esc(l.id) + '">' + esc(l.name) +
+          (l.access_end ? ' (until ' + esc(l.access_end) + ')' : '') + '</option>';
+      }).join('');
+    locField.hidden = false;
+  } else {
+    locField.hidden = true;
+  }
+}
+
+function onLocationChange(){
+  var clientSel = document.getElementById('clientSelect');
+  var c = clientsById[clientSel.value];
+  if (!c) return;
+  var locId = document.getElementById('locationSelect').value;
+  var loc = (c.locations || []).filter(function(l){ return l.id === locId; })[0];
+  if (loc){
+    checkOnlyProducts(loc.modules || []);
+    // If the location has an access-end date, offer its remaining days.
+    if (loc.access_end){
+      var end = new Date(loc.access_end + 'T00:00:00Z').getTime();
+      var today = new Date(new Date().toISOString().slice(0,10) + 'T00:00:00Z').getTime();
+      var d = Math.round((end - today) / 86400000);
+      if (d >= 1) document.getElementById('days').value = d;
+    }
+  }
+}
+
+// Resolve the customer name + client_id the form should submit.
+function resolveCustomer(){
+  var sel = document.getElementById('clientSelect');
+  var val = sel.value;
+  if (val === '__new__'){
+    return { customer: document.getElementById('customer').value.trim(), client_id: null };
+  }
+  var c = clientsById[val];
+  if (c) return { customer: c.name, client_id: c.id };
+  return { customer: '', client_id: null };
 }
 
 var licensesById = {};
@@ -356,12 +461,13 @@ document.getElementById('issueForm').addEventListener('submit', async function(e
   e.preventDefault();
   showMsg('', true);
   const btn = document.getElementById('issueBtn');
-  const customer = document.getElementById('customer').value.trim();
+  const who = resolveCustomer();
+  const customer = who.customer;
   const days = parseInt(document.getElementById('days').value, 10);
   const products = Array.prototype.map.call(
     document.querySelectorAll('input[name=product]:checked'), function(c){ return c.value; }
   );
-  if (!customer){ showMsg('Enter a customer name.', false); return; }
+  if (!customer){ showMsg('Pick a client, or choose "type a new name" and enter one.', false); return; }
   if (!(days >= 1)){ showMsg('Trial length must be at least 1 day.', false); return; }
   if (!products.length){ showMsg('Select at least one product.', false); return; }
 
@@ -370,11 +476,14 @@ document.getElementById('issueForm').addEventListener('submit', async function(e
     const data = await api('/admin/api/licenses', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ customer: customer, days: days, products: products })
+      body: JSON.stringify({ customer: customer, days: days, products: products, client_id: who.client_id })
     });
     showResult(data.license, 'New license key');
     showMsg('Key issued for ' + data.license.customer + '.', true);
     document.getElementById('issueForm').reset();
+    document.getElementById('clientSelect').value = '';
+    document.getElementById('customerField').hidden = true;
+    document.getElementById('locationField').hidden = true;
     document.getElementById('days').value = 30;
     document.querySelectorAll('input[name=product]:checked').forEach(function(c){ c.checked = false; });
     loadLicenses();
@@ -416,7 +525,11 @@ document.getElementById('masterBtn').addEventListener('click', async function(){
   }
 });
 
+document.getElementById('clientSelect').addEventListener('change', onClientChange);
+document.getElementById('locationSelect').addEventListener('change', onLocationChange);
+
 loadProducts();
+loadClientOptions();
 loadLicenses();
 </script>
 

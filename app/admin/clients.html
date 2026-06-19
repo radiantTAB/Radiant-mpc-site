@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Client Setup — Radiant Admin Workspace</title>
+<title>Client Manager — Radiant Admin Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -86,6 +86,16 @@ img{max-width:100%;display:block}
 .msg-err{color:var(--accent)}
 .muted{color:var(--text-dim);font-size:14px}
 
+/* Facility profile fields */
+.profile-head{font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:12px;color:var(--text-mute);margin:22px 0 12px;border-top:1px solid var(--line);padding-top:18px}
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;max-width:640px}
+.profile-grid .field{margin-bottom:14px}
+.profile-grid .field.span2{grid-column:1 / -1}
+.profile-grid label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:7px}
+.profile-grid input,.profile-grid select{width:100%;max-width:none;font-family:var(--font-body);font-size:15px;padding:10px 12px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text)}
+.profile-grid input:focus,.profile-grid select:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+@media(max-width:560px){.profile-grid{grid-template-columns:1fr}}
+
 /* Client + location cards */
 .client-card{border:1px solid var(--line);border-radius:10px;margin-bottom:20px;overflow:hidden}
 .client-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px 24px;background:var(--bg-elev);border-bottom:1px solid var(--line)}
@@ -154,7 +164,7 @@ code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!importan
   <div class="nav-links">
     <a href="/">&larr; Launcher</a>
     <a href="/admin/index.html">Admin Home</a>
-    <a href="/admin/clients.html" class="active">Client Setup</a>
+    <a href="/admin/clients.html" class="active">Client Manager</a>
     <a href="/admin/license-manager.html">License Manager</a>
     <button type="button" class="nav-cta" onclick="adminSignOut()"
       style="font:inherit;cursor:pointer;background:transparent">Sign Out</button>
@@ -171,9 +181,9 @@ function adminSignOut(){
 <!-- Hero -->
 <header class="hub-hero-band">
   <div class="hub-hero">
-    <div class="crumb"><a href="index.html">Admin Workspace</a> / Client Setup</div>
-    <h1>Client Setup</h1>
-    <p>Manage client organizations and their locations — the modules each location can use, the access window, and the license key for it.</p>
+    <div class="crumb"><a href="index.html">Admin Workspace</a> / Client Manager</div>
+    <h1>Client Manager</h1>
+    <p>Add, edit, and delete client organizations — facility details, contacts, locations, the modules each location can use, and its license key. Clients here are available to pick in the License Manager.</p>
   </div>
 </header>
 
@@ -211,6 +221,8 @@ function adminSignOut(){
         <label for="cNotes">Notes (optional)</label>
         <input type="text" id="cNotes" placeholder="Anything worth recording">
       </div>
+      <div class="profile-head">Facility details (optional)</div>
+      <div id="addProfile"></div>
       <button type="button" class="btn btn-primary" id="addClientBtn">
         <svg class="ic"><use href="#i-users"/></svg> Add Client
       </button>
@@ -250,6 +262,94 @@ var allProducts = [];
 var clients = [];
 var editingLocationId = null;
 var addingLocationFor = null;
+var editingClientFor = null;
+
+// --- Facility profile fields --------------------------------------------
+// Preset vendor lists; each field also offers an "Other…" free-text option.
+var VENDORS = {
+  rv_vendor: ['Varian ARIA', 'Elekta MOSAIQ', 'RaySearch RayCare'],
+  tps_vendor: ['Varian Eclipse', 'RaySearch RayStation', 'Elekta Monaco', 'Philips Pinnacle', 'Varian Halcyon'],
+  linac_vendor: ['Varian', 'Elekta', 'Accuray', 'Siemens']
+};
+
+function vendorField(prefix, key, label, current){
+  current = current || '';
+  var opts = VENDORS[key] || [];
+  var inList = opts.indexOf(current) >= 0;
+  var otherSel = current && !inList;
+  var html = '<div class="field"><label>' + esc(label) + '</label>' +
+    '<select id="' + key + '_sel_' + prefix + '" onchange="vendorToggle(\'' + key + '\',\'' + prefix + '\')">' +
+    '<option value="">— select —</option>';
+  for (var i=0;i<opts.length;i++){
+    html += '<option value="' + esc(opts[i]) + '"' + ((inList && opts[i]===current)?' selected':'') + '>' + esc(opts[i]) + '</option>';
+  }
+  html += '<option value="__other__"' + (otherSel?' selected':'') + '>Other…</option></select>' +
+    '<input type="text" id="' + key + '_oth_' + prefix + '" placeholder="Other vendor" value="' +
+      (otherSel?esc(current):'') + '" style="margin-top:7px;' + (otherSel?'':'display:none') + '">' +
+    '</div>';
+  return html;
+}
+function vendorToggle(key, prefix){
+  var sel = document.getElementById(key + '_sel_' + prefix);
+  var oth = document.getElementById(key + '_oth_' + prefix);
+  if (sel && oth) oth.style.display = (sel.value === '__other__') ? '' : 'none';
+}
+function readVendor(key, prefix){
+  var sel = document.getElementById(key + '_sel_' + prefix);
+  if (!sel) return '';
+  if (sel.value === '__other__'){
+    var oth = document.getElementById(key + '_oth_' + prefix);
+    return oth ? oth.value.trim() : '';
+  }
+  return sel.value;
+}
+
+function profileFields(prefix, p){
+  p = p || {};
+  function v(k){ return esc(p[k]||''); }
+  function inp(k, label, ph, span, type){
+    return '<div class="field' + (span?' span2':'') + '"><label>' + esc(label) + '</label>' +
+      '<input type="' + (type||'text') + '" id="pf_' + k + '_' + prefix + '" placeholder="' + esc(ph||'') + '" value="' + v(k) + '"></div>';
+  }
+  return '<div class="profile-grid">' +
+    inp('address_street','Street address','123 Main St', true) +
+    inp('address_city','City','') +
+    inp('address_state','State','OH') +
+    inp('address_zip','ZIP','') +
+    inp('phone','Phone','(555) 555-5555') +
+    inp('contact_name','Primary contact','Jane Smith, PhD') +
+    inp('contact_title','Contact title','Chief Physicist') +
+    vendorField(prefix,'rv_vendor','Record & Verify (R&V)', p.rv_vendor) +
+    vendorField(prefix,'tps_vendor','Treatment Planning System', p.tps_vendor) +
+    vendorField(prefix,'linac_vendor','Linac vendor', p.linac_vendor) +
+    inp('linac_models','Linac model(s)','TrueBeam, Halcyon') +
+    inp('num_linacs','# of linacs','2', false, 'number') +
+  '</div>';
+}
+function readProfileFields(prefix){
+  function gv(k){ var el = document.getElementById('pf_' + k + '_' + prefix); return el ? el.value.trim() : ''; }
+  return {
+    address_street: gv('address_street'), address_city: gv('address_city'),
+    address_state: gv('address_state'), address_zip: gv('address_zip'),
+    phone: gv('phone'), contact_name: gv('contact_name'), contact_title: gv('contact_title'),
+    rv_vendor: readVendor('rv_vendor', prefix),
+    tps_vendor: readVendor('tps_vendor', prefix),
+    linac_vendor: readVendor('linac_vendor', prefix),
+    linac_models: gv('linac_models'), num_linacs: gv('num_linacs')
+  };
+}
+function profileSummary(p){
+  if (!p) return '';
+  var bits = [];
+  var loc = [p.address_city, p.address_state].filter(Boolean).join(', ');
+  if (loc) bits.push(loc);
+  if (p.rv_vendor) bits.push('R&V: ' + p.rv_vendor);
+  if (p.tps_vendor) bits.push('TPS: ' + p.tps_vendor);
+  if (p.linac_vendor) bits.push('Linac: ' + p.linac_vendor + (p.num_linacs ? ' ×' + p.num_linacs : ''));
+  if (p.contact_name) bits.push(p.contact_name + (p.contact_title ? ' (' + p.contact_title + ')' : ''));
+  if (!bits.length) return '';
+  return '<div class="client-sub">' + esc(bits.join('  ·  ')) + '</div>';
+}
 
 function findClient(id){
   for (var i=0;i<clients.length;i++){ if (clients[i].id===id) return clients[i]; }
@@ -353,6 +453,7 @@ function renderClients(){
     return;
   }
   wrap.innerHTML = clients.map(function(c){
+    if (editingClientFor === c.id) return clientEditForm(c);
     var locs = c.locations.length
       ? c.locations.map(renderLocation).join('')
       : '<p class="muted" style="padding:14px 0">No locations yet.</p>';
@@ -372,11 +473,13 @@ function renderClients(){
         '<div><div class="client-name">' + esc(c.name) + '</div>' +
           (c.contact_email ? '<div class="client-sub">' + esc(c.contact_email) + '</div>' : '') +
           (c.notes ? '<div class="client-sub">' + esc(c.notes) + '</div>' : '') +
+          profileSummary(c.profile) +
           '<div class="client-sub">Portal login: ' +
             (c.has_login ? '<strong>enabled</strong>' : 'not set') + ' ' +
             '<button class="rowbtn" onclick="setPassword(\'' + c.id + '\')">' +
               (c.has_login ? 'Change password' : 'Set password') + '</button>' +
             (c.has_login ? '<button class="rowbtn" onclick="clearPassword(\'' + c.id + '\')">Disable</button>' : '') +
+            ' <button class="rowbtn" onclick="startEditClient(\'' + c.id + '\')">Edit details</button>' +
             ' ' + qbBlock +
           '</div>' +
         '</div>' +
@@ -484,24 +587,80 @@ function cancelEdit(){ editingLocationId = null; renderClients(); }
 function startAddLocation(clientId){ addingLocationFor = clientId; editingLocationId = null; renderClients(); }
 function cancelAddLocation(){ addingLocationFor = null; renderClients(); }
 
+// --- Edit a client's details + facility profile -------------------------
+function startEditClient(id){
+  editingClientFor = id; editingLocationId = null; addingLocationFor = null; editingQuikbolusFor = null;
+  renderClients();
+}
+function cancelEditClient(){ editingClientFor = null; renderClients(); }
+
+function clientEditForm(c){
+  var p = c.profile || {};
+  return '<div class="client-card"><div class="client-head" style="display:block">' +
+    '<div class="client-name" style="margin-bottom:14px">Edit client</div>' +
+    '<div class="field"><label>Client / organization name</label>' +
+      '<input type="text" id="ec_name_' + c.id + '" value="' + esc(c.name) + '"></div>' +
+    '<div class="field"><label>Contact email</label>' +
+      '<input type="email" id="ec_email_' + c.id + '" value="' + esc(c.contact_email) + '"></div>' +
+    '<div class="field"><label>Notes</label>' +
+      '<input type="text" id="ec_notes_' + c.id + '" value="' + esc(c.notes) + '"></div>' +
+    '<div class="profile-head">Facility details</div>' +
+    profileFields(c.id, p) +
+    '<div style="margin-top:16px">' +
+      '<button class="rowbtn rowbtn-go" onclick="saveClientEdits(\'' + c.id + '\')">Save details</button>' +
+      '<button class="rowbtn" onclick="cancelEditClient()">Cancel</button>' +
+    '</div>' +
+  '</div></div>';
+}
+
+async function saveClientEdits(id){
+  var name = (document.getElementById('ec_name_' + id).value || '').trim();
+  if (!name){ alert('Client name is required.'); return; }
+  var body = {
+    name: name,
+    contact_email: (document.getElementById('ec_email_' + id).value || '').trim(),
+    notes: (document.getElementById('ec_notes_' + id).value || '').trim()
+  };
+  var prof = readProfileFields(id);
+  for (var k in prof){ body[k] = prof[k]; }
+  try {
+    await api('/admin/api/clients/' + encodeURIComponent(id), {
+      method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify(body)
+    });
+    editingClientFor = null;
+    topMsg('Client details saved.', true);
+    loadClients();
+  } catch (e) { alert('Could not save: ' + e.message); }
+}
+
 async function addClient(){
   var name = document.getElementById('cName').value.trim();
   if (!name){ topMsg('Enter a client name.', false); return; }
+  var body = {
+    name: name,
+    contact_email: document.getElementById('cEmail').value.trim(),
+    notes: document.getElementById('cNotes').value.trim()
+  };
+  var prof = readProfileFields('add');
+  for (var k in prof){ body[k] = prof[k]; }
   try {
     await api('/admin/api/clients', {
       method:'POST', headers:{'content-type':'application/json'},
-      body: JSON.stringify({
-        name: name,
-        contact_email: document.getElementById('cEmail').value.trim(),
-        notes: document.getElementById('cNotes').value.trim()
-      })
+      body: JSON.stringify(body)
     });
-    document.getElementById('cName').value = '';
-    document.getElementById('cEmail').value = '';
-    document.getElementById('cNotes').value = '';
+    clearAddForm();
     topMsg('Client added.', true);
     loadClients();
   } catch (e) { topMsg(e.message, false); }
+}
+
+function clearAddForm(){
+  ['cName','cEmail','cNotes'].forEach(function(id){ var e = document.getElementById(id); if (e) e.value = ''; });
+  var add = document.getElementById('addProfile');
+  if (add){
+    add.querySelectorAll('input').forEach(function(i){ i.value = ''; i.style.display = (i.id.indexOf('_oth_') >= 0 ? 'none' : ''); });
+    add.querySelectorAll('select').forEach(function(s){ s.value = ''; });
+  }
 }
 
 async function deleteClient(id){
@@ -608,6 +767,7 @@ document.getElementById('copyBtn').addEventListener('click', function(){
 });
 
 (async function init(){
+  document.getElementById('addProfile').innerHTML = profileFields('add', null);
   await loadProducts();
   await loadClients();
 })();

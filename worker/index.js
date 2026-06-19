@@ -423,6 +423,9 @@ async function handleApi(request, env, url) {
     const products = (Array.isArray(body.products) ? body.products : []).filter(
       (p) => PRODUCT_IDS.includes(p)
     );
+    // Optional link back to a client created in Client Manager. Free-text
+    // one-off keys leave this null.
+    const clientId = String(body.client_id || "").trim() || null;
 
     if (!customer) return json({ error: "Customer name is required." }, 400);
     if (!Number.isInteger(days) || days < 1) {
@@ -434,9 +437,17 @@ async function handleApi(request, env, url) {
 
     const result = await signLicense(env.LICENSE_SIGNING_KEY, customer, days, products);
 
+    // Self-healing migration: link column added the first time a client-
+    // bound key is issued. Ignore the duplicate-column error thereafter.
+    try {
+      await env.DB.prepare("ALTER TABLE licenses ADD COLUMN client_id TEXT").run();
+    } catch (_) {
+      // Already exists -- ignore.
+    }
+
     await env.DB.prepare(
-      "INSERT INTO licenses (id, customer, issued, expires, key, created_at, products) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO licenses (id, customer, issued, expires, key, created_at, products, client_id) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
       .bind(
         result.id,
@@ -445,7 +456,8 @@ async function handleApi(request, env, url) {
         result.expires,
         result.key,
         new Date().toISOString(),
-        result.products.join(",")
+        result.products.join(","),
+        clientId
       )
       .run();
 
