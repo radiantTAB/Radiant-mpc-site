@@ -166,6 +166,7 @@ code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!importan
     <a href="/admin/index.html">Admin Home</a>
     <a href="/admin/clients.html" class="active">Client Manager</a>
     <a href="/admin/license-manager.html">License Manager</a>
+    <a href="/admin/eclipse-licensing.html">Eclipse Licensing</a>
     <button type="button" class="nav-cta" onclick="adminSignOut()"
       style="font:inherit;cursor:pointer;background:transparent">Sign Out</button>
   </div>
@@ -319,6 +320,7 @@ function profileFields(prefix, p){
     inp('phone','Phone','(555) 555-5555') +
     inp('contact_name','Primary contact','Jane Smith, PhD') +
     inp('contact_title','Contact title','Chief Physicist') +
+    inp('ad_domain','Windows AD domain(s) — license site-lock','GHDOMAIN, SITE2DOMAIN', true) +
     vendorField(prefix,'rv_vendor','Record & Verify (R&V)', p.rv_vendor) +
     vendorField(prefix,'tps_vendor','Treatment Planning System', p.tps_vendor) +
     vendorField(prefix,'linac_vendor','Linac vendor', p.linac_vendor) +
@@ -346,6 +348,7 @@ function profileSummary(p){
   if (p.rv_vendor) bits.push('R&V: ' + p.rv_vendor);
   if (p.tps_vendor) bits.push('TPS: ' + p.tps_vendor);
   if (p.linac_vendor) bits.push('Linac: ' + p.linac_vendor + (p.num_linacs ? ' ×' + p.num_linacs : ''));
+  if (p.ad_domain) bits.push('Domain: ' + p.ad_domain);
   if (p.contact_name) bits.push(p.contact_name + (p.contact_title ? ' (' + p.contact_title + ')' : ''));
   if (!bits.length) return '';
   return '<div class="client-sub">' + esc(bits.join('  ·  ')) + '</div>';

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Eclipse Licensing — Radiant Admin Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/radiant-logo.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-elev:#fafafa;--bg-card:#f4f4f5;
+  --line:#e6e6e8;--line-hi:#cdcdd1;
+  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
+  --accent:#d00008;--accent-2:#a80006;--accent-bright:#f03020;--accent-warm:#f86058;
+  --charcoal:#303030;--ok:#1a7f37;
+  --font-display:'Montserrat',system-ui,sans-serif;
+  --font-body:'Montserrat',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --max-w:1180px;--pad-x:clamp(20px,5vw,64px);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(208,0,8,.035) 1px,transparent 0);background-size:32px 32px;pointer-events:none;z-index:0}
+a{color:var(--accent);text-decoration:none;transition:color .2s}
+a:hover{color:var(--accent-bright)}
+img{max-width:100%;display:block}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.svg-defs{position:absolute;width:0;height:0;overflow:hidden}
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:22px var(--pad-x);background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;gap:10px}
+.brand-logo{height:160px;width:auto;display:block}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{color:var(--text-mute);font-size:14px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.nav-links a:hover{color:var(--text)}
+.nav-links a.active{color:var(--accent)}
+.nav-cta{padding:9px 18px;border:1px solid var(--line-hi);border-radius:999px;color:var(--text)!important}
+.nav-cta:hover{border-color:var(--accent);color:var(--accent)!important;background:rgba(208,0,8,.06)}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;font-family:var(--font-body);font-size:14px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;transition:all .2s;border:1px solid transparent;cursor:pointer}
+.btn .ic{width:17px;height:17px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-2);color:#fff}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{color:var(--text);border-color:var(--line-hi);background:none}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.hub-hero-band{position:relative;z-index:2;background:var(--bg-elev);border-bottom:1px solid var(--line)}
+.hub-hero{max-width:var(--max-w);margin:0 auto;padding:54px var(--pad-x) 48px}
+.crumb{font-family:var(--font-mono);font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-dim);margin-bottom:18px}
+.crumb a{color:var(--text-mute)}
+.hub-hero h1{font-family:var(--font-display);font-weight:800;font-size:clamp(32px,5vw,48px);line-height:1.05;letter-spacing:-.025em}
+.hub-hero p{font-size:18px;color:var(--text-mute);margin-top:12px;max-width:680px}
+.section{padding:48px var(--pad-x) 80px;position:relative;z-index:2}
+.section-inner{max-width:var(--max-w);margin:0 auto}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent-warm);background:var(--bg-elev);padding:18px 22px;display:flex;gap:14px;align-items:flex-start;margin-bottom:32px}
+.note .ic{width:22px;height:22px;color:var(--accent-warm);margin-top:1px}
+.note p{font-size:14px;color:var(--text-mute);margin:0}
+.lm-card{background:var(--bg);border:1px solid var(--line);border-top:3px solid var(--accent);padding:30px;margin-bottom:32px}
+.lm-card>h2{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px}
+.lm-card>.sub{font-size:14px;color:var(--text-mute);margin-bottom:24px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+.grid2 .span2{grid-column:1 / -1}
+@media(max-width:620px){.grid2{grid-template-columns:1fr}}
+.field{margin-bottom:18px}
+.field>label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:8px}
+.field input,.field select{width:100%;font-family:var(--font-body);font-size:15px;padding:11px 14px;border:1px solid var(--line-hi);border-radius:8px;background:var(--bg-elev);color:var(--text)}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent);background:var(--bg)}
+.field .hint{font-size:12.5px;color:var(--text-dim);margin-top:6px}
+.field input[type=file]{padding:10px;background:var(--bg-elev)}
+.msg{margin-top:14px;font-size:14px;font-weight:600;min-height:18px}
+.msg-ok{color:var(--ok)}
+.msg-err{color:var(--accent)}
+.muted{color:var(--text-dim);font-size:14px}
+.result{margin-top:24px;border:1px solid var(--line);border-left:3px solid var(--ok);background:var(--bg-elev);padding:22px 24px}
+.result h3{font-family:var(--font-display);font-size:16px;font-weight:700;margin-bottom:6px}
+.result .meta{font-size:13px;color:var(--text-mute);margin-bottom:12px}
+.table-wrap{overflow-x:auto}
+.lic-table{width:100%;border-collapse:collapse;font-size:14px}
+.lic-table th{text-align:left;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);padding:10px 12px;border-bottom:1px solid var(--line-hi);white-space:nowrap}
+.lic-table td{padding:12px;border-bottom:1px solid var(--line);color:var(--text-mute);vertical-align:top}
+.badge{display:inline-block;font-family:var(--font-mono);font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.badge-ok{background:rgba(26,127,55,.1);color:var(--ok)}
+.badge-exp{background:rgba(208,0,8,.08);color:var(--accent)}
+.badge-rev{background:rgba(90,90,90,.16);color:#5a5a5a}
+.actions{white-space:nowrap}
+.rowbtn{font-family:var(--font-body);font-size:12px;font-weight:600;padding:6px 11px;margin-right:4px;border:1px solid var(--line-hi);border-radius:6px;background:var(--bg);color:var(--text-mute);cursor:pointer;transition:all .15s}
+.rowbtn:hover{border-color:var(--accent);color:var(--accent)}
+.rowbtn-danger:hover{border-color:var(--accent);background:var(--accent);color:#fff}
+.footer{padding:40px var(--pad-x);border-top:1px solid var(--line);background:var(--bg-elev);position:relative;z-index:2;font-size:13px;color:var(--text-dim);text-align:center}
+@media(max-width:720px){.nav-links{gap:16px}.nav-links a:not(.nav-cta){display:none}.brand-logo{height:96px}}
+.card,.lm-card,.result,.note{background:var(--bg-card)!important}
+input,select,textarea{background:rgba(255,255,255,.04)!important;color:var(--text);border-color:var(--line-hi)}
+input:focus,select:focus{background:rgba(255,255,255,.07)!important;border-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M16 5l3 3"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-pkg" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/></symbol>
+</svg>
+
+<nav class="nav">
+  <a href="/" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  </a>
+  <div class="nav-links">
+    <a href="/">&larr; Launcher</a>
+    <a href="/admin/index.html">Admin Home</a>
+    <a href="/admin/clients.html">Client Manager</a>
+    <a href="/admin/license-manager.html">License Manager</a>
+    <a href="/admin/eclipse-licensing.html" class="active">Eclipse Licensing</a>
+    <button type="button" class="nav-cta" onclick="adminSignOut()" style="font:inherit;cursor:pointer;background:transparent">Sign Out</button>
+  </div>
+</nav>
+<script>
+function adminSignOut(){
+  fetch('/admin/api/logout', { method:'POST', credentials:'include' })
+    .then(function(){ location.href = '/admin/login.html'; })
+    .catch(function(){ location.href = '/admin/login.html'; });
+}
+</script>
+
+<header class="hub-hero-band">
+  <div class="hub-hero">
+    <div class="crumb"><a href="index.html">Admin Workspace</a> / Eclipse Licensing</div>
+    <h1>Eclipse Script Licensing</h1>
+    <p>Turn a clinic-neutral Eclipse/ESAPI script into a shippable, time-limited, site-locked bundle. Upload the script .zip, pick the clinic and term, and download the finished package — the license file is injected for you.</p>
+  </div>
+</header>
+
+<section class="section">
+  <div class="section-inner">
+
+    <div class="note">
+      <svg class="ic"><use href="#i-lock"/></svg>
+      <p>Your script .zip stays in your browser — it's never uploaded. The server only signs the <code>license.key</code> (site-locked to the clinic's AD domain, valid until the term) and logs it here. The bundle is assembled and downloaded locally. Issue a key for a product the first time and it's remembered for next time.</p>
+    </div>
+
+    <!-- Issue bundle -->
+    <div class="lm-card">
+      <h2>Issue a license bundle</h2>
+      <div class="sub">Pick the clinic, the product, the term, and upload the neutral script .zip.</div>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="clientSelect">Client</label>
+          <select id="clientSelect"><option value="">Loading…</option></select>
+        </div>
+        <div class="field" id="customerField" hidden>
+          <label for="customer">Customer / organization name</label>
+          <input type="text" id="customer" placeholder="e.g. General Hospital">
+        </div>
+
+        <div class="field">
+          <label for="productId">Product ID</label>
+          <input type="text" id="productId" list="productList" placeholder="e.g. portaldoseqa" autocomplete="off">
+          <datalist id="productList"></datalist>
+          <div class="hint">Must match the string the script's <code>LicenseGate.Check("…")</code> uses. New ones are remembered.</div>
+        </div>
+
+        <div class="field">
+          <label for="term">License term</label>
+          <select id="term">
+            <option value="365" selected>1 year</option>
+            <option value="730">2 years</option>
+            <option value="180">6 months</option>
+            <option value="90">90 days</option>
+            <option value="custom">Custom date…</option>
+          </select>
+          <div class="hint" id="expiryHint"></div>
+        </div>
+
+        <div class="field" id="customDateField" hidden>
+          <label for="customDate">Expiry date</label>
+          <input type="date" id="customDate">
+        </div>
+
+        <div class="field span2">
+          <label for="domains">Site-lock — Windows AD domain(s)</label>
+          <input type="text" id="domains" placeholder="GHDOMAIN, SITE2DOMAIN">
+          <div class="hint">Comma-separated. Auto-filled from the client. <strong>Leave blank to allow any workstation</strong> (not site-locked).</div>
+        </div>
+
+        <div class="field">
+          <label for="provider">Provider name (on the install PDF)</label>
+          <input type="text" id="provider" value="Radiant Medical Physics Consulting, LLC">
+        </div>
+        <div class="field">
+          <label for="support">Support email (on the install PDF)</label>
+          <input type="text" id="support" value="support@radiant-mpc.com">
+        </div>
+
+        <div class="field span2">
+          <label for="zipFile">Neutral script .zip</label>
+          <input type="file" id="zipFile" accept=".zip,application/zip">
+          <div class="hint">The client-neutral build (DLLs etc.). <code>license.key</code> + a branded install PDF are added; it's re-zipped and downloaded.</div>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary" id="buildBtn">
+        <svg class="ic"><use href="#i-pkg"/></svg> Generate &amp; Download Bundle
+      </button>
+      <div class="msg" id="formMsg" role="status"></div>
+
+      <div class="result" id="result" hidden>
+        <h3 id="resultTitle">Bundle ready</h3>
+        <div class="meta" id="resultMeta"></div>
+        <button type="button" class="btn btn-ghost" id="reDownloadBtn"><svg class="ic"><use href="#i-pkg"/></svg> Download again</button>
+      </div>
+    </div>
+
+    <!-- Issued licenses -->
+    <div class="lm-card">
+      <h2>Issued Eclipse licenses</h2>
+      <div class="sub">Renew re-mints a fresh license.key (no re-upload — the clinic already has the DLLs). Cancel = stop renewing; the key self-expires on its date.</div>
+      <div class="table-wrap">
+        <table class="lic-table">
+          <thead><tr><th>Clinic</th><th>Product</th><th>Site lock</th><th>Issued</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="licBody"><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="footer">© 2026 Radiant Medical Physics Consulting LLC · Admin</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+async function api(path, opts){
+  const res = await fetch(path, opts);
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
+  return data;
+}
+function showMsg(text, ok){ var el=document.getElementById('formMsg'); el.textContent=text||''; el.className='msg '+(ok?'msg-ok':'msg-err'); }
+
+// ---- clients + products + table ----
+var clientsById = {};
+async function loadClients(){
+  var sel = document.getElementById('clientSelect');
+  try {
+    var data = await api('/admin/api/clients');
+    clientsById = {};
+    (data.clients||[]).forEach(function(c){ clientsById[c.id]=c; });
+    sel.innerHTML = '<option value="">— select a client —</option>' +
+      (data.clients||[]).map(function(c){ return '<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>'; }).join('') +
+      '<option value="__new__">— type a new name —</option>';
+  } catch(e){ sel.innerHTML = '<option value="__new__">— type a new name —</option>'; }
+}
+async function loadProducts(){
+  try {
+    var data = await api('/admin/api/eclipse-products');
+    document.getElementById('productList').innerHTML =
+      (data.products||[]).map(function(p){ return '<option value="'+esc(p)+'">'; }).join('');
+  } catch(e){}
+}
+var licById = {};
+async function loadLicenses(){
+  var body = document.getElementById('licBody');
+  try {
+    var data = await api('/admin/api/eclipse-licenses');
+    licById = {};
+    (data.licenses||[]).forEach(function(l){ licById[l.id]=l; });
+    if (!data.licenses.length){ body.innerHTML='<tr><td colspan="7" class="muted">No Eclipse licenses issued yet.</td></tr>'; return; }
+    body.innerHTML = data.licenses.map(function(l){
+      var cls = l.status==='Active'?'badge-ok':(l.status==='Revoked'?'badge-rev':'badge-exp');
+      var who = l.client_name || l.customer;
+      var dom = l.domains.length ? esc(l.domains.join(', ')) : '<span class="muted">any site</span>';
+      var revBtn = l.revoked
+        ? '<button class="rowbtn" onclick="setRevoke(\''+l.id+'\',false)">Restore</button>'
+        : '<button class="rowbtn rowbtn-danger" onclick="setRevoke(\''+l.id+'\',true)">Cancel</button>';
+      return '<tr><td>'+esc(who)+'</td><td>'+esc(l.product_id)+'</td><td>'+dom+'</td><td>'+esc(l.issued)+
+        '</td><td>'+esc(l.expires)+'</td><td><span class="badge '+cls+'">'+esc(l.status)+'</span></td>'+
+        '<td class="actions"><button class="rowbtn" onclick="renew(\''+l.id+'\')">Renew</button>'+revBtn+
+        '<button class="rowbtn" onclick="copyKey(\''+l.id+'\')">Copy key</button></td></tr>';
+    }).join('');
+  } catch(e){ body.innerHTML='<tr><td colspan="7" class="muted">Could not load — '+esc(e.message)+'</td></tr>'; }
+}
+
+// ---- form helpers ----
+function onClientChange(){
+  var sel=document.getElementById('clientSelect'), val=sel.value;
+  var custF=document.getElementById('customerField');
+  if (val==='__new__'){ custF.hidden=false; document.getElementById('customer').focus(); return; }
+  custF.hidden=true;
+  var c=clientsById[val];
+  if (c && c.profile && c.profile.ad_domain){ document.getElementById('domains').value=c.profile.ad_domain; }
+}
+function onTermChange(){
+  var custom = document.getElementById('term').value==='custom';
+  document.getElementById('customDateField').hidden = !custom;
+  document.getElementById('expiryHint').textContent = custom ? '' : ('Expires ' + computeExpires());
+}
+function computeExpires(){
+  var sel=document.getElementById('term').value;
+  if (sel==='custom') return document.getElementById('customDate').value || '';
+  var d=new Date();
+  if (sel==='90') d.setDate(d.getDate()+90);
+  else if (sel==='180') d.setMonth(d.getMonth()+6);
+  else if (sel==='730') d.setFullYear(d.getFullYear()+2);
+  else d.setFullYear(d.getFullYear()+1);
+  return d.toISOString().slice(0,10);
+}
+function resolveCustomer(){
+  var sel=document.getElementById('clientSelect'), val=sel.value;
+  if (val==='__new__') return { customer: document.getElementById('customer').value.trim(), client_id: null };
+  var c=clientsById[val];
+  if (c) return { customer: c.name, client_id: c.id };
+  return { customer:'', client_id:null };
+}
+function domainList(){
+  return document.getElementById('domains').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+}
+function sanitize(s){ return String(s||'').replace(/[^A-Za-z0-9._-]+/g,'_').replace(/^_+|_+$/g,'') || 'license'; }
+
+function downloadBytes(bytes, filename, mime){
+  var blob = new Blob([bytes], { type: mime||'application/octet-stream' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+}
+
+// ---- branded install PDF (client-side) ----
+function makeInstallPdf(lic, provider, support){
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ unit:'pt', format:'letter' });
+  var x=56, y=70;
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(208,0,8);
+  doc.text(provider || 'Software License', x, y); y+=10;
+  doc.setDrawColor(208,0,8); doc.setLineWidth(2); doc.line(x, y, 556, y); y+=34;
+  doc.setTextColor(20,20,20); doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.text('Software License & Installation', x, y); y+=28;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11.5); doc.setTextColor(60,60,60);
+  function row(k,v){ doc.setFont('helvetica','bold'); doc.text(k, x, y); doc.setFont('helvetica','normal'); doc.text(String(v), x+150, y); y+=20; }
+  row('Prepared for:', lic.customer);
+  row('Product:', lic.product_id);
+  row('License term:', lic.issued + '  to  ' + lic.expires);
+  row('Site lock:', lic.domains && lic.domains.length ? lic.domains.join(', ') : 'Any workstation (not site-locked)');
+  y+=12;
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,20,20);
+  doc.text('Installation', x, y); y+=22;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(60,60,60);
+  var steps = [
+    '1.  Copy "license.key" to:  %AppData%\\RadiantEsapi\\Licensing\\',
+    '     (create the folders if they do not exist). A copy is also placed next to the DLLs.',
+    '2.  Deploy the included DLLs to your Eclipse / Portal Dosimetry PublishedScripts folder.',
+    '3.  Launch the tool from the Eclipse Scripts menu — it will start once the license is found.'
+  ];
+  steps.forEach(function(s){ doc.text(s, x, y); y+=18; });
+  y+=14;
+  doc.setFont('helvetica','bold'); doc.text('Renewal', x, y); y+=18;
+  doc.setFont('helvetica','normal');
+  doc.text('This license expires on ' + lic.expires + '. Contact ' + (support||'') + ' before then to renew —', x, y); y+=16;
+  doc.text('you will receive a replacement license.key; no reinstall of the software is needed.', x, y); y+=30;
+  doc.setTextColor(140,140,140); doc.setFontSize(10);
+  doc.text('Questions: ' + (support||''), x, y);
+  return new Uint8Array(doc.output('arraybuffer'));
+}
+function makeReadme(lic, provider, support){
+  return [
+    (provider||'Software License') + ' — ' + lic.product_id,
+    '',
+    'Licensed to: ' + lic.customer,
+    'Term: ' + lic.issued + ' to ' + lic.expires,
+    'Site lock: ' + (lic.domains&&lic.domains.length ? lic.domains.join(', ') : 'any workstation'),
+    '',
+    'Install: copy license.key to %AppData%\\RadiantEsapi\\Licensing\\ , deploy the DLLs to your',
+    'Eclipse/Portal Dosimetry PublishedScripts folder, then launch from the Scripts menu.',
+    'See Install_and_Activation.pdf for details. Renewals: ' + (support||'') + '.',
+    ''
+  ].join('\n');
+}
+
+// ---- build the full bundle (browser-side) ----
+async function buildBundle(){
+  if (!window.fflate || !window.jspdf){ showMsg('Packaging libraries did not load — check your connection and reload.', false); return; }
+  var file = document.getElementById('zipFile').files[0];
+  if (!file){ showMsg('Choose the neutral script .zip first.', false); return; }
+  var who = resolveCustomer();
+  var productId = document.getElementById('productId').value.trim().toLowerCase();
+  var expires = computeExpires();
+  var domains = domainList();
+  var provider = document.getElementById('provider').value.trim();
+  var support = document.getElementById('support').value.trim();
+  if (!who.customer){ showMsg('Pick a client or type a customer name.', false); return; }
+  if (!productId){ showMsg('Enter the product ID.', false); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expires)){ showMsg('Pick a valid term / expiry date.', false); return; }
+  if (!domains.length && !confirm('No site-lock domain set — this key will run on ANY workstation. Continue?')) return;
+
+  var btn=document.getElementById('buildBtn'); btn.disabled=true; showMsg('Signing license…', true);
+  try {
+    var signed = await api('/admin/api/eclipse-license', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ client_id: who.client_id, customer: who.customer, product_id: productId, expires: expires, domains: domains })
+    });
+    var lic = signed.license;
+
+    showMsg('Packaging bundle…', true);
+    var buf = new Uint8Array(await file.arrayBuffer());
+    var entries = window.fflate.unzipSync(buf);
+    var out = {}; for (var k in entries) out[k] = entries[k];
+    var keyBytes = window.fflate.strToU8(lic.key);
+    out['license.key'] = keyBytes;
+    // also drop license.key next to every DLL directory (so next-to-DLL discovery works too)
+    var dirs = {};
+    for (var p in entries){ if (/\.dll$/i.test(p)){ var dir = p.indexOf('/')>=0 ? p.slice(0,p.lastIndexOf('/')+1) : ''; if (dir) dirs[dir]=1; } }
+    Object.keys(dirs).forEach(function(dir){ out[dir+'license.key']=keyBytes; });
+    out['Install_and_Activation.pdf'] = makeInstallPdf(lic, provider, support);
+    out['README.txt'] = window.fflate.strToU8(makeReadme(lic, provider, support));
+
+    var zipped = window.fflate.zipSync(out, { level: 6 });
+    var fname = sanitize(lic.customer) + '_' + sanitize(lic.product_id) + '_' + lic.expires + '.zip';
+    window._lastBundle = { bytes: zipped, name: fname };
+    downloadBytes(zipped, fname, 'application/zip');
+
+    document.getElementById('result').hidden=false;
+    document.getElementById('resultTitle').textContent='Bundle ready — '+fname;
+    document.getElementById('resultMeta').textContent =
+      lic.customer+'  ·  '+lic.product_id+'  ·  '+lic.issued+' → '+lic.expires+'  ·  '+
+      (lic.domains.length?lic.domains.join(', '):'any site');
+    showMsg('Done — bundle downloaded and license logged.', true);
+    loadProducts(); loadLicenses();
+  } catch(e){ showMsg(e.message, false); }
+  finally { btn.disabled=false; }
+}
+
+// ---- renew: re-mint just the license.key (clinic already has the DLLs) ----
+async function renew(id){
+  var l = licById[id]; if (!l) return;
+  var daysStr = prompt('Renew "'+ (l.client_name||l.customer) +'" — '+l.product_id+'\n\nNew term in days from today (e.g. 365):', '365');
+  if (daysStr===null) return;
+  var days = parseInt(daysStr,10);
+  if (!(days>=1)){ alert('Enter a whole number of days (1 or more).'); return; }
+  var d=new Date(); d.setDate(d.getDate()+days); var expires=d.toISOString().slice(0,10);
+  try {
+    var signed = await api('/admin/api/eclipse-license', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ client_id: l.client_id, customer: l.customer, product_id: l.product_id, expires: expires, domains: l.domains })
+    });
+    downloadBytes(window.fflate.strToU8(signed.license.key), 'license.key', 'text/plain');
+    alert('Renewed to '+expires+'. The new license.key downloaded — send it to the clinic to drop into\n%AppData%\\RadiantEsapi\\Licensing\\ (replaces the old one). No reinstall needed.');
+    loadLicenses();
+  } catch(e){ alert('Could not renew: '+e.message); }
+}
+async function setRevoke(id, revoke){
+  var l=licById[id]; var who=l?(l.client_name||l.customer):'this license';
+  if (revoke && !confirm('Cancel the license for '+who+'?\n\nOffline keys cannot be remotely killed — this marks it cancelled here so you stop renewing it. It still works on the clinic\'s machine until its expiry date.')) return;
+  try { await api('/admin/api/licenses/'+encodeURIComponent(id)+'/'+(revoke?'revoke':'unrevoke'), {method:'POST'}); loadLicenses(); }
+  catch(e){ alert('Could not update: '+e.message); }
+}
+function copyKey(id){
+  var l=licById[id]; if(!l) return;
+  if (navigator.clipboard) navigator.clipboard.writeText(l.key);
+  alert('License key copied to clipboard.');
+}
+
+document.getElementById('clientSelect').addEventListener('change', onClientChange);
+document.getElementById('term').addEventListener('change', onTermChange);
+document.getElementById('customDate').addEventListener('change', onTermChange);
+document.getElementById('buildBtn').addEventListener('click', buildBundle);
+document.getElementById('reDownloadBtn').addEventListener('click', function(){ if(window._lastBundle) downloadBytes(window._lastBundle.bytes, window._lastBundle.name, 'application/zip'); });
+
+onTermChange();
+loadClients();
+loadProducts();
+loadLicenses();
+</script>
+<script src="/session-guard.js" defer></script>
+</body>
+</html>

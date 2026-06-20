@@ -140,6 +140,7 @@ code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!importan
     <a href="/admin/index.html" class="active">Admin Home</a>
     <a href="/admin/clients.html">Client Manager</a>
     <a href="/admin/license-manager.html">License Manager</a>
+    <a href="/admin/eclipse-licensing.html">Eclipse Licensing</a>
     <button type="button" class="nav-cta" onclick="adminSignOut()"
       style="font:inherit;cursor:pointer;background:transparent">Sign Out</button>
   </div>
@@ -192,6 +193,14 @@ function adminSignOut(){
         <h3>Client Manager</h3>
         <p>Add, edit, and delete client organizations — facility details (address, R&amp;V / TPS / linac vendors), contacts, locations, and the modules each location can access. Clients here are selectable in the License Manager.</p>
         <span class="card-link">Open Client Manager <svg class="ic"><use href="#i-arrow-right"/></svg></span>
+      </a>
+
+      <a class="prod-card" href="eclipse-licensing.html">
+        <div class="card-icon"><svg class="ic"><use href="#i-key"/></svg></div>
+        <span class="soon-tag soon-tag--live">Available</span>
+        <h3>Eclipse Licensing</h3>
+        <p>Package a clinic-neutral Eclipse/ESAPI script into a shippable, time-limited, site-locked .zip — upload the script, pick the clinic and term, download the bundle with the license file injected. Renew or cancel from the issued list.</p>
+        <span class="card-link">Open Eclipse Licensing <svg class="ic"><use href="#i-arrow-right"/></svg></span>
       </a>
 
     </div>

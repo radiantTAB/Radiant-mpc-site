@@ -35,6 +35,17 @@ function cleanProducts(products) {
   return [...set].sort();
 }
 
+// Sorted, de-duplicated, UPPER-cased list of non-empty AD-domain strings
+// (site-lock). Matches radkey_sign.py: sorted({d.strip().upper()}).
+function cleanDomains(domains) {
+  const set = new Set();
+  for (const d of domains || []) {
+    const s = String(d).trim().toUpperCase();
+    if (s) set.add(s);
+  }
+  return [...set].sort();
+}
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -48,13 +59,15 @@ function addDays(iso, days) {
 // Canonical UTF-8 JSON bytes: keys in sorted order, compact separators.
 // Matches Python json.dumps(sort_keys=True, separators=(",",":")).
 function payloadToBytes(payload) {
-  const ordered = {
-    customer: payload.customer,
-    expires: payload.expires,
-    id: payload.id,
-    issued: payload.issued,
-    products: payload.products,
-  };
+  // Keys MUST be emitted in sorted order (matches Python json.dumps sort_keys=True).
+  // `domains` sorts between customer and expires; included only when present, so
+  // tokens WITHOUT a site-lock stay byte-identical to before (web-app keys unchanged).
+  const ordered = { customer: payload.customer };
+  if (payload.domains && payload.domains.length) ordered.domains = payload.domains;
+  ordered.expires = payload.expires;
+  ordered.id = payload.id;
+  ordered.issued = payload.issued;
+  ordered.products = payload.products;
   return new TextEncoder().encode(JSON.stringify(ordered));
 }
 
@@ -85,16 +98,26 @@ async function importPrivateKey(pem) {
 
 // Issue a signed license key. Returns { id, customer, issued, expires,
 // products, key }. `pem` is the private signing key.
-export async function signLicense(pem, customer, days, products) {
+export async function signLicense(pem, customer, days, products, opts = {}) {
   customer = String(customer || "").trim();
   if (!customer) throw new Error("Customer name is required.");
-  days = parseInt(days, 10);
-  if (!Number.isInteger(days) || days < 1) {
-    throw new Error("Trial length must be at least 1 day.");
-  }
 
   const issued = todayISO();
-  const expires = addDays(issued, days);
+  let expires;
+  if (opts.expires) {
+    // Explicit expiry date (used by offline/Eclipse bundles with year-length terms).
+    expires = String(opts.expires).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expires)) {
+      throw new Error("Expiry must be an ISO date (YYYY-MM-DD).");
+    }
+  } else {
+    days = parseInt(days, 10);
+    if (!Number.isInteger(days) || days < 1) {
+      throw new Error("Trial length must be at least 1 day.");
+    }
+    expires = addDays(issued, days);
+  }
+
   const payload = {
     id: crypto.randomUUID().replace(/-/g, "").slice(0, 12),
     customer,
@@ -102,6 +125,9 @@ export async function signLicense(pem, customer, days, products) {
     expires,
     products: cleanProducts(products),
   };
+  // Optional AD-domain site-lock for offline/Eclipse packages.
+  const domains = cleanDomains(opts.domains);
+  if (domains.length) payload.domains = domains;
 
   const payloadBytes = payloadToBytes(payload);
   const key = await importPrivateKey(pem);

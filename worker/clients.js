@@ -68,6 +68,7 @@ const CLIENT_PROFILE_COLUMNS = [
   "linac_vendor",
   "linac_models",
   "num_linacs",
+  "ad_domain", // Windows AD domain(s) for offline/Eclipse license site-lock (comma-separated)
 ];
 
 // Self-healing migration for the profile columns. Runs once per isolate

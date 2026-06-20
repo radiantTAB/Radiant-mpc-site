@@ -360,6 +360,23 @@ function licenseStatus(row, today) {
   return "Active";
 }
 
+// Self-healing migration for the Eclipse-licensing columns on `licenses`.
+// Runs once per isolate; each ALTER is wrapped so the duplicate-column error
+// after the first deploy is ignored. (client_id may already exist from the
+// web License Manager path — the try/catch makes that harmless.)
+let _eclipseColumnsEnsured = false;
+async function ensureEclipseColumns(env) {
+  if (_eclipseColumnsEnsured) return;
+  for (const col of ["client_id TEXT", "kind TEXT", "domains TEXT"]) {
+    try {
+      await env.DB.prepare("ALTER TABLE licenses ADD COLUMN " + col).run();
+    } catch (_) {
+      // already exists -- ignore
+    }
+  }
+  _eclipseColumnsEnsured = true;
+}
+
 // PUBLIC: the list of revoked license-key IDs. A Radiant app can fetch this
 // and refuse a key whose id is listed. NOTE: app-side checking is a separate
 // update to each Radiant app — until an app is updated, revoking a key only
@@ -512,6 +529,118 @@ async function handleApi(request, env, url) {
     }
     await env.DB.prepare("DELETE FROM licenses WHERE id = ?").bind(id).run();
     return json({ ok: true, id, deleted: true });
+  }
+
+  // ===== Eclipse offline-script licensing =====
+
+  // POST /admin/api/eclipse-license — sign a domain-locked, timed license.key
+  // for an offline Eclipse/ESAPI script and record it (kind='eclipse'). The
+  // zip packaging happens in the browser; this endpoint only signs + logs.
+  if (path === "/admin/api/eclipse-license" && method === "POST") {
+    if (!env.DB) return json({ error: "Database is not connected yet." }, 500);
+    if (!env.LICENSE_SIGNING_KEY) {
+      return json({ error: "Signing key is not configured (set LICENSE_SIGNING_KEY)." }, 500);
+    }
+    await ensureEclipseColumns(env);
+
+    const body = await request.json().catch(() => ({}));
+    const productId = String(body.product_id || "").trim().toLowerCase();
+    const expires = String(body.expires || "").slice(0, 10);
+    const clientId = String(body.client_id || "").trim() || null;
+    let customer = String(body.customer || "").trim();
+    const domains = Array.isArray(body.domains)
+      ? body.domains
+      : String(body.domains || "").split(",");
+
+    if (!productId) return json({ error: "Product ID is required." }, 400);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expires)) {
+      return json({ error: "A valid expiry date (YYYY-MM-DD) is required." }, 400);
+    }
+    // A chosen client always names the licensee (overrides any typed name).
+    if (clientId) {
+      const c = await env.DB.prepare("SELECT name FROM clients WHERE id = ?").bind(clientId).first();
+      if (c && c.name) customer = c.name;
+    }
+    if (!customer) return json({ error: "Pick a client or enter a customer name." }, 400);
+
+    let result;
+    try {
+      result = await signLicense(env.LICENSE_SIGNING_KEY, customer, null, [productId], {
+        expires,
+        domains,
+      });
+    } catch (e) {
+      return json({ error: "Could not sign the license: " + e.message }, 400);
+    }
+    const domStr = (result.domains || []).join(",");
+
+    await env.DB.prepare(
+      "INSERT INTO licenses (id, customer, issued, expires, key, created_at, products, client_id, kind, domains) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'eclipse', ?)"
+    )
+      .bind(
+        result.id,
+        result.customer,
+        result.issued,
+        result.expires,
+        result.key,
+        new Date().toISOString(),
+        productId,
+        clientId,
+        domStr
+      )
+      .run();
+
+    return json({
+      ok: true,
+      license: {
+        id: result.id,
+        customer: result.customer,
+        issued: result.issued,
+        expires: result.expires,
+        key: result.key,
+        product_id: productId,
+        domains: result.domains || [],
+      },
+    });
+  }
+
+  // GET /admin/api/eclipse-licenses — issued Eclipse licenses, newest first.
+  if (path === "/admin/api/eclipse-licenses" && method === "GET") {
+    if (!env.DB) return json({ error: "Database is not connected yet." }, 500);
+    await ensureEclipseColumns(env);
+    const { results } = await env.DB.prepare(
+      "SELECT l.*, c.name AS client_name FROM licenses l " +
+        "LEFT JOIN clients c ON c.id = l.client_id " +
+        "WHERE l.kind = 'eclipse' ORDER BY l.created_at DESC"
+    ).all();
+    const today = todayISO();
+    return json({
+      licenses: (results || []).map((r) => ({
+        id: r.id,
+        customer: r.customer,
+        client_id: r.client_id || null,
+        client_name: r.client_name || null,
+        product_id: r.products || "",
+        domains: r.domains ? r.domains.split(",").filter(Boolean) : [],
+        issued: r.issued,
+        expires: r.expires,
+        revoked: !!r.revoked,
+        status: licenseStatus(r, today),
+        key: r.key,
+      })),
+    });
+  }
+
+  // GET /admin/api/eclipse-products — distinct product IDs already issued, so
+  // the form's datalist remembers them (no catalog to maintain / redeploy).
+  if (path === "/admin/api/eclipse-products" && method === "GET") {
+    if (!env.DB) return json({ products: [] });
+    await ensureEclipseColumns(env);
+    const { results } = await env.DB.prepare(
+      "SELECT DISTINCT products FROM licenses WHERE kind = 'eclipse' AND products <> '' ORDER BY products"
+    ).all();
+    return json({ products: (results || []).map((r) => r.products).filter(Boolean) });
   }
 
   return json({ error: "Not found." }, 404);
