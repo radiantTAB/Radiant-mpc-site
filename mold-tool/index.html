@@ -1,0 +1,1017 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Silicone Mold Designer</title>
+<style>
+  :root {
+    --bg:            #0e1116;
+    --panel:         #171b22;
+    --panel-2:       #1f242d;
+    --border:        #2a3140;
+    --ink:           #e5e9f0;
+    --ink-dim:       #9aa3b2;
+    --ink-mute:      #6a7382;
+    --accent:        #4dc0b5;
+    --accent-hi:     #6ad6cc;
+    --accent-lo:     #38a89e;
+    --pour:          #f6c453;
+    --top:           #ff6b6b;
+    --bot:           #4a9eff;
+    --danger:        #ef4444;
+    --warn:          #f59e0b;
+    --ok:            #22c55e;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+            Arial, "Noto Sans", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font); font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+
+  /* ----- top bar ----- */
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex: 0 0 auto;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; letter-spacing: 0.2px;
+  }
+  .brand .logo-cube {
+    width: 22px; height: 22px;
+    display: inline-grid; place-items: center;
+    background: var(--accent); color: #0e1116;
+    border-radius: 5px; font-weight: 800; font-size: 13px;
+  }
+  .brand .title { font-size: 15px; }
+  .brand .sub {
+    color: var(--ink-dim); font-weight: 500; font-size: 12px;
+    padding-left: 8px; border-left: 1px solid var(--border); margin-left: 4px;
+  }
+  .topbar .grow { flex: 1; }
+  .topbar .kbd {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--ink-mute);
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 7px;
+  }
+
+  /* ----- main split ----- */
+  main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  aside {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 12px 14px 24px;
+  }
+  .viewer {
+    position: relative;
+    background: #0a0d12;
+    min-height: 0;
+  }
+  #gl { display: block; width: 100%; height: 100%; }
+
+  /* ----- controls ----- */
+  .group {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px 12px;
+    margin-bottom: 10px;
+  }
+  .group h2 {
+    margin: 0 0 8px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px;
+    text-transform: uppercase; color: var(--ink-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .group h2 .num {
+    width: 16px; height: 16px; border-radius: 3px;
+    background: var(--accent); color: #0e1116;
+    display: inline-grid; place-items: center;
+    font-size: 10px; font-weight: 800;
+  }
+  .grid2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+  }
+  .grid1 { display: grid; grid-template-columns: 1fr; gap: 6px 10px; }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field label {
+    font-size: 10.5px; font-weight: 600; color: var(--ink-dim);
+    letter-spacing: 0.2px;
+  }
+  .field input[type="number"], .field select {
+    background: var(--bg); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 5px;
+    padding: 6px 8px; font-family: var(--mono); font-size: 12.5px;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(77,192,181,0.22);
+  }
+  .field .hint { font-size: 10.5px; color: var(--ink-mute); }
+
+  .slider {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .slider input[type="range"] {
+    flex: 1; accent-color: var(--accent);
+  }
+  .slider .v {
+    font-family: var(--mono); font-size: 11.5px;
+    color: var(--ink); min-width: 58px; text-align: right;
+  }
+
+  /* ----- buttons ----- */
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  button {
+    font-family: var(--font); font-size: 12.5px; font-weight: 600;
+    padding: 8px 12px; border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--ink);
+    cursor: pointer;
+    transition: background .12s, border-color .12s, transform .05s;
+    flex: 1;
+  }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary {
+    background: var(--accent); color: #071013; border-color: transparent;
+  }
+  button.primary:hover:not(:disabled) { background: var(--accent-hi); }
+  button.ghost:hover:not(:disabled) {
+    border-color: var(--accent); color: var(--accent);
+  }
+
+  /* ----- drop zone ----- */
+  .drop {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 6px;
+    padding: 18px 12px;
+    border: 2px dashed var(--border); border-radius: 7px;
+    color: var(--ink-dim); cursor: pointer;
+    transition: border-color .12s, background .12s, color .12s;
+    text-align: center;
+  }
+  .drop:hover, .drop.hover {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(77,192,181,0.06);
+  }
+  .drop.loaded {
+    border-style: solid; border-color: var(--ok);
+    background: rgba(34,197,94,0.06);
+    color: var(--ink);
+  }
+  .drop .name {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--ink); word-break: break-all;
+  }
+  .drop .msg { font-size: 11px; }
+  .drop svg { width: 26px; height: 26px; }
+  input[type="file"] { display: none; }
+
+  /* ----- info + errors ----- */
+  .info {
+    font-size: 11.5px; color: var(--ink-dim);
+    line-height: 1.55; padding: 6px 2px 0;
+  }
+  .info b { color: var(--ink); font-weight: 700; }
+  .kv {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-family: var(--mono); font-size: 11.5px;
+    color: var(--ink-dim); padding: 2px 0;
+  }
+  .kv .k { color: var(--ink-mute); }
+  .kv .v { color: var(--ink); }
+  .err {
+    font-size: 11px; color: #ffbaba;
+    background: rgba(239,68,68,0.10);
+    border: 1px solid rgba(239,68,68,0.35);
+    border-radius: 5px;
+    padding: 8px 10px; margin-top: 8px;
+    font-family: var(--mono); line-height: 1.45;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .warn {
+    font-size: 11px; color: #ffd48a;
+    background: rgba(245,158,11,0.10);
+    border: 1px solid rgba(245,158,11,0.35);
+    border-radius: 5px; padding: 8px 10px; margin-top: 8px;
+  }
+
+  /* ----- viewer overlays ----- */
+  .over {
+    position: absolute;
+    padding: 8px 12px;
+    background: rgba(23,27,34,0.85);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .over.legend {
+    left: 14px; top: 14px; color: var(--ink-dim); max-width: 260px;
+  }
+  .over.legend .sw {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 2px; margin-right: 6px; vertical-align: middle;
+  }
+  .over.status {
+    left: 14px; bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .chip {
+    padding: 2px 8px; border-radius: 10px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: var(--panel-2); color: var(--ink-dim);
+    border: 1px solid var(--border);
+  }
+  .chip.ok    { color: var(--ok);     border-color: rgba(34,197,94,0.4); }
+  .chip.warn  { color: var(--warn);   border-color: rgba(245,158,11,0.4); }
+  .chip.err   { color: var(--danger); border-color: rgba(239,68,68,0.4); }
+
+  .over.viewctl {
+    right: 14px; top: 14px;
+    display: flex; flex-direction: column; gap: 8px; min-width: 200px;
+  }
+  .over.viewctl .toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+  }
+  .over.viewctl label {
+    font-size: 11px; color: var(--ink-dim);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .over.viewctl input[type="range"] {
+    width: 120px; accent-color: var(--accent);
+  }
+  .over.viewctl input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+
+  /* ----- busy overlay ----- */
+  .busy {
+    position: absolute; inset: 0;
+    background: rgba(10,13,18,0.72);
+    display: none; align-items: center; justify-content: center;
+    z-index: 30;
+  }
+  .busy.on { display: flex; }
+  .busy .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 26px;
+    text-align: center; min-width: 220px;
+  }
+  .busy .spinner {
+    width: 22px; height: 22px; margin: 0 auto 8px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .busy .msg { font-size: 13px; font-weight: 600; }
+  .busy .sub { font-size: 11px; color: var(--ink-dim); margin-top: 4px; }
+
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; grid-template-rows: 45vh 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="logo-cube">M</span>
+    <span class="title">Silicone Mold Designer</span>
+    <span class="sub">STL in · two-part printable mold out</span>
+  </div>
+  <div class="grow"></div>
+  <span class="kbd">double-click viewer to toggle bolus</span>
+</div>
+
+<main>
+  <aside>
+
+    <!-- 1. INPUT -->
+    <div class="group">
+      <h2><span class="num">1</span> Input mesh</h2>
+      <label class="drop" id="drop" for="file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 19h16"/>
+        </svg>
+        <div class="name" id="fname">Drop or click for .stl</div>
+        <div class="msg" id="fmsg">binary or ASCII STL</div>
+      </label>
+      <input type="file" id="file" accept=".stl" />
+      <div class="row">
+        <button class="ghost" id="btn-demo">Load demo shape</button>
+      </div>
+      <div class="info" id="mesh-info">No mesh loaded.</div>
+    </div>
+
+    <!-- 2. OUTER BLOCK -->
+    <div class="group">
+      <h2><span class="num">2</span> Outer block</h2>
+      <div class="grid2">
+        <div class="field">
+          <label>Wall (mm)</label>
+          <input type="number" id="wall"     value="5"   min="2" max="20" step="0.5"/>
+        </div>
+        <div class="field">
+          <label>Floor (mm)</label>
+          <input type="number" id="floor"    value="5"   min="2" max="20" step="0.5"/>
+        </div>
+        <div class="field">
+          <label>Headroom (mm)</label>
+          <input type="number" id="headroom" value="10"  min="0" max="30" step="1"/>
+        </div>
+        <div class="field">
+          <label>Cast scale ×</label>
+          <input type="number" id="cscale"   value="1"   min="1" max="1.05" step="0.001"/>
+          <div class="hint">1.005 ≈ silicone shrink</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. POUR SPOUT -->
+    <div class="group">
+      <h2><span class="num">3</span> Pour spout</h2>
+      <div class="grid2">
+        <div class="field">
+          <label>Top Ø (mm)</label>
+          <input type="number" id="s-top" value="14" min="4" max="30" step="0.5"/>
+          <div class="hint">wide, easy pour</div>
+        </div>
+        <div class="field">
+          <label>Bottom Ø (mm)</label>
+          <input type="number" id="s-bot" value="6"  min="3" max="20" step="0.5"/>
+          <div class="hint">into cavity</div>
+        </div>
+        <div class="field">
+          <label>Collar height (mm)</label>
+          <input type="number" id="s-ext" value="10" min="0" max="30" step="1"/>
+        </div>
+        <div class="field">
+          <label>Collar wall (mm)</label>
+          <input type="number" id="s-wall" value="2.5" min="1" max="6" step="0.5"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. SPLIT -->
+    <div class="group">
+      <h2><span class="num">4</span> Parting plane (Z)</h2>
+      <div class="slider">
+        <input type="range" id="split" min="0" max="100" value="50" step="1"/>
+        <span class="v" id="split-val">— mm</span>
+      </div>
+      <div class="hint" style="margin-top:6px;">
+        Two halves meet at this Z. Default = bolus mid-height.
+      </div>
+    </div>
+
+    <!-- 5. PEGS -->
+    <div class="group">
+      <h2><span class="num">5</span> Registration pegs</h2>
+      <div class="grid2">
+        <div class="field">
+          <label>Count</label>
+          <select id="peg-n">
+            <option value="0">None</option>
+            <option value="4" selected>4 corners</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Diameter (mm)</label>
+          <input type="number" id="peg-d" value="6" min="3" max="12" step="0.5"/>
+        </div>
+        <div class="field">
+          <label>Depth (mm)</label>
+          <input type="number" id="peg-h" value="8" min="4" max="15" step="0.5"/>
+        </div>
+        <div class="field">
+          <label>Slip (mm)</label>
+          <input type="number" id="peg-s" value="0.15" min="0" max="0.5" step="0.05"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="group">
+      <div class="row">
+        <button class="primary" id="btn-build" disabled>Build mold</button>
+      </div>
+      <div class="row">
+        <button class="ghost" id="btn-export" disabled>Export both STLs</button>
+      </div>
+      <div id="err-slot"></div>
+    </div>
+
+    <div class="info">
+      <b>Filament tip:</b> each half prints flat side (parting face) down on the
+      bed. Supports needed only under the pour spout collar.
+    </div>
+
+  </aside>
+
+  <section class="viewer">
+    <canvas id="gl"></canvas>
+
+    <div class="over legend" id="legend">
+      <div><b>Silicone Mold Designer</b></div>
+      <div style="margin-top:4px;">Load an STL of the object you want to cast.</div>
+      <div style="margin-top:6px;">
+        <span class="sw" style="background:#7d8590"></span>Bolus
+        &nbsp; <span class="sw" style="background:#ff6b6b"></span>Top half
+        &nbsp; <span class="sw" style="background:#4a9eff"></span>Bottom half
+      </div>
+    </div>
+
+    <div class="over viewctl" id="viewctl" style="display:none;">
+      <div class="toggle">
+        <label><input type="checkbox" id="show-bolus" checked/> show bolus</label>
+      </div>
+      <div class="toggle">
+        <label>explode</label>
+        <input type="range" id="explode" min="0" max="120" value="0" step="1"/>
+      </div>
+    </div>
+
+    <div class="over status" id="status">
+      <span class="chip" id="chip">Idle</span>
+      <span id="status-text">Loading manifold-3d…</span>
+    </div>
+
+    <div class="busy" id="busy">
+      <div class="card">
+        <div class="spinner"></div>
+        <div class="msg" id="busy-msg">Working…</div>
+        <div class="sub">boolean ops on real anatomy can take a few seconds</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "manifold-3d": "https://cdn.jsdelivr.net/npm/manifold-3d@3.0.1/manifold.js"
+  }
+}
+</script>
+
+<script type="module">
+/* ============================================================
+ *  Silicone Mold Designer
+ *  Pure browser tool. STL upload → two-part rigid mold with
+ *  pour spout and registration pegs → STL downloads.
+ *
+ *  Stack: three.js (viewer + STL I/O), manifold-3d (WASM
+ *  boolean mesh ops). No server, no build.
+ * ============================================================ */
+
+import * as THREE from 'three';
+import { OrbitControls }      from 'three/addons/controls/OrbitControls.js';
+import { STLLoader }          from 'three/addons/loaders/STLLoader.js';
+import { STLExporter }        from 'three/addons/exporters/STLExporter.js';
+import { mergeVertices }      from 'three/addons/utils/BufferGeometryUtils.js';
+import Module                 from 'manifold-3d';
+
+// ---------- state ----------
+const app = {
+  wasm: null,
+  bolus: {
+    geometry:  null,
+    manifold:  null,
+    mesh:      null,   // THREE.Mesh in scene
+    bbox:      null,
+  },
+  halves: {
+    top:      null,    // Manifold
+    bot:      null,    // Manifold
+    topMesh:  null,    // THREE.Mesh
+    botMesh:  null,    // THREE.Mesh
+    plane:    null,    // parting-plane preview
+    partingZ: 0,
+  },
+};
+
+// ---------- DOM ----------
+const $ = (id) => document.getElementById(id);
+const canvas   = $('gl');
+const chip     = $('chip');
+const chipText = $('status-text');
+const legend   = $('legend');
+const viewctl  = $('viewctl');
+const busy     = $('busy');
+const busyMsg  = $('busy-msg');
+const btnBuild = $('btn-build');
+const btnExp   = $('btn-export');
+const errSlot  = $('err-slot');
+
+// ---------- three.js viewer ----------
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0d12);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
+camera.up.set(0, 0, 1);
+camera.position.set(180, -180, 140);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const key = new THREE.DirectionalLight(0xffffff, 0.9);
+key.position.set(140, -180, 220);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x8cd8ff, 0.3);
+rim.position.set(-180, 120, 60);
+scene.add(rim);
+
+const grid = new THREE.GridHelper(300, 30, 0x2a3140, 0x1c2029);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+scene.add(new THREE.AxesHelper(24));
+
+const moldGrp = new THREE.Group();
+scene.add(moldGrp);
+
+function fit() {
+  const r = canvas.getBoundingClientRect();
+  renderer.setSize(Math.max(2, r.width), Math.max(2, r.height), false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(fit).observe(canvas);
+addEventListener('resize', fit);
+fit();
+(function loop() {
+  requestAnimationFrame(loop);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+// ---------- status / busy / errors ----------
+function setStatus(kind, txt) {
+  chip.className = 'chip ' + (kind || '');
+  chip.textContent =
+    kind === 'ok'   ? 'Ready'  :
+    kind === 'warn' ? 'Warn'   :
+    kind === 'err'  ? 'Error'  : 'Idle';
+  chipText.textContent = txt;
+}
+function setBusy(on, msg) {
+  busy.classList.toggle('on', !!on);
+  if (msg) busyMsg.textContent = msg;
+}
+function clearErr() { errSlot.innerHTML = ''; }
+function showErr(e) {
+  clearErr();
+  const div = document.createElement('div');
+  div.className = 'err';
+  div.textContent = (e && e.stack) ? e.stack : (e && e.message) || String(e);
+  errSlot.appendChild(div);
+  setStatus('err', 'Something failed — see left panel.');
+  console.error(e);
+}
+function tick() { return new Promise(r => requestAnimationFrame(r)); }
+
+// ---------- manifold-3d bootstrap ----------
+try {
+  const wasm = await Module();
+  wasm.setup();
+  app.wasm = wasm;
+  setStatus('', 'Load an STL to begin.');
+} catch (e) {
+  showErr(new Error(
+    'Failed to load manifold-3d WASM.\n' +
+    '(Check network, CSP, or CDN block.)\n\n' + (e && e.message)
+  ));
+}
+
+// ---------- geometry conversion helpers ----------
+function geoToManifold(geo) {
+  const { Manifold, Mesh } = app.wasm;
+  // Manifold requires an INDEXED mesh where every edge is shared. STLLoader
+  // returns unindexed vertices — mergeVertices dedupes with a small tolerance.
+  const g0 = new THREE.BufferGeometry();
+  g0.setAttribute('position',
+    new THREE.BufferAttribute(geo.attributes.position.array.slice(), 3));
+  if (geo.index) g0.setIndex(geo.index.clone());
+  const g = mergeVertices(g0, 1e-4);
+  const positions = g.attributes.position.array;
+  const indices   = g.index.array;
+  const mesh = new Mesh({
+    numProp:        3,
+    vertProperties: positions instanceof Float32Array ? positions : new Float32Array(positions),
+    triVerts:       indices   instanceof Uint32Array  ? indices   : new Uint32Array(indices),
+  });
+  return new Manifold(mesh);
+}
+function manifoldToGeo(m) {
+  const mesh = m.getMesh();
+  const numProp = mesh.numProp || 3;
+  let pos;
+  if (numProp === 3) {
+    pos = mesh.vertProperties;
+  } else {
+    const n = mesh.vertProperties.length / numProp;
+    pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i*3]   = mesh.vertProperties[i*numProp];
+      pos[i*3+1] = mesh.vertProperties[i*numProp+1];
+      pos[i*3+2] = mesh.vertProperties[i*numProp+2];
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
+  geo.computeVertexNormals();
+  return geo;
+}
+function bboxOf(geo) {
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  return {
+    min: bb.min.clone(), max: bb.max.clone(),
+    center: bb.getCenter(new THREE.Vector3()),
+    size:   bb.getSize(new THREE.Vector3()),
+  };
+}
+
+// ---------- teardown ----------
+function clearMold() {
+  while (moldGrp.children.length) {
+    const c = moldGrp.children.pop();
+    c.geometry?.dispose();
+    c.material?.dispose();
+  }
+  app.halves.top?.delete();
+  app.halves.bot?.delete();
+  app.halves = { top:null, bot:null, topMesh:null, botMesh:null, plane:null, partingZ:0 };
+  btnExp.disabled = true;
+}
+function clearBolus() {
+  clearMold();
+  if (app.bolus.mesh) {
+    scene.remove(app.bolus.mesh);
+    app.bolus.mesh.geometry.dispose();
+    app.bolus.mesh.material.dispose();
+  }
+  app.bolus.manifold?.delete();
+  app.bolus = { geometry:null, manifold:null, mesh:null, bbox:null };
+  btnBuild.disabled = true;
+}
+
+// ---------- ingest a bolus geometry (from upload or demo) ----------
+async function loadBolus(geo, label) {
+  clearBolus();
+  clearErr();
+  if (!app.wasm) throw new Error('manifold-3d not loaded yet.');
+
+  setBusy(true, 'Preparing mesh…');
+  await tick();
+  const merged = mergeVertices(geo, 1e-4);
+  const bb     = bboxOf(merged);
+  const man    = geoToManifold(merged);
+  setBusy(false);
+
+  app.bolus = { geometry: merged, manifold: man, bbox: bb, mesh: null };
+
+  const mat  = new THREE.MeshStandardMaterial({
+    color: 0x7d8590, roughness: 0.75, metalness: 0.0,
+    transparent: true, opacity: 0.35, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(merged, mat);
+  app.bolus.mesh = mesh;
+  scene.add(mesh);
+
+  // Camera framing.
+  const s = bb.size;
+  const maxDim = Math.max(s.x, s.y, s.z);
+  const dist   = maxDim * 2.2 + 60;
+  controls.target.copy(bb.center);
+  camera.position.set(
+    bb.center.x + dist * 0.7,
+    bb.center.y - dist * 0.9,
+    bb.center.z + dist * 0.65
+  );
+  controls.update();
+
+  // Parting slider bounds.
+  const sp = $('split');
+  sp.min   = bb.min.z.toFixed(2);
+  sp.max   = bb.max.z.toFixed(2);
+  sp.step  = ((bb.max.z - bb.min.z) / 200).toFixed(3);
+  sp.value = ((bb.min.z + bb.max.z) / 2).toFixed(2);
+  $('split-val').textContent = Number(sp.value).toFixed(1) + ' mm';
+
+  const nTris = merged.index.count / 3 | 0;
+  $('mesh-info').innerHTML =
+    `<div class="kv"><span class="k">source</span><span class="v">${label}</span></div>` +
+    `<div class="kv"><span class="k">extent</span><span class="v">${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm</span></div>` +
+    `<div class="kv"><span class="k">triangles</span><span class="v">${nTris.toLocaleString()}</span></div>`;
+
+  legend.innerHTML =
+    `<div><b>${label}</b></div>` +
+    `<div style="margin-top:4px;color:var(--ink-mute);">${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm · ${nTris.toLocaleString()} tris</div>` +
+    `<div style="margin-top:6px;">` +
+      `<span class="sw" style="background:#7d8590"></span>Bolus &nbsp; ` +
+      `<span class="sw" style="background:#ff6b6b"></span>Top &nbsp; ` +
+      `<span class="sw" style="background:#4a9eff"></span>Bottom` +
+    `</div>`;
+
+  btnBuild.disabled = false;
+  setStatus('ok', 'Ready — click "Build mold".');
+}
+
+// ---------- STL upload ----------
+const drop = $('drop');
+const file = $('file');
+file.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) readStl(f).catch(showErr);
+});
+['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.add('hover');
+}));
+['dragleave','drop'].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.remove('hover');
+}));
+drop.addEventListener('drop', e => {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) readStl(f).catch(showErr);
+});
+async function readStl(f) {
+  setStatus('', 'Reading ' + f.name + '…');
+  const buf = await f.arrayBuffer();
+  const geo = new STLLoader().parse(buf);
+  $('fname').textContent = f.name;
+  $('fmsg').textContent  = (buf.byteLength / 1024).toFixed(0) + ' KB';
+  drop.classList.add('loaded');
+  await loadBolus(geo, f.name);
+}
+
+// ---------- demo shape ----------
+$('btn-demo').addEventListener('click', async () => {
+  try {
+    setStatus('', 'Generating demo…');
+    const g = new THREE.SphereGeometry(1, 96, 48);
+    // Oblate ellipsoid ~120 × 80 × 24 mm, lifted so its base sits near z=0.
+    g.scale(60, 40, 12);
+    g.translate(0, 0, 6);
+    $('fname').textContent = 'demo';
+    $('fmsg').textContent  = 'flattened ellipsoid';
+    drop.classList.add('loaded');
+    await loadBolus(g, 'demo');
+  } catch (e) { showErr(e); }
+});
+
+// ---------- mold generation ----------
+btnBuild.addEventListener('click', async () => {
+  if (!app.bolus.manifold) return;
+  try {
+    clearErr();
+    setBusy(true, 'Building mold blank…');
+    await tick();
+    const p = readParams();
+
+    setBusy(true, 'Subtracting cavity + spout…');
+    await tick();
+    const halves = generateMold(app.bolus.manifold, app.bolus.bbox, p);
+
+    setBusy(true, 'Rendering…');
+    await tick();
+    clearMold();
+    app.halves.top      = halves.top;
+    app.halves.bot      = halves.bot;
+    app.halves.partingZ = halves.partingZ;
+    renderHalves(halves, p);
+
+    viewctl.style.display = '';
+    btnExp.disabled = false;
+    setBusy(false);
+    setStatus('ok', 'Mold built — inspect, tweak, or export.');
+  } catch (e) {
+    setBusy(false);
+    showErr(e);
+  }
+});
+
+function readParams() {
+  const n = id => Number($(id).value);
+  return {
+    wall:     n('wall'),
+    floor:    n('floor'),
+    headroom: n('headroom'),
+    cscale:   n('cscale'),
+    sTop:     n('s-top'),
+    sBot:     n('s-bot'),
+    sExt:     n('s-ext'),
+    sWall:    n('s-wall'),
+    split:    n('split'),
+    pegN:     Number($('peg-n').value),
+    pegD:     n('peg-d'),
+    pegH:     n('peg-h'),
+    pegS:     n('peg-s'),
+  };
+}
+
+function generateMold(bolus, bb, p) {
+  const { Manifold } = app.wasm;
+  const dx = bb.size.x, dy = bb.size.y, dz = bb.size.z;
+  const cx = bb.center.x, cy = bb.center.y, cz = bb.center.z;
+
+  // ---- outer block ----
+  const blockSize = [dx + 2*p.wall, dy + 2*p.wall, dz + p.floor + p.headroom];
+  const blockCen  = [cx, cy, cz + (p.headroom - p.floor) / 2];
+  const block = Manifold.cube(blockSize, true).translate(blockCen);
+
+  // ---- optional shrink-comp scaled bolus for cavity ----
+  let cavityShape = bolus;
+  if (p.cscale !== 1) {
+    cavityShape = bolus
+      .translate([-cx, -cy, -cz])
+      .scale([p.cscale, p.cscale, p.cscale])
+      .translate([cx, cy, cz]);
+  }
+  let mold = block.subtract(cavityShape);
+
+  // ---- pour spout ----
+  const blockTopZ = bb.max.z + p.headroom;
+  const rBot = p.sBot / 2;
+  const rTop = p.sTop / 2;
+  const chanBotZ = bb.max.z - 2;                    // dip into bolus for clean union
+  const chanTopZ = blockTopZ + p.sExt + 0.5;        // punch through above collar
+  const chanH    = chanTopZ - chanBotZ;
+  const channel  = Manifold.cylinder(chanH, rBot, rTop, 48, false)
+                     .translate([cx, cy, chanBotZ]);
+
+  if (p.sExt > 0) {
+    const collarR = rTop + p.sWall;
+    const collar = Manifold.cylinder(p.sExt + 0.3, collarR, collarR, 48, false)
+                     .translate([cx, cy, blockTopZ - 0.15]);
+    mold = mold.union(collar);
+  }
+  mold = mold.subtract(channel);
+
+  // ---- split ----
+  const partingZ = Math.max(bb.min.z + 0.5, Math.min(bb.max.z - 0.5, p.split));
+  const [above, below] = mold.splitByPlane([0, 0, 1], partingZ);
+
+  // ---- registration pegs ----
+  let top = above, bot = below;
+  if (p.pegN === 4 && p.pegD > 0 && p.pegH > 0) {
+    const bxMin = bb.min.x - p.wall, bxMax = bb.max.x + p.wall;
+    const byMin = bb.min.y - p.wall, byMax = bb.max.y + p.wall;
+    const inset = Math.max(3, p.pegD * 0.6);
+    const pr    = p.pegD / 2;
+    const corners = [
+      [bxMin + inset + pr, byMin + inset + pr],
+      [bxMax - inset - pr, byMin + inset + pr],
+      [bxMax - inset - pr, byMax - inset - pr],
+      [bxMin + inset + pr, byMax - inset - pr],
+    ];
+    let pegs = null, sockets = null;
+    for (const [px, py] of corners) {
+      const peg = Manifold.cylinder(p.pegH, pr, pr, 24, false)
+                    .translate([px, py, partingZ]);
+      const soc = Manifold.cylinder(p.pegH + 0.4, pr + p.pegS, pr + p.pegS, 24, false)
+                    .translate([px, py, partingZ - 0.2]);
+      pegs    = pegs    ? pegs.union(peg)    : peg;
+      sockets = sockets ? sockets.union(soc) : soc;
+    }
+    bot = below.union(pegs);
+    top = above.subtract(sockets);
+  }
+  return { top, bot, partingZ };
+}
+
+function renderHalves(h, p) {
+  const topGeo = manifoldToGeo(h.top);
+  const botGeo = manifoldToGeo(h.bot);
+  const topMat = new THREE.MeshStandardMaterial({
+    color: 0xff6b6b, roughness: 0.55, metalness: 0.05,
+    transparent: true, opacity: 0.92, side: THREE.DoubleSide,
+  });
+  const botMat = new THREE.MeshStandardMaterial({
+    color: 0x4a9eff, roughness: 0.55, metalness: 0.05,
+    transparent: true, opacity: 0.92, side: THREE.DoubleSide,
+  });
+  const topMesh = new THREE.Mesh(topGeo, topMat);
+  const botMesh = new THREE.Mesh(botGeo, botMat);
+  moldGrp.add(topMesh);
+  moldGrp.add(botMesh);
+  app.halves.topMesh = topMesh;
+  app.halves.botMesh = botMesh;
+
+  // Parting-plane hint.
+  const bx = app.bolus.bbox;
+  const planeGeo = new THREE.PlaneGeometry(
+    bx.size.x + 2 * p.wall + 20,
+    bx.size.y + 2 * p.wall + 20
+  );
+  const planeMat = new THREE.MeshBasicMaterial({
+    color: 0x4dc0b5, transparent: true, opacity: 0.14,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const plane = new THREE.Mesh(planeGeo, planeMat);
+  plane.position.set(bx.center.x, bx.center.y, h.partingZ);
+  moldGrp.add(plane);
+  app.halves.plane = plane;
+
+  // Re-apply current explode + bolus-visibility state.
+  applyExplode(Number($('explode').value));
+  applyBolusVis($('show-bolus').checked);
+}
+
+// ---------- exports ----------
+btnExp.addEventListener('click', () => {
+  try {
+    clearErr();
+    if (!app.halves.topMesh || !app.halves.botMesh) return;
+    // Undo explode before exporting so the STLs are positioned at their true
+    // parting-plane location (they still print separately of course).
+    const explodeVal = Number($('explode').value);
+    applyExplode(0);
+    const exp = new STLExporter();
+    dl(exp.parse(app.halves.topMesh, { binary: true }), 'mold_top.stl');
+    dl(exp.parse(app.halves.botMesh, { binary: true }), 'mold_bottom.stl');
+    applyExplode(explodeVal);
+    setStatus('ok', 'Exported: mold_top.stl + mold_bottom.stl');
+  } catch (e) { showErr(e); }
+});
+function dl(data, name) {
+  const blob = data instanceof DataView
+    ? new Blob([data.buffer], { type: 'application/octet-stream' })
+    : new Blob([data], { type: 'model/stl' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+// ---------- live UI ----------
+$('split').addEventListener('input', e => {
+  $('split-val').textContent = Number(e.target.value).toFixed(1) + ' mm';
+  if (app.halves.plane) app.halves.plane.position.z = Number(e.target.value);
+});
+
+$('explode').addEventListener('input', e => applyExplode(Number(e.target.value)));
+$('show-bolus').addEventListener('change', e => applyBolusVis(e.target.checked));
+
+function applyExplode(offset) {
+  if (!app.halves.topMesh || !app.halves.botMesh) return;
+  app.halves.topMesh.position.z = +offset;
+  app.halves.botMesh.position.z = -offset;
+  if (app.halves.plane) {
+    app.halves.plane.position.z = app.halves.partingZ + (offset > 0 ? offset * 0.5 : 0);
+    app.halves.plane.material.opacity = offset > 0 ? 0.05 : 0.14;
+  }
+}
+function applyBolusVis(on) {
+  if (app.bolus.mesh) app.bolus.mesh.visible = !!on;
+}
+
+// ---------- double-click bolus toggle ----------
+canvas.addEventListener('dblclick', () => {
+  const cb = $('show-bolus');
+  cb.checked = !cb.checked;
+  applyBolusVis(cb.checked);
+});
+
+</script>
+</body>
+</html>
