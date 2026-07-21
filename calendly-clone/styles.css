@@ -1,22 +1,64 @@
 /* ==========================================================================
-   Calendly-style scheduling app — personal clone
+   Meetly — Calendly-style scheduling app (personal clone)
    Original styling, no proprietary assets. Plain CSS, no dependencies.
+   Token-based palette with full light/dark theming.
    ========================================================================== */
 
 :root {
   --brand: #0a66ff;
   --brand-dark: #0047b3;
   --brand-tint: #eef4ff;
+  --on-brand: #ffffff;
   --ink: #1a1a2e;
   --muted: #64748b;
   --line: #e2e8f0;
   --bg: #ffffff;
-  --bg-soft: #f7f9fc;
+  --bg-soft: #f4f7fc;
+  --surface: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --footer-bg: #0d1526;
+  --footer-ink: #94a3b8;
   --success: #16a34a;
   --radius: 12px;
   --shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.14);
-  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Dark theme follows the OS preference... */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand: #4d8bff;
+    --brand-dark: #6ba0ff;
+    --brand-tint: rgba(77, 139, 255, 0.14);
+    --ink: #e8edf6;
+    --muted: #93a3bb;
+    --line: #24314a;
+    --bg: #0d1420;
+    --bg-soft: #111a29;
+    --surface: #141f31;
+    --header-bg: rgba(13, 20, 32, 0.82);
+    --footer-bg: #080d16;
+    --footer-ink: #8496b0;
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ...and an explicit data-theme attribute wins over it, both directions. */
+:root[data-theme="light"] {
+  --brand: #0a66ff; --brand-dark: #0047b3; --brand-tint: #eef4ff;
+  --ink: #1a1a2e; --muted: #64748b; --line: #e2e8f0;
+  --bg: #ffffff; --bg-soft: #f4f7fc; --surface: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.85); --footer-bg: #0d1526; --footer-ink: #94a3b8;
+  --shadow: 0 4px 24px rgba(15, 23, 42, 0.08); --shadow-lg: 0 12px 40px rgba(15, 23, 42, 0.14);
+}
+:root[data-theme="dark"] {
+  --brand: #4d8bff; --brand-dark: #6ba0ff; --brand-tint: rgba(77, 139, 255, 0.14);
+  --ink: #e8edf6; --muted: #93a3bb; --line: #24314a;
+  --bg: #0d1420; --bg-soft: #111a29; --surface: #141f31;
+  --header-bg: rgba(13, 20, 32, 0.82); --footer-bg: #080d16; --footer-ink: #8496b0;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4); --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -35,6 +77,8 @@ body {
 a { color: inherit; text-decoration: none; }
 
 img { max-width: 100%; display: block; }
+
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .container {
   width: 100%;
@@ -59,7 +103,7 @@ img { max-width: 100%; display: block; }
   white-space: nowrap;
 }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary { background: var(--brand); color: var(--on-brand); }
 .btn-primary:hover { background: var(--brand-dark); }
 .btn-outline { background: transparent; color: var(--brand); border-color: var(--brand); }
 .btn-outline:hover { background: var(--brand-tint); }
@@ -73,7 +117,7 @@ img { max-width: 100%; display: block; }
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--header-bg);
   backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--line);
 }
@@ -102,11 +146,11 @@ img { max-width: 100%; display: block; }
 .nav a.link { color: var(--muted); font-weight: 500; }
 .nav a.link:hover { color: var(--ink); }
 .nav-actions { display: flex; align-items: center; gap: 12px; }
-.nav-toggle { display: none; background: none; border: 0; cursor: pointer; }
+.nav-toggle { display: none; background: none; border: 0; cursor: pointer; color: var(--ink); }
 
 /* ---------- Hero ---------- */
 .hero {
-  background: linear-gradient(180deg, var(--brand-tint) 0%, #fff 100%);
+  background: linear-gradient(180deg, var(--brand-tint) 0%, var(--bg) 100%);
   padding: 84px 0 64px;
 }
 .hero-grid {
@@ -120,7 +164,7 @@ img { max-width: 100%; display: block; }
   font-size: .8rem; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--brand);
-  background: #fff;
+  background: var(--surface);
   padding: 6px 14px; border-radius: 999px;
   border: 1px solid var(--line);
   margin-bottom: 20px;
@@ -130,6 +174,7 @@ img { max-width: 100%; display: block; }
   line-height: 1.08;
   letter-spacing: -0.03em;
   margin: 0 0 20px;
+  text-wrap: balance;
 }
 .hero p.lead {
   font-size: 1.2rem;
@@ -142,7 +187,7 @@ img { max-width: 100%; display: block; }
 
 /* Hero mock booking card */
 .hero-card {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: var(--shadow-lg);
@@ -182,12 +227,12 @@ img { max-width: 100%; display: block; }
 .section { padding: 84px 0; }
 .section.alt { background: var(--bg-soft); }
 .section-head { text-align: center; max-width: 680px; margin: 0 auto 56px; }
-.section-head h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -0.02em; margin: 0 0 14px; }
+.section-head h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; }
 .section-head p { font-size: 1.12rem; color: var(--muted); margin: 0; }
 
 .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
 .feature {
-  background: #fff; border: 1px solid var(--line);
+  background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 30px;
   transition: transform .2s ease, box-shadow .2s ease;
 }
@@ -200,6 +245,8 @@ img { max-width: 100%; display: block; }
 }
 .feature h3 { margin: 0 0 8px; font-size: 1.15rem; }
 .feature p { margin: 0; color: var(--muted); }
+.price { font-size: 2rem; color: var(--ink); font-weight: 800; margin: 8px 0; }
+.price small { font-size: .9rem; color: var(--muted); font-weight: 500; }
 
 /* Steps */
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; counter-reset: step; }
@@ -216,19 +263,19 @@ img { max-width: 100%; display: block; }
 
 /* CTA band */
 .cta-band { background: var(--brand); color: #fff; text-align: center; padding: 72px 0; }
-.cta-band h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 16px; letter-spacing: -0.02em; }
+.cta-band h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 16px; letter-spacing: -0.02em; text-wrap: balance; }
 .cta-band p { font-size: 1.15rem; opacity: .9; margin: 0 0 28px; }
 .cta-band .btn-primary { background: #fff; color: var(--brand); }
 .cta-band .btn-primary:hover { background: #eaf0ff; }
 
 /* ---------- Footer ---------- */
-.site-footer { background: #0d1526; color: #cbd5e1; padding: 56px 0 32px; }
+.site-footer { background: var(--footer-bg); color: var(--footer-ink); padding: 56px 0 32px; }
 .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 32px; margin-bottom: 40px; }
 .footer-grid h4 { color: #fff; font-size: .95rem; margin: 0 0 16px; }
-.footer-grid a { display: block; color: #94a3b8; padding: 5px 0; font-size: .92rem; }
+.footer-grid a { display: block; color: var(--footer-ink); padding: 5px 0; font-size: .92rem; }
 .footer-grid a:hover { color: #fff; }
-.footer-brand p { color: #94a3b8; font-size: .92rem; max-width: 280px; }
-.footer-bottom { border-top: 1px solid #1e293b; padding-top: 22px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; color: #64748b; font-size: .85rem; }
+.footer-brand p { color: var(--footer-ink); font-size: .92rem; max-width: 280px; }
+.footer-bottom { border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 22px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; color: var(--footer-ink); font-size: .85rem; }
 
 /* ==========================================================================
    Booking page
@@ -249,7 +296,7 @@ img { max-width: 100%; display: block; }
 .event-types { display: grid; gap: 16px; }
 .event-type {
   display: flex; align-items: center; gap: 18px;
-  background: #fff; border: 1px solid var(--line);
+  background: var(--surface); border: 1px solid var(--line);
   border-left: 5px solid var(--brand);
   border-radius: var(--radius); padding: 22px 24px;
   cursor: pointer; transition: transform .15s ease, box-shadow .2s ease;
@@ -265,7 +312,7 @@ img { max-width: 100%; display: block; }
 /* Scheduler layout */
 .scheduler {
   max-width: 980px; margin: 0 auto;
-  background: #fff; border: 1px solid var(--line);
+  background: var(--surface); border: 1px solid var(--line);
   border-radius: 16px; box-shadow: var(--shadow);
   display: grid; grid-template-columns: 300px 1fr;
   overflow: hidden; min-height: 560px;
@@ -277,7 +324,7 @@ img { max-width: 100%; display: block; }
 .sched-aside h2 { margin: 0 0 16px; font-size: 1.4rem; }
 .sched-meta { display: grid; gap: 12px; color: var(--muted); }
 .sched-meta div { display: flex; align-items: flex-start; gap: 10px; font-size: .95rem; }
-.sched-meta .mi { color: var(--muted); flex-shrink: 0; }
+.sched-meta .mi { flex-shrink: 0; }
 
 .sched-main { padding: 30px 32px; }
 .sched-main h3 { margin: 0 0 20px; font-size: 1.2rem; }
@@ -288,7 +335,7 @@ img { max-width: 100%; display: block; }
 .cal-nav { display: flex; gap: 6px; }
 .cal-nav button {
   width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line);
-  background: #fff; cursor: pointer; font-size: 1rem; color: var(--brand);
+  background: var(--surface); cursor: pointer; font-size: 1rem; color: var(--brand);
   display: grid; place-items: center;
 }
 .cal-nav button:hover { background: var(--brand-tint); }
@@ -304,20 +351,19 @@ img { max-width: 100%; display: block; }
 .cal-day.available { background: var(--brand-tint); }
 .cal-day.selected { background: var(--brand); color: #fff; }
 .cal-day.today::after { content: ""; position: absolute; bottom: 6px; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
-.cal-day:disabled { color: #cbd5e1; cursor: default; background: none; font-weight: 400; }
+.cal-day:disabled { color: var(--muted); opacity: .4; cursor: default; background: none; font-weight: 400; }
 .cal-empty { aspect-ratio: 1; }
 
 /* Time slots */
-.slots-panel { }
 .slots-panel .slots-date { font-weight: 600; margin: 0 0 14px; }
 .slots-list { display: grid; gap: 10px; max-height: 380px; overflow-y: auto; padding-right: 4px; }
 .slot-btn {
   padding: 13px; border: 1.5px solid var(--brand); border-radius: 8px;
-  background: #fff; color: var(--brand); font: inherit; font-weight: 600;
+  background: var(--surface); color: var(--brand); font: inherit; font-weight: 600;
   cursor: pointer; transition: background .15s ease, color .15s ease;
 }
 .slot-btn:hover { background: var(--brand-tint); }
-.slot-btn.confirming { display: flex; gap: 8px; }
+.slot-btn.confirming { display: flex; gap: 8px; padding: 0; border-color: transparent; }
 .slot-btn.confirming .slot-time { flex: 1; background: #4a5568; color: #fff; border-radius: 6px; padding: 13px; }
 .slot-btn.confirming .slot-next { flex: 1; background: var(--brand); color: #fff; border-radius: 6px; padding: 13px; }
 .empty-hint { color: var(--muted); text-align: center; padding: 40px 0; }
@@ -329,7 +375,7 @@ img { max-width: 100%; display: block; }
 .field label .req { color: #dc2626; }
 .field input, .field textarea {
   width: 100%; padding: 12px 14px; border: 1.5px solid var(--line);
-  border-radius: 8px; font: inherit; color: var(--ink); background: #fff;
+  border-radius: 8px; font: inherit; color: var(--ink); background: var(--surface);
 }
 .field input:focus, .field textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-tint); }
 .field textarea { resize: vertical; min-height: 84px; }
@@ -369,9 +415,13 @@ img { max-width: 100%; display: block; }
   .nav.open {
     display: flex; flex-direction: column; align-items: flex-start;
     position: absolute; top: 68px; left: 0; right: 0;
-    background: #fff; padding: 20px 24px; gap: 16px;
+    background: var(--surface); padding: 20px 24px; gap: 16px;
     border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
   }
   .nav-toggle { display: block; }
   .footer-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; scroll-behavior: auto !important; }
 }
