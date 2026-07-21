@@ -364,7 +364,7 @@
       <div class="grid2">
         <div class="field">
           <label>Top Ø (mm)</label>
-          <input type="number" id="s-top" value="14" min="4" max="30" step="0.5"/>
+          <input type="number" id="s-top" value="16" min="4" max="30" step="0.5"/>
           <div class="hint">wide, easy pour</div>
         </div>
         <div class="field">
@@ -463,7 +463,9 @@
       plug prints upside-down resting on its flat plateau (add a brim) —
       <b>no supports on either half</b>; every plug slope is &le; 45&deg; by
       construction. Molds aren't dose-relevant: 2 walls + 10&ndash;15&nbsp;%
-      gyroid infill is plenty. If the plug binds on the tray's silhouette
+      gyroid infill is plenty. <b>PLA or PETG both work</b> for
+      room-temperature-cure silicone (use a mold release; avoid PLA for
+      hot-pour materials). If the plug binds on the tray's silhouette
       wall, set slicer XY compensation to &minus;0.1&nbsp;mm on the plug.
     </div>
 
@@ -711,7 +713,8 @@ function clearMold() {
   app.halves.top?.delete();
   app.halves.bot?.delete();
   app.halves = { top:null, bot:null, topMesh:null, botMesh:null,
-                 plane:null, partingZ:null, drawDir:[0,0,1] };
+                 plane:null, partingZ:null, drawDir:[0,0,1],
+                 funnelMesh:null, funnelBase:null };
   btnExp.disabled = true;
 }
 function clearBolus() {
@@ -884,7 +887,8 @@ btnBuild.addEventListener('click', async () => {
           `<span class="sw" style="background:#4a9eff"></span>Core tray (patient side)` +
         `</div>` +
         `<div style="margin-top:4px;color:var(--ink-mute);">` +
-          `Tray dome replicates the patient surface — the cast is formed against it.` +
+          `Tray dome replicates the patient surface — the cast is formed against it. ` +
+          `<span style="color:#f6c453;">Yellow = pour spout</span> (funnel through the plug cap).` +
         `</div>` +
         `<div style="margin-top:4px;color:var(--ink-mute);">` +
           `Material: plug ${halves.plugVol.toFixed(0)} + tray ${halves.trayVol.toFixed(0)} ` +
@@ -1190,6 +1194,93 @@ function coneErode(g, seed, slope) {
   return chamferSweep(nx, ny, px, py, Float64Array.from(seed), slope);
 }
 
+/** 3×3 box blur over the node grid, `passes` times (≈ gaussian). */
+function boxBlurGrid(g, field, passes) {
+  const { nx, ny } = g;
+  let src = Float64Array.from(field);
+  let dst = new Float64Array(field.length);
+  for (let p = 0; p < passes; p++) {
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      let s = 0, c = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+        s += src[jj * nx + ii]; c++;
+      }
+      dst[j * nx + i] = s / c;
+    }
+    [src, dst] = [dst, src];
+  }
+  return src;
+}
+
+/**
+ * Marching-squares iso-contour of a smooth scalar field at value 0
+ * (field > 0 = inside), with linear interpolation on cell edges —
+ * yields a smooth sub-pixel polygon instead of a pixel staircase.
+ * Returns the longest closed loop as [[x,y], ...].
+ */
+function isoContour(g, field, iso) {
+  const { nx, ny, x0, y0, px, py } = g;
+  const val = (i, j) => field[j * nx + i] - iso;
+  const pts = new Map(), adj = new Map();
+  const lerpH = (i, j) => { const a = val(i, j), b = val(i + 1, j); const t = a / (a - b); return [x0 + (i + t) * px, y0 + j * py]; };
+  const lerpV = (i, j) => { const a = val(i, j), b = val(i, j + 1); const t = a / (a - b); return [x0 + i * px, y0 + (j + t) * py]; };
+  const link = (k1, p1, k2, p2) => {
+    if (!pts.has(k1)) pts.set(k1, p1);
+    if (!pts.has(k2)) pts.set(k2, p2);
+    if (!adj.has(k1)) adj.set(k1, []);
+    if (!adj.has(k2)) adj.set(k2, []);
+    adj.get(k1).push(k2); adj.get(k2).push(k1);
+  };
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const a = val(i, j) > 0, b = val(i + 1, j) > 0,
+          c = val(i + 1, j + 1) > 0, d = val(i, j + 1) > 0;
+    const code = (a ? 1 : 0) | (b ? 2 : 0) | (c ? 4 : 0) | (d ? 8 : 0);
+    if (code === 0 || code === 15) continue;
+    const eB = [`h${i},${j}`,   () => lerpH(i, j)];
+    const eR = [`v${i+1},${j}`, () => lerpV(i + 1, j)];
+    const eT = [`h${i},${j+1}`, () => lerpH(i, j + 1)];
+    const eL = [`v${i},${j}`,   () => lerpV(i, j)];
+    const seg = (e1, e2) => link(e1[0], e1[1](), e2[0], e2[1]());
+    switch (code) {
+      case 1: case 14: seg(eL, eB); break;
+      case 2: case 13: seg(eB, eR); break;
+      case 4: case 11: seg(eR, eT); break;
+      case 8: case 7:  seg(eT, eL); break;
+      case 3: case 12: seg(eL, eR); break;
+      case 6: case 9:  seg(eB, eT); break;
+      case 5:  seg(eL, eB); seg(eR, eT); break;
+      case 10: seg(eB, eR); seg(eT, eL); break;
+    }
+  }
+  const visited = new Set();
+  let best = null;
+  for (const start of adj.keys()) {
+    if (visited.has(start)) continue;
+    const loop = [];
+    let cur = start, prev = null;
+    while (cur && !visited.has(cur)) {
+      visited.add(cur); loop.push(pts.get(cur));
+      let nxt = null;
+      for (const nb of (adj.get(cur) || [])) {
+        if (nb !== prev && !visited.has(nb)) { nxt = nb; break; }
+      }
+      prev = cur; cur = nxt;
+    }
+    if (!best || loop.length > best.length) best = loop;
+  }
+  return best || [];
+}
+function signedArea(loop) {
+  let s = 0;
+  for (let i = 0; i < loop.length; i++) {
+    const [x1, y1] = loop[i], [x2, y2] = loop[(i + 1) % loop.length];
+    s += x1 * y2 - x2 * y1;
+  }
+  return s / 2;
+}
+
 /** Largest connected component of a manifold (drops floating crumbs). */
 function keepLargest(m) {
   const parts = m.decompose();
@@ -1298,16 +1389,17 @@ async function generateShellMold(bolus, bboxOrig, p) {
   // silhouette it drops to a thin flange; beyond the flange, gone.
   {
     const nN = grid.nx * grid.ny;
-    const seed = new Float64Array(nN);
+    const raw = new Float64Array(nN);
     for (let n = 0; n < nN; n++) {
-      seed[n] = isFinite(grid.H[n]) ? grid.H[n] + p.headroom : flangeTopZ;
+      raw[n] = isFinite(grid.H[n]) ? grid.H[n] + p.headroom : flangeTopZ;
     }
+    // Blur the seed to kill raster texture on the visible cap surface,
+    // then re-impose the minimum thickness so smoothing never thins it.
+    const seed = boxBlurGrid(grid, raw, 2);
     const capH = coneDilate(grid, seed, 1.0);
     const topH = new Float64Array(nN);
     for (let n = 0; n < nN; n++) {
-      topH[n] = (dist[n] <= flangeW)
-        ? Math.max(Math.min(capH[n], bz1), flangeTopZ)
-        : z0 - 1;                       // outside flange: crop away
+      topH[n] = Math.max(Math.min(Math.max(capH[n], raw[n]), bz1), flangeTopZ);
     }
     const capSolid = T(terrainManifold(
       { nx: grid.nx, ny: grid.ny, H: topH, x0: grid.x0, y0: grid.y0,
@@ -1315,17 +1407,20 @@ async function generateShellMold(bolus, bboxOrig, p) {
     upper = T(upper.intersect(capSolid));
   }
 
-  // Tray: crop the slab to the same silhouette + flange footprint.
+  // Crop BOTH halves to a smooth silhouette + flange outline: a
+  // marching-squares iso-contour of the distance field (sub-pixel
+  // interpolated — no pixel staircase) extruded to a prism.
   {
-    const nN = grid.nx * grid.ny;
-    const footH = new Float64Array(nN);
-    for (let n = 0; n < nN; n++) {
-      footH[n] = (dist[n] <= flangeW) ? bz1 + 1 : bz0 - 1;
+    const negDist = new Float64Array(dist.length);
+    for (let n = 0; n < dist.length; n++) negDist[n] = flangeW - dist[n];
+    const loop = isoContour(grid, negDist, 0);
+    if (loop.length >= 8) {
+      if (signedArea(loop) < 0) loop.reverse();
+      const prism = T(T(Manifold.extrude([loop], (bz1 - bz0) + 4))
+                        .translate([0, 0, bz0 - 2]));
+      upper = T(upper.intersect(prism));
+      lower = T(lower.intersect(prism));
     }
-    const footSolid = T(terrainManifold(
-      { nx: grid.nx, ny: grid.ny, H: footH, x0: grid.x0, y0: grid.y0,
-        px: grid.px, py: grid.py }, bz0 - 2, bz0 - 1));
-    lower = T(lower.intersect(footSolid));
   }
 
   // Tray: hollow the dome from below — pocket ceiling follows the
@@ -1433,6 +1528,11 @@ async function generateShellMold(bolus, bboxOrig, p) {
     partingZ: null,
     drawDir: rotVecInv([0, 0, 1], rots),
     ax, trappedVol, bolusVol, plugVol, trayVol,
+    funnel: {
+      tip:  rotVecInv([cx, cy, chanBot], rots),
+      top:  rotVecInv([cx, cy, bz1 + 2], rots),
+      rTop: p.sTop / 2, rBot: p.sBot / 2,
+    },
   };
 }
 
@@ -1469,6 +1569,27 @@ function renderHalves(h, p) {
     plane.position.set(bx.center.x, bx.center.y, h.partingZ);
     moldGrp.add(plane);
     app.halves.plane = plane;
+  }
+
+  // Pour-spout marker (shell mode): yellow cone at the funnel location
+  // so the pour entry is unmistakable in the preview.
+  if (h.funnel) {
+    const f = h.funnel;
+    const tip = new THREE.Vector3(...f.tip), top = new THREE.Vector3(...f.top);
+    const dir = top.clone().sub(tip);
+    const len = dir.length();
+    const geo = new THREE.CylinderGeometry(f.rTop, f.rBot, len, 32, 1, true);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xf6c453, transparent: true, opacity: 0.6,
+      side: THREE.DoubleSide, depthWrite: false, depthTest: false,
+    });
+    const fm = new THREE.Mesh(geo, mat);
+    fm.renderOrder = 999;               // draw last: visible through the halves
+    fm.position.copy(tip.clone().add(top).multiplyScalar(0.5));
+    fm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    moldGrp.add(fm);
+    app.halves.funnelMesh = fm;
+    app.halves.funnelBase = fm.position.clone();
   }
 
   // Re-apply current explode + bolus-visibility state.
@@ -1534,6 +1655,14 @@ function applyExplode(offset) {
   const d = app.halves.drawDir || [0, 0, 1];
   app.halves.topMesh.position.set( d[0]*offset,  d[1]*offset,  d[2]*offset);
   app.halves.botMesh.position.set(-d[0]*offset, -d[1]*offset, -d[2]*offset);
+  if (app.halves.funnelMesh && app.halves.funnelBase) {
+    // funnel travels with the plug (top half)
+    app.halves.funnelMesh.position.set(
+      app.halves.funnelBase.x + d[0]*offset,
+      app.halves.funnelBase.y + d[1]*offset,
+      app.halves.funnelBase.z + d[2]*offset,
+    );
+  }
   if (app.halves.plane && app.halves.partingZ != null) {
     app.halves.plane.position.z = app.halves.partingZ + (offset > 0 ? offset * 0.5 : 0);
     app.halves.plane.material.opacity = offset > 0 ? 0.05 : 0.14;
