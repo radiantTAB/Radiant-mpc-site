@@ -1761,77 +1761,141 @@ function orientForPrint(m0) {
   return placed;
 }
 
-/** 3MF object XML for one manifold. */
-function objectXml(m, id, name) {
+/** Mesh XML (vertices + triangles) for one manifold. */
+function meshXml(m) {
   const mesh = m.getMesh();
   const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
   const nV = vp.length / np;
-  const out = [`<object id="${id}" type="model"><mesh><vertices>`];
+  const out = ['<mesh><vertices>'];
   for (let i = 0; i < nV; i++)
-    out.push(`<vertex x="${vp[i*np].toFixed(4)}" y="${vp[i*np+1].toFixed(4)}" z="${vp[i*np+2].toFixed(4)}"/>`);
+    out.push(`<vertex x="${vp[i*np].toFixed(3)}" y="${vp[i*np+1].toFixed(3)}" z="${vp[i*np+2].toFixed(3)}"/>`);
   out.push('</vertices><triangles>');
   for (let t = 0; t < tv.length; t += 3)
     out.push(`<triangle v1="${tv[t]}" v2="${tv[t+1]}" v3="${tv[t+2]}"/>`);
-  out.push('</triangles></mesh></object>');
-  return out.join('');
+  out.push('</triangles></mesh>');
+  return out.join('\n');
 }
 
-/** Assemble a Bambu-compatible multi-plate 3MF: one object per plate. */
+/**
+ * Assemble a Bambu-Studio-style multi-plate 3MF. Bambu's parser
+ * rejects plain inline-geometry 3MFs that carry plate config, so this
+ * mirrors the structure Bambu itself writes (and community converters
+ * use): each object's mesh in its own 3D/Objects/object_N.model file,
+ * referenced from the root model via the production extension with
+ * UUIDs, plus Metadata/model_settings.config assigning one object per
+ * plate. Object 2 is translated into plate 2's world slot
+ * (plate stride = bed width × 1.1).
+ */
 function build3mfTwoPlates(parts) {
-  const objs = parts.map((p, i) => objectXml(p.manifold, i + 1, p.name)).join('\n');
-  const items = parts.map((_, i) => `<item objectid="${i+1}" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>`).join('\n');
-  const model =
-`<?xml version="1.0" encoding="UTF-8"?>
-<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
- <metadata name="Application">Radiant QuikBolus</metadata>
- <metadata name="Title">Bolus silicone mold — two plates</metadata>
- <resources>
-${objs}
- </resources>
- <build>
-${items}
- </build>
-</model>`;
+  const XMLH = '<?xml version="1.0" encoding="UTF-8"?>';
+  const NS = 'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" ' +
+             'xmlns:BambuStudio="http://schemas.bambulab.com/package/2021" ' +
+             'xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06" ' +
+             'requiredextensions="p"';
+  const uid = (k) => `${String(k).padStart(8, '0')}-0000-0000-0000-${String(k).padStart(12, '0')}`;
+  const STRIDE_X = 256 * 1.1;   // BambuStudio logical plate stride
 
-  // Bambu/Orca plate assignment: object N -> plate N.
-  const plateBlocks = parts.map((p, i) => `  <plate>
-   <metadata key="plater_id" value="${i+1}"/>
+  const files = [];
+  const wrappers = [], items = [], objCfg = [], plates = [], subRels = [];
+
+  parts.forEach((p, i) => {
+    const wid = 2 * (i + 1);              // root wrapper object ids: 2, 4
+    const subPath = `/3D/Objects/object_${i + 1}.model`;
+    // sub-model file: the actual mesh as object id 1
+    files.push({
+      name: subPath.slice(1),
+      data:
+`${XMLH}
+<model unit="millimeter" xml:lang="en-US" ${NS}>
+ <metadata name="BambuStudio:3mfVersion">1</metadata>
+ <resources>
+  <object id="1" p:UUID="${uid(wid * 10 + 1)}" type="model">
+${meshXml(p.manifold)}
+  </object>
+ </resources>
+ <build/>
+</model>`,
+    });
+    subRels.push(`<Relationship Target="${subPath}" Id="rel-${i + 1}" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>`);
+    wrappers.push(
+`  <object id="${wid}" p:UUID="${uid(wid)}" type="model">
+   <components>
+    <component p:path="${subPath}" objectid="1" p:UUID="${uid(wid * 10)}"/>
+   </components>
+  </object>`);
+    const dx = i * STRIDE_X;              // move object i onto plate i+1
+    items.push(`  <item objectid="${wid}" p:UUID="${uid(wid * 100)}" transform="1 0 0 0 1 0 0 0 1 ${dx.toFixed(3)} 0 0" printable="1"/>`);
+    objCfg.push(
+`  <object id="${wid}">
+   <metadata key="name" value="${p.name}"/>
+   <metadata key="extruder" value="1"/>
+   <part id="1" subtype="normal_part">
+    <metadata key="name" value="${p.name}"/>
+    <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>
+   </part>
+  </object>`);
+    plates.push(
+`  <plate>
+   <metadata key="plater_id" value="${i + 1}"/>
    <metadata key="plater_name" value="${p.plate}"/>
    <metadata key="locked" value="false"/>
    <model_instance>
-    <metadata key="object_id" value="${i+1}"/>
+    <metadata key="object_id" value="${wid}"/>
     <metadata key="instance_id" value="0"/>
+    <metadata key="identify_id" value="${100 * (i + 1)}"/>
    </model_instance>
-  </plate>`).join('\n');
-  const objCfg = parts.map((p, i) => `  <object id="${i+1}">
-   <metadata key="name" value="${p.name}"/>
-   <metadata key="extruder" value="1"/>
-  </object>`).join('\n');
-  const modelSettings =
-`<?xml version="1.0" encoding="UTF-8"?>
-<config>
-${objCfg}
-${plateBlocks}
-</config>`;
+  </plate>`);
+  });
 
-  const contentTypes =
-`<?xml version="1.0" encoding="UTF-8"?>
+  files.push({
+    name: '3D/3dmodel.model',
+    data:
+`${XMLH}
+<model unit="millimeter" xml:lang="en-US" ${NS}>
+ <metadata name="Application">BambuStudio-01.09.00.70</metadata>
+ <metadata name="BambuStudio:3mfVersion">1</metadata>
+ <metadata name="Title">Bolus silicone mold — two plates</metadata>
+ <resources>
+${wrappers.join('\n')}
+ </resources>
+ <build p:UUID="${uid(999)}">
+${items.join('\n')}
+ </build>
+</model>`,
+  });
+  files.push({
+    name: '3D/_rels/3dmodel.model.rels',
+    data:
+`${XMLH}
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ ${subRels.join('\n ')}
+</Relationships>`,
+  });
+  files.push({
+    name: 'Metadata/model_settings.config',
+    data:
+`${XMLH}
+<config>
+${objCfg.join('\n')}
+${plates.join('\n')}
+</config>`,
+  });
+  files.unshift(
+    { name: '[Content_Types].xml',
+      data:
+`${XMLH}
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
-</Types>`;
-  const rels =
-`<?xml version="1.0" encoding="UTF-8"?>
+</Types>` },
+    { name: '_rels/.rels',
+      data:
+`${XMLH}
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
- <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.openxmlformats.org/package/2006/relationships/3dmodel"/>
-</Relationships>`;
-
-  return zipStore([
-    { name: '[Content_Types].xml',            data: contentTypes },
-    { name: '_rels/.rels',                    data: rels },
-    { name: '3D/3dmodel.model',               data: model },
-    { name: 'Metadata/model_settings.config', data: modelSettings },
-  ]);
+ <Relationship Target="/3D/3dmodel.model" Id="rel-0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
+</Relationships>` },
+  );
+  return zipStore(files);
 }
 
 /** Minimal STORED (uncompressed) ZIP writer — no dependency. Returns a Blob. */
