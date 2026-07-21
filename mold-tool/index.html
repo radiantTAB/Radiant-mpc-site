@@ -347,8 +347,8 @@
         </div>
         <div class="field">
           <label>Cap thickness (mm)</label>
-          <input type="number" id="headroom" value="8"  min="4" max="30" step="1"/>
-          <div class="hint">plug lid over cavity (shell) / headroom (flat)</div>
+          <input type="number" id="headroom" value="12"  min="4" max="30" step="1"/>
+          <div class="hint">plug lid + pour-basin depth (shell) / headroom (flat)</div>
         </div>
         <div class="field">
           <label>Cast scale ×</label>
@@ -363,14 +363,14 @@
       <h2><span class="num">3</span> Pour spout</h2>
       <div class="grid2">
         <div class="field">
-          <label>Top Ø (mm)</label>
-          <input type="number" id="s-top" value="16" min="4" max="30" step="0.5"/>
-          <div class="hint">wide, easy pour</div>
+          <label>Mouth Ø (mm)</label>
+          <input type="number" id="s-top" value="30" min="8" max="50" step="0.5"/>
+          <div class="hint">45° pour basin; auto-limited by cap thickness</div>
         </div>
         <div class="field">
-          <label>Bottom Ø (mm)</label>
-          <input type="number" id="s-bot" value="6"  min="3" max="20" step="0.5"/>
-          <div class="hint">into cavity</div>
+          <label>Throat Ø (mm)</label>
+          <input type="number" id="s-bot" value="8"  min="3" max="20" step="0.5"/>
+          <div class="hint">into cavity (= sprue-stub size)</div>
         </div>
         <div class="field">
           <label>Collar height (mm)</label>
@@ -888,7 +888,8 @@ btnBuild.addEventListener('click', async () => {
         `</div>` +
         `<div style="margin-top:4px;color:var(--ink-mute);">` +
           `Tray dome replicates the patient surface — the cast is formed against it. ` +
-          `<span style="color:#f6c453;">Yellow = pour spout</span> (funnel through the plug cap).` +
+          `<span style="color:#f6c453;">Yellow = pour basin</span> — wide 45° dish in the ` +
+          `plug cap, necking into the cavity. Fill it to the brim for feed head.` +
         `</div>` +
         `<div style="margin-top:4px;color:var(--ink-mute);">` +
           `Material: plug ${halves.plugVol.toFixed(0)} + tray ${halves.trayVol.toFixed(0)} ` +
@@ -1457,14 +1458,25 @@ async function generateShellMold(bolus, bboxOrig, p) {
   upper = T(keepLargest(upper));
   lower = T(keepLargest(lower));
 
-  // ---- pour funnel: countersunk through the plug plate (no collar,
-  //      so the plug prints top-face-down with zero supports) ----
+  // ---- pour basin: wide 45°-dished funnel mouth recessed into the
+  //      cap (a raised collar would break the flipped support-free
+  //      print — any feature above the plateau becomes the bed
+  //      contact). The basin catches the pour and contains drips,
+  //      necking to a short cylindrical throat into the cavity apex.
+  //      Mouth Ø is auto-limited by cap thickness: 45° walls need
+  //      depth, so deeper cap = wider mouth. ----
   const cx = (bb.min[0]+bb.max[0])/2, cy = (bb.min[1]+bb.max[1])/2;
-  const chanBot = bb.max[2] - 2;
-  const chanH   = (bz1 + 0.5) - chanBot;
-  const channel = T(T(Manifold.cylinder(chanH, p.sBot/2, p.sTop/2, 48, false))
-                      .translate([cx, cy, chanBot]));
-  upper = T(upper.subtract(channel));
+  const rThroat = p.sBot / 2;
+  const rMouth  = Math.max(rThroat + 2,
+                    Math.min(p.sTop / 2, rThroat + (p.headroom - 1)));
+  const basinDepth = rMouth - rThroat;          // 45° dish
+  const basinBotZ  = bz1 - basinDepth;
+  const throatBotZ = bb.max[2] - 2;             // 2 mm into the bolus apex
+  const basin  = T(T(Manifold.cylinder((bz1 + 0.5) - basinBotZ, rThroat, rMouth, 64, false))
+                     .translate([cx, cy, basinBotZ]));
+  const throat = T(T(Manifold.cylinder((basinBotZ - throatBotZ) + 0.5, rThroat, rThroat, 48, false))
+                     .translate([cx, cy, throatBotZ]));
+  upper = T(T(upper.subtract(basin)).subtract(throat));
 
   // ---- registration pegs on the flange, at the silhouette extremes ----
   // Sockets pierce the thin flange as through-holes: prints cleanly
@@ -1529,9 +1541,9 @@ async function generateShellMold(bolus, bboxOrig, p) {
     drawDir: rotVecInv([0, 0, 1], rots),
     ax, trappedVol, bolusVol, plugVol, trayVol,
     funnel: {
-      tip:  rotVecInv([cx, cy, chanBot], rots),
+      tip:  rotVecInv([cx, cy, throatBotZ], rots),
       top:  rotVecInv([cx, cy, bz1 + 2], rots),
-      rTop: p.sTop / 2, rBot: p.sBot / 2,
+      rTop: rMouth, rBot: rThroat,
     },
   };
 }
