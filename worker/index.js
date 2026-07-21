@@ -187,9 +187,13 @@ function isAuthExempt(path) {
     path === "/portal/login" ||
     path === "/portal/request-trial.html" ||
     path === "/portal/request-trial" ||
+    path === "/portal/reset.html" ||
+    path === "/portal/reset" ||
     path === "/portal/api/login" ||
     path === "/portal/api/me" ||
     path === "/portal/api/trial-request" ||
+    path === "/portal/api/forgot-password" ||
+    path === "/portal/api/reset-password" ||
     path.startsWith("/admin/") ||
     isSharedAsset(path)
   );

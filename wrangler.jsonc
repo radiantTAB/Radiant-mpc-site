@@ -22,6 +22,13 @@
     "run_worker_first": true
   },
 
+  // Cloudflare Email Sending. Used by the portal password-reset flow to
+  // mail one-time links from no-reply@radiant-mpc.com. The domain must be
+  // onboarded once: `wrangler email sending enable radiant-mpc.com`.
+  "send_email": [
+    { "name": "EMAIL", "allowed_sender_addresses": ["no-reply@radiant-mpc.com"] }
+  ],
+
   // D1 database for the License Manager.
   // database_id is filled in after the database is created in the
   // Cloudflare dashboard (Storage & databases -> D1).

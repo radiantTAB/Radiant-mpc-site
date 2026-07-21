@@ -7,6 +7,9 @@
 //   POST /portal/api/login         { email, password }       -> sets a session cookie
 //   GET  /portal/api/me                                      -> the client's apps
 //   POST /portal/api/logout                                  -> clears the session
+//   POST /portal/api/forgot-password { email }               -> emails a one-time
+//                                                               reset link
+//   POST /portal/api/reset-password  { token, new_password } -> consumes that link
 //   POST /portal/api/trial-request { email, name, practice } -> creates a 14-day trial
 //                                                               client + signed license
 //                                                               + session in one shot
@@ -35,6 +38,12 @@ const IDLE_MS = IDLE_MINUTES * 60 * 1000;
 // this to "now" whenever you need to invalidate every existing login at once.
 const SESSION_EPOCH = "2026-06-11T23:34:45Z";
 
+// How long a password-reset link stays valid, and the address it comes from.
+// The from-domain must be onboarded onto Cloudflare Email Sending
+// (`wrangler email sending enable radiant-mpc.com`).
+const RESET_TTL_MINUTES = 60;
+const RESET_FROM = "no-reply@radiant-mpc.com";
+
 // Lazy one-time guard to add the last_seen column used for idle tracking.
 let _portalSchemaReady = false;
 async function ensurePortalSchema(env) {
@@ -45,6 +54,17 @@ async function ensurePortalSchema(env) {
     ).run();
   } catch (_) {
     // Column already exists -- fine.
+  }
+  try {
+    // Password-reset links. Only the SHA-256 of the token is stored, so a
+    // leaked DB copy cannot be replayed against the reset endpoint.
+    await env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS portal_resets (" +
+        "token_hash TEXT PRIMARY KEY, client_id TEXT NOT NULL, " +
+        "created_at TEXT, expires_at TEXT)"
+    ).run();
+  } catch (_) {
+    // Already there.
   }
   _portalSchemaReady = true;
 }
@@ -58,9 +78,10 @@ const SESSION_COOKIE_ATTRS =
 
 // Apps that are hosted web apps a client can launch in a browser.
 // Anything not listed is a desktop app (download + key).
+// quikbolus is deliberately absent: mold/mesh generation is too memory-hungry
+// to host, so it ships as the local desktop app instead.
 const HOSTED_APPS = {
   quikflow: "/apps/quikflow/",
-  quikbolus: "https://quikbolus.radiant-mpc.com/",
   quikqa: "https://quikqa.radiant-mpc.com/",
   quiklog: "https://quiklog.radiant-mpc.com/",
   quikram: "https://quikram.radiant-mpc.com/",
@@ -122,6 +143,14 @@ async function verifyPassword(password, stored) {
   if (parts.length !== 2 || !parts[0] || !parts[1]) return false;
   const recomputed = await hashPassword(password, parts[0]);
   return recomputed === stored;
+}
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(text)
+  );
+  return bytesToHex(new Uint8Array(buf));
 }
 
 export function readCookie(request, name) {
@@ -267,6 +296,136 @@ export async function handlePortalApi(request, env, url) {
         "WHERE id = ?"
     )
       .bind(newHash, session.id)
+      .run();
+    return json({ ok: true });
+  }
+
+  // ---- POST /portal/api/forgot-password ----
+  // Public, unauthenticated. Emails a one-time reset link. Always answers
+  // 200 {ok:true} regardless of whether the address has an account, so the
+  // endpoint cannot be used to enumerate customers.
+  if (path === "/portal/api/forgot-password" && method === "POST") {
+    // Checked before the account lookup: if mail is misconfigured we must
+    // fail identically for every address, not only for real accounts.
+    if (!env.EMAIL) {
+      return json(
+        { error: "Password reset is temporarily unavailable. Please email info@Radiant-MPC.com." },
+        500
+      );
+    }
+    const body = await request.json().catch(() => ({}));
+    const email = String(body.email || "").trim().toLowerCase();
+    const quiet = json({ ok: true });
+    if (!email || !email.includes("@") || email.length > 254) return quiet;
+
+    const client = await env.DB.prepare(
+      "SELECT id, name, contact_email FROM clients " +
+        "WHERE lower(contact_email) = ? AND password_hash IS NOT NULL"
+    )
+      .bind(email)
+      .first();
+    if (!client) return quiet;
+
+    // Throttle: at most one reset mail per client per minute.
+    const recent = await env.DB.prepare(
+      "SELECT created_at FROM portal_resets WHERE client_id = ? " +
+        "ORDER BY created_at DESC LIMIT 1"
+    )
+      .bind(client.id)
+      .first();
+    if (recent && Date.now() - Date.parse(recent.created_at) < 60000) {
+      return quiet;
+    }
+
+    // One live token per client -- requesting a new link kills the old one.
+    await env.DB.prepare("DELETE FROM portal_resets WHERE client_id = ?")
+      .bind(client.id)
+      .run();
+    const token = bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+    const now = Date.now();
+    await env.DB.prepare(
+      "INSERT INTO portal_resets (token_hash, client_id, created_at, expires_at) " +
+        "VALUES (?, ?, ?, ?)"
+    )
+      .bind(
+        await sha256Hex(token),
+        client.id,
+        new Date(now).toISOString(),
+        new Date(now + RESET_TTL_MINUTES * 60000).toISOString()
+      )
+      .run();
+
+    const link =
+      "https://app.radiant-mpc.com/portal/reset.html?token=" + token;
+    const text =
+      "A password reset was requested for your Radiant client portal account.\n\n" +
+      "Set a new password (link expires in " + RESET_TTL_MINUTES + " minutes):\n" +
+      link +
+      "\n\nIf you did not request this, you can ignore this email -- your " +
+      "current password still works.\n\n" +
+      "Radiant Medical Physics Consulting LLC\ninfo@Radiant-MPC.com\n";
+    try {
+      await env.EMAIL.send({
+        to: client.contact_email,
+        from: { email: RESET_FROM, name: "Radiant Medical Physics" },
+        subject: "Reset your Radiant client portal password",
+        text: text,
+        html:
+          '<p>A password reset was requested for your Radiant client portal account.</p>' +
+          '<p><a href="' + link + '">Set a new password</a> ' +
+          "(link expires in " + RESET_TTL_MINUTES + " minutes).</p>" +
+          "<p>If you did not request this, you can ignore this email &mdash; " +
+          "your current password still works.</p>" +
+          "<p>Radiant Medical Physics Consulting LLC<br>info@Radiant-MPC.com</p>",
+      });
+    } catch (err) {
+      // Drop the token so a retry isn't throttled behind a mail we never sent.
+      await env.DB.prepare("DELETE FROM portal_resets WHERE client_id = ?")
+        .bind(client.id)
+        .run();
+      console.error("reset mail failed:", err && (err.code || err.message));
+      return json(
+        { error: "Could not send the reset email. Please email info@Radiant-MPC.com." },
+        500
+      );
+    }
+    return quiet;
+  }
+
+  // ---- POST /portal/api/reset-password ----
+  // Public, unauthenticated -- the token IS the credential. Single use.
+  if (path === "/portal/api/reset-password" && method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    const token = String(body.token || "");
+    const next = String(body.new_password || "");
+    if (next.length < 8) {
+      return json({ error: "New password must be at least 8 characters." }, 400);
+    }
+    const row = token
+      ? await env.DB.prepare(
+          "SELECT client_id, expires_at FROM portal_resets WHERE token_hash = ?"
+        )
+          .bind(await sha256Hex(token))
+          .first()
+      : null;
+    if (!row || row.expires_at < new Date().toISOString()) {
+      return json(
+        { error: "This reset link is invalid or has expired. Request a new one." },
+        400
+      );
+    }
+    await env.DB.prepare(
+      "UPDATE clients SET password_hash = ?, must_change_password = 0 WHERE id = ?"
+    )
+      .bind(await hashPassword(next), row.client_id)
+      .run();
+    // Burn the token and sign out everywhere -- a reset means the old
+    // password (and anyone holding a session on it) is done.
+    await env.DB.prepare("DELETE FROM portal_resets WHERE client_id = ?")
+      .bind(row.client_id)
+      .run();
+    await env.DB.prepare("DELETE FROM portal_sessions WHERE client_id = ?")
+      .bind(row.client_id)
       .run();
     return json({ ok: true });
   }

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Reset Password — Radiant Medical Physics Consulting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/radiant-logo.png">
+<link rel="stylesheet" href="/bold.css">
+<style>
+/* Mirrors login.html — Bold · Radiant Field (inherits bold.css dark tokens) */
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;
+  background:radial-gradient(ellipse 70% 60% at 50% 0%,rgba(240,39,29,.12),transparent 60%),var(--bg)}
+.login-card{position:relative;width:100%;max-width:420px;background:linear-gradient(180deg,var(--bg-2),var(--bg-3));
+  border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:18px;padding:40px 36px;text-align:center;
+  box-shadow:0 40px 90px -40px rgba(48,48,48,.16)}
+.login-logo{height:96px;width:auto;margin:0 auto 18px}
+h1{font-family:var(--font-display);font-size:24px;font-weight:900;letter-spacing:-.02em;color:var(--text);text-transform:uppercase}
+.sub{font-size:14px;color:var(--ink-2);margin-bottom:28px}
+.field{margin-bottom:16px;text-align:left}
+.field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);margin-bottom:7px}
+.field input{width:100%;font-family:var(--font-body);font-size:15px;padding:12px 14px;border:1px solid var(--line-hi);border-radius:8px;background:rgba(255,255,255,.04);color:var(--text)}
+.field input:focus{outline:none;border-color:var(--accent);background:rgba(255,255,255,.07)}
+.login-card .btn{width:100%;justify-content:center;margin-top:6px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.msg{margin-top:14px;font-size:13.5px;font-weight:600;min-height:18px}
+.msg-err{color:var(--accent)}
+.msg-ok{color:var(--ink-2)}
+.hint{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-3)}
+.hint a{color:var(--ink-2)}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="login-logo">
+
+  <!-- Mode A: no ?token= -- ask for the email address. -->
+  <form id="askForm" hidden autocomplete="on">
+    <h1>Reset Password</h1>
+    <p class="sub">We'll email you a link to set a new password.</p>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" required>
+    </div>
+    <button type="submit" class="btn btn-primary" id="askBtn">Send Reset Link</button>
+  </form>
+
+  <!-- Mode B: ?token=... -- set the new password. -->
+  <form id="setForm" hidden autocomplete="on">
+    <h1>New Password</h1>
+    <p class="sub">Choose a password of at least 8 characters.</p>
+    <div class="field">
+      <label for="pw1">New password</label>
+      <input type="password" id="pw1" autocomplete="new-password" minlength="8" required>
+    </div>
+    <div class="field">
+      <label for="pw2">Confirm new password</label>
+      <input type="password" id="pw2" autocomplete="new-password" minlength="8" required>
+    </div>
+    <button type="submit" class="btn btn-primary" id="setBtn">Set Password</button>
+  </form>
+
+  <div class="msg" id="msg" role="alert"></div>
+  <p class="hint">Still stuck? Email <a href="mailto:info@Radiant-MPC.com?subject=Client%20portal%20access">info@Radiant-MPC.com</a> &middot; <a href="/portal/login.html">Back to sign in</a></p>
+</div>
+
+<script>
+var token = new URLSearchParams(location.search).get('token') || '';
+var msg = document.getElementById('msg');
+var askForm = document.getElementById('askForm');
+var setForm = document.getElementById('setForm');
+(token ? setForm : askForm).hidden = false;
+
+function say(text, isError) {
+  msg.textContent = text;
+  msg.className = 'msg ' + (isError ? 'msg-err' : 'msg-ok');
+}
+
+async function post(url, payload, btn, onOk) {
+  say('', false);
+  btn.disabled = true;
+  try {
+    var res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    var data = {};
+    try { data = await res.json(); } catch (ex) {}
+    if (res.ok) { onOk(); } else {
+      say(data.error || 'Something went wrong. Please try again.', true);
+      btn.disabled = false;
+    }
+  } catch (ex) {
+    say('Could not reach the server. Please try again.', true);
+    btn.disabled = false;
+  }
+}
+
+askForm.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var btn = document.getElementById('askBtn');
+  post('/portal/api/forgot-password',
+    { email: document.getElementById('email').value.trim() },
+    btn,
+    function () {
+      askForm.hidden = true;
+      // Deliberately unconditional: we are not told whether the address
+      // has an account, and neither is the visitor.
+      say('If that email has a Radiant account, a reset link is on its way. It expires in 60 minutes.', false);
+    });
+});
+
+setForm.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var pw1 = document.getElementById('pw1').value;
+  if (pw1 !== document.getElementById('pw2').value) {
+    say('The two passwords do not match.', true);
+    return;
+  }
+  post('/portal/api/reset-password',
+    { token: token, new_password: pw1 },
+    document.getElementById('setBtn'),
+    function () {
+      setForm.hidden = true;
+      say('Password updated. Redirecting to sign in…', false);
+      setTimeout(function () { location.href = '/portal/login.html'; }, 1500);
+    });
+});
+</script>
+
+</body>
+</html>
