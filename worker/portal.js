@@ -39,10 +39,11 @@ const IDLE_MS = IDLE_MINUTES * 60 * 1000;
 const SESSION_EPOCH = "2026-06-11T23:34:45Z";
 
 // How long a password-reset link stays valid, and the address it comes from.
-// The from-domain must be onboarded onto Cloudflare Email Sending
-// (`wrangler email sending enable radiant-mpc.com`).
+// Sent from the send.radiant-mpc.com SUBDOMAIN, not the apex: the apex SPF/DKIM
+// belongs to Zoho (business mail), and onboarding it to Cloudflare Email
+// Sending would rewrite those records. The subdomain carries its own SPF/DKIM.
 const RESET_TTL_MINUTES = 60;
-const RESET_FROM = "no-reply@radiant-mpc.com";
+const RESET_FROM = "no-reply@send.radiant-mpc.com";
 
 // Lazy one-time guard to add the last_seen column used for idle tracking.
 let _portalSchemaReady = false;

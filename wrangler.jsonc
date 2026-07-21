@@ -22,11 +22,12 @@
     "run_worker_first": true
   },
 
-  // Cloudflare Email Sending. Used by the portal password-reset flow to
-  // mail one-time links from no-reply@radiant-mpc.com. The domain must be
-  // onboarded once: `wrangler email sending enable radiant-mpc.com`.
+  // Cloudflare Email Sending. Used by the portal password-reset flow to mail
+  // one-time links. Sends from the send.radiant-mpc.com subdomain, onboarded
+  // once via `wrangler email sending enable send.radiant-mpc.com` -- NOT the
+  // apex, whose SPF/DKIM belong to Zoho business mail.
   "send_email": [
-    { "name": "EMAIL", "allowed_sender_addresses": ["no-reply@radiant-mpc.com"] }
+    { "name": "EMAIL", "allowed_sender_addresses": ["no-reply@send.radiant-mpc.com"] }
   ],
 
   // D1 database for the License Manager.
