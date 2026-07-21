@@ -1852,9 +1852,12 @@ function build3mfTwoPlates(parts) {
   const wrappers = [], items = [], objCfg = [], plates = [], subRels = [];
 
   parts.forEach((p, i) => {
-    const wid = 2 * (i + 1);              // root wrapper object ids: 2, 4
+    const wid  = 2 * (i + 1);             // root wrapper object ids: 2, 4
+    const soid = 2 * i + 1;               // sub-model mesh ids: 1, 3 — globally
+                                          // unique: Bambu keys objects by bare id
+                                          // across files, so duplicate ids make
+                                          // every plate show the same mesh
     const subPath = `/3D/Objects/object_${i + 1}.model`;
-    // sub-model file: the actual mesh as object id 1
     files.push({
       name: subPath.slice(1),
       data:
@@ -1862,7 +1865,7 @@ function build3mfTwoPlates(parts) {
 <model unit="millimeter" xml:lang="en-US" ${NS}>
  <metadata name="BambuStudio:3mfVersion">1</metadata>
  <resources>
-  <object id="1" p:UUID="${uid(wid * 10 + 1)}" type="model">
+  <object id="${soid}" p:UUID="${uid(wid * 10 + 1)}" type="model">
 ${meshXml(p.manifold)}
   </object>
  </resources>
@@ -1873,7 +1876,7 @@ ${meshXml(p.manifold)}
     wrappers.push(
 `  <object id="${wid}" p:UUID="${uid(wid)}" type="model">
    <components>
-    <component p:path="${subPath}" objectid="1" p:UUID="${uid(wid * 10)}"/>
+    <component p:path="${subPath}" objectid="${soid}" p:UUID="${uid(wid * 10)}"/>
    </components>
   </object>`);
     const dx = i * STRIDE_X;              // move object i onto plate i+1
@@ -1933,6 +1936,11 @@ ${objCfg.join('\n')}
 ${plates.join('\n')}
 </config>`,
   });
+  // Presence of project_settings.config is what makes Bambu Studio treat
+  // the file as a PROJECT (honoring the plate layout) instead of doing a
+  // plain geometry import that ignores plates. Empty JSON = keep the
+  // user's current printer/filament/process presets untouched.
+  files.push({ name: 'Metadata/project_settings.config', data: '{}' });
   files.unshift(
     { name: '[Content_Types].xml',
       data:
@@ -1940,6 +1948,8 @@ ${plates.join('\n')}
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+ <Default Extension="config" ContentType="application/vnd.bambulab-package.settings+xml"/>
+ <Default Extension="png" ContentType="image/png"/>
 </Types>` },
     { name: '_rels/.rels',
       data:
