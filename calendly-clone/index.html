@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meetly — Easy scheduling ahead</title>
+  <meta name="description" content="Meetly is a simple scheduling app. Share your availability, let people book time, and skip the back-and-forth emails. A personal Calendly-style clone." />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230a66ff'/><text x='50' y='72' font-size='64' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>M</text></svg>" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="brand">
+        <span class="logo-mark">M</span> Meetly
+      </a>
+      <nav class="nav" id="nav">
+        <a class="link" href="#features">Features</a>
+        <a class="link" href="#how">How it works</a>
+        <a class="link" href="#pricing">Pricing</a>
+        <a class="link" href="booking.html">Book a demo</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn btn-ghost" href="booking.html">Log in</a>
+        <a class="btn btn-primary" href="booking.html">Get started</a>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow">Scheduling, simplified</span>
+        <h1>Easy scheduling ahead</h1>
+        <p class="lead">Meetly takes the work out of connecting with others so you can accomplish more. Share a link, and let people pick a time that works — no more email tag.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" href="booking.html">Try the booking flow</a>
+          <a class="btn btn-outline btn-lg" href="#how">See how it works</a>
+        </div>
+        <p class="hero-note">No credit card required · Free for personal use</p>
+      </div>
+
+      <!-- Mock booking card -->
+      <div class="hero-card" aria-hidden="true">
+        <div class="hc-head">
+          <div class="avatar">AL</div>
+          <div>
+            <h3>30 Minute Meeting</h3>
+            <div class="hc-sub">with Alex Lark</div>
+          </div>
+        </div>
+        <div class="hc-mini-cal">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+          <span></span><span></span><span class="day">1</span><span class="day">2</span><span class="dot">3</span><span class="dot">4</span><span class="day">5</span>
+          <span class="dot">6</span><span class="sel">7</span><span class="dot">8</span><span class="dot">9</span><span class="day">10</span><span class="day">11</span><span class="day">12</span>
+          <span class="day">13</span><span class="dot">14</span><span class="dot">15</span><span class="dot">16</span><span class="day">17</span><span class="day">18</span><span class="day">19</span>
+        </div>
+        <div class="hc-slots">
+          <b>9:00am</b>
+          <b class="filled">9:30am</b>
+          <b>10:00am</b>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Logos -->
+  <section class="logos">
+    <div class="container">
+      <p>Loved by busy people at</p>
+      <div class="logos-row">
+        <span>Northwind</span><span>Acme&nbsp;Co</span><span>Globex</span><span>Umbra</span><span>Initech</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <h2>Everything you need to book better meetings</h2>
+        <p>From one-on-ones to team round-robins, Meetly handles the scheduling logistics so you don't have to.</p>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="ficon">🔗</div>
+          <h3>Share a single link</h3>
+          <p>Send one link and let invitees pick from your real-time availability. No downloads, no accounts required.</p>
+        </div>
+        <div class="feature">
+          <div class="ficon">📅</div>
+          <h3>Calendar sync</h3>
+          <p>Connect Google, Outlook, or iCloud so booked times are blocked instantly and conflicts never happen.</p>
+        </div>
+        <div class="feature">
+          <div class="ficon">⏰</div>
+          <h3>Buffers &amp; limits</h3>
+          <p>Add padding between meetings and cap your daily bookings so you stay in control of your day.</p>
+        </div>
+        <div class="feature">
+          <div class="ficon">🔔</div>
+          <h3>Automated reminders</h3>
+          <p>Confirmation and reminder notifications go out automatically, cutting no-shows dramatically.</p>
+        </div>
+        <div class="feature">
+          <div class="ficon">👥</div>
+          <h3>Team scheduling</h3>
+          <p>Round-robin and collective event types route each booking to the right person on your team.</p>
+        </div>
+        <div class="feature">
+          <div class="ficon">🔌</div>
+          <h3>Works with your stack</h3>
+          <p>Native hooks for video calls, CRM, and payments mean Meetly fits into how you already work.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section alt" id="how">
+    <div class="container">
+      <div class="section-head">
+        <h2>Booking a meeting takes seconds</h2>
+        <p>Three simple steps — for you and for the people booking with you.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num"></div>
+          <h3>Set your availability</h3>
+          <p>Tell Meetly when you're free. Create event types like a 15-minute intro or a 60-minute deep dive.</p>
+        </div>
+        <div class="step">
+          <div class="num"></div>
+          <h3>Share your link</h3>
+          <p>Drop your Meetly link in an email, text, or on your site. Invitees see only your open times.</p>
+        </div>
+        <div class="step">
+          <div class="num"></div>
+          <h3>Get booked</h3>
+          <p>They pick a slot, it lands on both calendars, and everyone gets a confirmation. Done.</p>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:44px;">
+        <a class="btn btn-primary btn-lg" href="booking.html">Try it yourself →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section class="section" id="pricing">
+    <div class="container">
+      <div class="section-head">
+        <h2>Simple pricing</h2>
+        <p>Start free. Upgrade when you need more.</p>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <div class="ficon">🌱</div>
+          <h3>Free</h3>
+          <p style="font-size:2rem;color:var(--ink);font-weight:800;margin:8px 0;">$0</p>
+          <p>One event type, unlimited bookings, and a personal scheduling link. Perfect to get going.</p>
+          <a class="btn btn-outline" style="margin-top:16px;" href="booking.html">Get started</a>
+        </div>
+        <div class="feature" style="border-color:var(--brand);border-width:2px;">
+          <div class="ficon">🚀</div>
+          <h3>Standard</h3>
+          <p style="font-size:2rem;color:var(--ink);font-weight:800;margin:8px 0;">$10<span style="font-size:.9rem;color:var(--muted);font-weight:500;">/mo</span></p>
+          <p>Unlimited event types, calendar sync, reminders, and integrations for individuals.</p>
+          <a class="btn btn-primary" style="margin-top:16px;" href="booking.html">Start free trial</a>
+        </div>
+        <div class="feature">
+          <div class="ficon">🏢</div>
+          <h3>Teams</h3>
+          <p style="font-size:2rem;color:var(--ink);font-weight:800;margin:8px 0;">$16<span style="font-size:.9rem;color:var(--muted);font-weight:500;">/mo</span></p>
+          <p>Round-robin routing, shared availability, and admin controls for the whole team.</p>
+          <a class="btn btn-outline" style="margin-top:16px;" href="booking.html">Contact sales</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA band -->
+  <section class="cta-band">
+    <div class="container">
+      <h2>Ready to ditch the email tag?</h2>
+      <p>Set up your scheduling link in under two minutes.</p>
+      <a class="btn btn-primary btn-lg" href="booking.html">Get started free</a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="brand" style="color:#fff;margin-bottom:14px;">
+            <span class="logo-mark">M</span> Meetly
+          </a>
+          <p>Easy scheduling ahead. A personal, self-hosted clone of a Calendly-style booking app — built for learning and personal use.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="booking.html">Book a demo</a>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <a href="#">About</a>
+          <a href="#">Blog</a>
+          <a href="#">Careers</a>
+        </div>
+        <div>
+          <h4>Support</h4>
+          <a href="#">Help center</a>
+          <a href="#">Contact</a>
+          <a href="#">Status</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year"></span> Meetly. Personal demo project — not affiliated with Calendly.</span>
+        <span>Privacy · Terms · Cookies</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const nav = document.getElementById('nav');
+    document.getElementById('navToggle').addEventListener('click', () => nav.classList.toggle('open'));
+    nav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => nav.classList.remove('open')));
+  </script>
+</body>
+</html>
