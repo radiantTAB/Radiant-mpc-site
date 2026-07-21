@@ -374,6 +374,7 @@
         <div class="field">
           <label>Collar height (mm)</label>
           <input type="number" id="s-ext" value="10" min="0" max="30" step="1"/>
+          <div class="hint">flat mode only — shell mode uses a flush countersunk funnel</div>
         </div>
         <div class="field">
           <label>Collar wall (mm)</label>
@@ -382,15 +383,40 @@
       </div>
     </div>
 
-    <!-- 4. SPLIT -->
+    <!-- 4. MOLD STYLE / PARTING -->
     <div class="group">
-      <h2><span class="num">4</span> Parting plane (Z)</h2>
-      <div class="slider">
-        <input type="range" id="split" min="0" max="100" value="50" step="1"/>
-        <span class="v" id="split-val">— mm</span>
+      <h2><span class="num">4</span> Mold style</h2>
+      <div class="grid1">
+        <div class="field">
+          <label>Style</label>
+          <select id="style">
+            <option value="shell" selected>Shell core/cavity — draped bolus (recommended)</option>
+            <option value="flat">Flat split — simple solid shapes</option>
+          </select>
+          <div class="hint" id="style-hint">
+            Core tray replicates the patient surface; cavity plug lowers over it.
+            Parting follows the anatomy — no flat-plane undercuts.
+          </div>
+        </div>
+        <div class="field" id="axis-field">
+          <label>Pull direction</label>
+          <select id="axis">
+            <option value="auto" selected>Auto (thinnest extent)</option>
+            <option value="x">X axis</option>
+            <option value="y">Y axis</option>
+            <option value="z">Z axis</option>
+          </select>
+          <div class="hint">Direction the bolus lifts off the patient.</div>
+        </div>
       </div>
-      <div class="hint" style="margin-top:6px;">
-        Two halves meet at this Z. Default = bolus mid-height.
+      <div id="flat-only" style="display:none;margin-top:8px;">
+        <div class="slider">
+          <input type="range" id="split" min="0" max="100" value="50" step="1"/>
+          <span class="v" id="split-val">— mm</span>
+        </div>
+        <div class="hint" style="margin-top:6px;">
+          Two halves meet at this Z. Default = bolus mid-height.
+        </div>
       </div>
     </div>
 
@@ -432,8 +458,10 @@
     </div>
 
     <div class="info">
-      <b>Filament tip:</b> each half prints flat side (parting face) down on the
-      bed. Supports needed only under the pour spout collar.
+      <b>Print tip (shell mode):</b> tray prints flat-bottom down, core dome up;
+      plug prints flat-top down, cavity up — <b>no supports on either half</b>.
+      If the plug binds on the tray's silhouette wall, set your slicer's XY /
+      horizontal compensation to &minus;0.1&nbsp;mm on the plug.
     </div>
 
   </aside>
@@ -513,12 +541,13 @@ const app = {
     bbox:      null,
   },
   halves: {
-    top:      null,    // Manifold
-    bot:      null,    // Manifold
+    top:      null,    // Manifold (plug / upper)
+    bot:      null,    // Manifold (tray / lower)
     topMesh:  null,    // THREE.Mesh
     botMesh:  null,    // THREE.Mesh
-    plane:    null,    // parting-plane preview
-    partingZ: 0,
+    plane:    null,    // parting-plane preview (flat mode only)
+    partingZ: null,
+    drawDir:  [0, 0, 1],  // explode direction in original frame
   },
 };
 
@@ -678,7 +707,8 @@ function clearMold() {
   }
   app.halves.top?.delete();
   app.halves.bot?.delete();
-  app.halves = { top:null, bot:null, topMesh:null, botMesh:null, plane:null, partingZ:0 };
+  app.halves = { top:null, bot:null, topMesh:null, botMesh:null,
+                 plane:null, partingZ:null, drawDir:[0,0,1] };
   btnExp.disabled = true;
 }
 function clearBolus() {
@@ -806,9 +836,14 @@ btnBuild.addEventListener('click', async () => {
     await tick();
     const p = readParams();
 
-    setBusy(true, 'Subtracting cavity + spout…');
-    await tick();
-    const halves = generateMold(app.bolus.manifold, app.bolus.bbox, p);
+    let halves;
+    if (p.style === 'shell') {
+      halves = await generateShellMold(app.bolus.manifold, app.bolus.bbox, p);
+    } else {
+      setBusy(true, 'Subtracting cavity + spout…');
+      await tick();
+      halves = generateMold(app.bolus.manifold, app.bolus.bbox, p);
+    }
 
     setBusy(true, 'Rendering…');
     await tick();
@@ -816,12 +851,39 @@ btnBuild.addEventListener('click', async () => {
     app.halves.top      = halves.top;
     app.halves.bot      = halves.bot;
     app.halves.partingZ = halves.partingZ;
+    app.halves.drawDir  = halves.drawDir || [0, 0, 1];
     renderHalves(halves, p);
 
     viewctl.style.display = '';
     btnExp.disabled = false;
     setBusy(false);
-    setStatus('ok', 'Mold built — inspect, tweak, or export.');
+
+    if (p.style === 'shell') {
+      const tc  = halves.trappedVol / 1000;                       // cm³
+      const pct = 100 * halves.trappedVol / halves.bolusVol;
+      const ax  = halves.ax.toUpperCase();
+      if (pct < 0.5) {
+        setStatus('ok', `Mold built — pull ${ax}: releases cleanly ` +
+          `(trapped ${tc.toFixed(2)} cm³ = ${pct.toFixed(2)}%).`);
+      } else if (pct < 5) {
+        setStatus('warn', `Mold built — pull ${ax}: ${tc.toFixed(1)} cm³ trapped ` +
+          `(${pct.toFixed(1)}%). A flexible cast should still release.`);
+      } else {
+        setStatus('warn', `Mold built — pull ${ax}: ${tc.toFixed(1)} cm³ trapped ` +
+          `(${pct.toFixed(1)}%). Try a different pull direction.`);
+      }
+      legend.innerHTML =
+        `<div><b>Core/cavity mold — pull ${ax}</b></div>` +
+        `<div style="margin-top:4px;">` +
+          `<span class="sw" style="background:#ff6b6b"></span>Cavity plug (pour side) &nbsp; ` +
+          `<span class="sw" style="background:#4a9eff"></span>Core tray (patient side)` +
+        `</div>` +
+        `<div style="margin-top:4px;color:var(--ink-mute);">` +
+          `Tray dome replicates the patient surface — the cast is formed against it.` +
+        `</div>`;
+    } else {
+      setStatus('ok', 'Mold built — inspect, tweak, or export.');
+    }
   } catch (e) {
     setBusy(false);
     showErr(e);
@@ -831,6 +893,8 @@ btnBuild.addEventListener('click', async () => {
 function readParams() {
   const n = id => Number($(id).value);
   return {
+    style:    $('style').value,
+    axis:     $('axis').value,
     wall:     n('wall'),
     floor:    n('floor'),
     headroom: n('headroom'),
@@ -914,7 +978,315 @@ function generateMold(bolus, bb, p) {
     bot = below.add(pegs);
     top = above.subtract(sockets);
   }
-  return { top, bot, partingZ };
+  return { top, bot, partingZ, drawDir: [0, 0, 1] };
+}
+
+/* ============================================================
+ *  Shell core/cavity mold — for draped bolus (scalp, ear,
+ *  chest wall, any anatomy-wrapped shell).
+ *
+ *  Idea: mold the bolus the way it sits on the patient.
+ *    - Pull axis d = direction the bolus lifts off the anatomy
+ *      (auto = thinnest bbox extent).
+ *    - Core TRAY: bottom half whose dome replicates the patient
+ *      surface (the bolus's inner face).
+ *    - Cavity PLUG: top half whose underside is the bolus's
+ *      outer face, with a countersunk pour funnel.
+ *    - Parting surface follows the anatomy silhouette, so a
+ *      <180°-wrap shell has NO undercuts by construction.
+ *
+ *  Construction (draw frame, pull = +Z):
+ *    1. Rasterize the bolus's top/bottom Z-envelopes onto a fine
+ *       XY grid (barycentric per-triangle — O(tris), no booleans).
+ *    2. Build a watertight "terrain" solid under the top envelope.
+ *    3. plug = box[z ≥ z0] − terrain − bolus
+ *       tray = (block − bolus) − plug   ← exact complement:
+ *              halves mate perfectly, cavity is exactly the bolus
+ *    4. trapped ≈ Σ(H−L)·cellArea − bolusVolume  ← release meter:
+ *       volume locked between the halves along the pull axis
+ *       (0 for any shell that wraps < 180°)
+ * ============================================================ */
+
+/** Signed volume + volume-centroid Z of a manifold (tetra sum). */
+function volumeAndCentroidZ(m) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  let V = 0, Cz = 0;
+  for (let i = 0; i < tv.length; i += 3) {
+    const a = tv[i]*np, b = tv[i+1]*np, c = tv[i+2]*np;
+    const ax=vp[a], ay=vp[a+1], az=vp[a+2];
+    const bx=vp[b], by=vp[b+1], bz=vp[b+2];
+    const cx=vp[c], cy=vp[c+1], cz=vp[c+2];
+    const v = (ax*(by*cz - bz*cy) - bx*(ay*cz - az*cy) + cx*(ay*bz - az*by)) / 6;
+    V += v; Cz += v * (az + bz + cz) / 4;
+  }
+  return { volume: Math.abs(V), cz: V !== 0 ? Cz / V : 0 };
+}
+
+/**
+ * Rasterize a manifold's top (H) and bottom (L) Z-envelopes onto an
+ * XY node grid spanning [x0,x1]×[y0,y1]. Pure JS, O(tris) — each
+ * triangle is barycentrically sampled at the grid nodes inside its
+ * XY footprint. Nodes never covered keep H=-Inf / L=+Inf.
+ */
+function envelopeGrid(m, x0, y0, x1, y1, pitch) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  const nx = Math.max(2, Math.round((x1 - x0) / pitch) + 1);
+  const ny = Math.max(2, Math.round((y1 - y0) / pitch) + 1);
+  const px = (x1 - x0) / (nx - 1), py = (y1 - y0) / (ny - 1);
+  const H = new Float64Array(nx * ny).fill(-Infinity);
+  const L = new Float64Array(nx * ny).fill(+Infinity);
+  for (let t = 0; t < tv.length; t += 3) {
+    const A = tv[t]*np, B = tv[t+1]*np, C = tv[t+2]*np;
+    const ax = vp[A], ay = vp[A+1], az = vp[A+2];
+    const bx = vp[B], by = vp[B+1], bz = vp[B+2];
+    const cx = vp[C], cy = vp[C+1], cz = vp[C+2];
+    const det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    if (Math.abs(det) < 1e-12) continue;          // vertical facet — no XY footprint
+    const i0 = Math.max(0, Math.ceil((Math.min(ax,bx,cx) - x0) / px));
+    const i1 = Math.min(nx - 1, Math.floor((Math.max(ax,bx,cx) - x0) / px));
+    const j0 = Math.max(0, Math.ceil((Math.min(ay,by,cy) - y0) / py));
+    const j1 = Math.min(ny - 1, Math.floor((Math.max(ay,by,cy) - y0) / py));
+    for (let j = j0; j <= j1; j++) {
+      const yy = y0 + j * py;
+      for (let i = i0; i <= i1; i++) {
+        const xx = x0 + i * px;
+        const l1 = ((by - cy) * (xx - cx) + (cx - bx) * (yy - cy)) / det;
+        const l2 = ((cy - ay) * (xx - cx) + (ax - cx) * (yy - cy)) / det;
+        const l3 = 1 - l1 - l2;
+        if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
+        const z = l1 * az + l2 * bz + l3 * cz;
+        const n = j * nx + i;
+        if (z > H[n]) H[n] = z;
+        if (z < L[n]) L[n] = z;
+      }
+    }
+  }
+  return { nx, ny, H, L, x0, y0, px, py };
+}
+
+/**
+ * Watertight terrain solid: top surface follows the H heightfield,
+ * flat bottom at zLow, vertical skirt around the grid perimeter.
+ * Uncovered nodes sit at zUncov (a hair above zLow), so outside the
+ * bolus footprint the terrain is a thin slab below the skirt seam
+ * and subtracting it is a no-op there.
+ */
+function terrainManifold(g, zLow, zUncov) {
+  const { Manifold, Mesh } = app.wasm;
+  const { nx, ny, H, x0, y0, px, py } = g;
+  const nv = nx * ny;
+  const verts = new Float32Array(nv * 2 * 3);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const n = j * nx + i;
+    const x = x0 + i * px, y = y0 + j * py;
+    // 0.1 mm inside the bolus skin: the exact-B subtraction then makes
+    // the finish cut, leaving no coincident-surface slivers on the plug.
+    let h = isFinite(H[n]) ? H[n] - 0.1 : zUncov;
+    h = Math.max(h, zLow + 0.4);
+    verts[3*n] = x;           verts[3*n+1] = y;           verts[3*n+2] = h;
+    verts[3*(nv+n)] = x;      verts[3*(nv+n)+1] = y;      verts[3*(nv+n)+2] = zLow;
+  }
+  const tris = [];
+  const id = (i, j) => j * nx + i;
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const a = id(i, j), b = id(i+1, j), c = id(i+1, j+1), d = id(i, j+1);
+    tris.push(a, b, c,  a, c, d);                       // top, normal +Z
+    tris.push(nv+a, nv+c, nv+b,  nv+a, nv+d, nv+c);     // bottom, normal −Z
+  }
+  for (let i = 0; i < nx - 1; i++) {
+    let a = id(i, 0), b = id(i+1, 0);
+    tris.push(a, nv+a, nv+b,  a, nv+b, b);              // −Y skirt
+    a = id(i, ny-1); b = id(i+1, ny-1);
+    tris.push(a, b, nv+b,  a, nv+b, nv+a);              // +Y skirt
+  }
+  for (let j = 0; j < ny - 1; j++) {
+    let a = id(0, j), b = id(0, j+1);
+    tris.push(a, b, nv+b,  a, nv+b, nv+a);              // −X skirt
+    a = id(nx-1, j); b = id(nx-1, j+1);
+    tris.push(a, nv+a, nv+b,  a, nv+b, b);              // +X skirt
+  }
+  const mesh = new Mesh({
+    numProp: 3, vertProperties: verts, triVerts: new Uint32Array(tris),
+  });
+  return new Manifold(mesh);
+}
+
+/**
+ * Trapped volume ≈ (volume between top/bottom envelopes) − bolus volume.
+ * Exactly 0 when every pull-axis column crosses the bolus once; positive
+ * where material is locked between the halves (wrap > 180°, folds).
+ */
+function trappedEstimate(g, bolusVol) {
+  const { nx, ny, H, L, px, py } = g;
+  const ca = px * py;
+  let between = 0;
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    let s = 0, c = 0;
+    const corners = [j*nx+i, j*nx+i+1, (j+1)*nx+i, (j+1)*nx+i+1];
+    for (const n of corners) {
+      if (isFinite(H[n]) && isFinite(L[n])) { s += H[n] - L[n]; c++; }
+    }
+    if (c) between += (s / c) * ca * (c / 4);
+  }
+  return Math.max(0, between - bolusVol);
+}
+
+/** Largest connected component of a manifold (drops floating crumbs). */
+function keepLargest(m) {
+  const parts = m.decompose();
+  if (parts.length <= 1) return parts[0] || m;
+  let best = null, bestV = -1;
+  for (const p of parts) {
+    const v = p.volume();
+    if (v > bestV) { bestV = v; best = p; }
+  }
+  for (const p of parts) if (p !== best) { try { p.delete(); } catch (_) {} }
+  return best;
+}
+
+/** Apply the inverse of a list of single-axis rotations (deg) to a vector. */
+function rotVecInv(v, rotsList) {
+  let [x, y, z] = v;
+  for (let i = rotsList.length - 1; i >= 0; i--) {
+    const [rx, ry, rz] = rotsList[i].map(a => -a * Math.PI / 180);
+    if (rx) { const c = Math.cos(rx), s = Math.sin(rx); [y, z] = [y*c - z*s, y*s + z*c]; }
+    if (ry) { const c = Math.cos(ry), s = Math.sin(ry); [x, z] = [x*c + z*s, -x*s + z*c]; }
+    if (rz) { const c = Math.cos(rz), s = Math.sin(rz); [x, y] = [x*c - y*s, x*s + y*c]; }
+  }
+  return [x, y, z];
+}
+
+async function generateShellMold(bolus, bboxOrig, p) {
+  const { Manifold } = app.wasm;
+
+  // manifold-3d evaluates booleans LAZILY: results reference their
+  // operands until first read. Deleting an operand before the final
+  // meshes are evaluated corrupts the WASM heap. So: collect every
+  // intermediate here and free it only AFTER forcing evaluation of
+  // the finished halves at the end.
+  const trash = [];
+  const T = (m) => { trash.push(m); return m; };
+
+  // ---- pull axis: user choice or thinnest bbox extent ----
+  let ax = p.axis;
+  if (ax === 'auto') {
+    const s = bboxOrig.size;
+    ax = (s.x <= s.y && s.x <= s.z) ? 'x' : (s.y <= s.z ? 'y' : 'z');
+  }
+  const AXROT = { x: [0, -90, 0], y: [90, 0, 0], z: [0, 0, 0] };
+  const rots = [];
+
+  // ---- rotate into draw frame: pull axis -> +Z ----
+  let B = T(bolus.rotate(AXROT[ax]));
+  rots.push(AXROT[ax]);
+
+  // ---- orient concave (patient) side down: a draped shell has its
+  //      volume centroid on the concave side of the bbox center ----
+  {
+    const bb = B.boundingBox();
+    const { cz } = volumeAndCentroidZ(B);
+    if (cz > (bb.min[2] + bb.max[2]) / 2) {
+      const f = [180, 0, 0];
+      B = T(B.rotate(f)); rots.push(f);
+    }
+  }
+
+  // ---- cast-shrink compensation ----
+  if (p.cscale !== 1) {
+    const bb = B.boundingBox();
+    const c = [(bb.min[0]+bb.max[0])/2, (bb.min[1]+bb.max[1])/2, (bb.min[2]+bb.max[2])/2];
+    B = T(T(T(B.translate([-c[0], -c[1], -c[2]])).scale(p.cscale)).translate(c));
+  }
+
+  const bb  = B.boundingBox();
+  const bx0 = bb.min[0] - p.wall,  bx1 = bb.max[0] + p.wall;
+  const by0 = bb.min[1] - p.wall,  by1 = bb.max[1] + p.wall;
+  const bz0 = bb.min[2] - p.floor, bz1 = bb.max[2] + p.headroom;
+
+  // Skirt seam just below the bolus: the silhouette wall always runs
+  // rim -> seam without slicing into the core dome.
+  const z0 = Math.max(bz0 + 1.5, bb.min[2] - 1);
+
+  setBusy(true, 'Rasterizing anatomy envelope…'); await tick();
+  const pitch = Math.min(1.2, Math.max(0.6, Math.max(bx1 - bx0, by1 - by0) / 120));
+  const grid = envelopeGrid(B, bx0, by0, bx1, by1, pitch);
+
+  setBusy(true, 'Building parting terrain…'); await tick();
+  const terrain = T(terrainManifold(grid, bz0 - 0.5, bz0 + 0.25));
+
+  setBusy(true, 'Cutting cavity plug…'); await tick();
+  const ubox  = T(T(Manifold.cube([bx1-bx0, by1-by0, bz1-z0], false)).translate([bx0, by0, z0]));
+  let   upper = T(T(ubox.subtract(terrain)).subtract(B));   // raster-error guard
+
+  setBusy(true, 'Deriving core tray…'); await tick();
+  const blk   = T(T(Manifold.cube([bx1-bx0, by1-by0, bz1-bz0], false)).translate([bx0, by0, bz0]));
+  let   lower = T(T(blk.subtract(B)).subtract(upper));      // exact complement
+
+  // Trapped pockets materialize as tiny disconnected mold crumbs
+  // (unprintable floating debris). Keep only the main body of each
+  // half — the cast simply gains that hair of silicone in the folds.
+  upper = T(keepLargest(upper));
+  lower = T(keepLargest(lower));
+
+  // ---- pour funnel: countersunk through the plug plate (no collar,
+  //      so the plug prints top-face-down with zero supports) ----
+  const cx = (bb.min[0]+bb.max[0])/2, cy = (bb.min[1]+bb.max[1])/2;
+  const chanBot = bb.max[2] - 2;
+  const chanH   = (bz1 + 0.5) - chanBot;
+  const channel = T(T(Manifold.cylinder(chanH, p.sBot/2, p.sTop/2, 48, false))
+                      .translate([cx, cy, chanBot]));
+  upper = T(upper.subtract(channel));
+
+  // ---- registration pegs on the tray ring at the skirt seam ----
+  if (p.pegN === 4 && p.pegD > 0 && p.pegH > 0) {
+    const inset = Math.max(3, p.pegD * 0.6), pr = p.pegD / 2;
+    const corners = [
+      [bx0 + inset + pr, by0 + inset + pr],
+      [bx1 - inset - pr, by0 + inset + pr],
+      [bx1 - inset - pr, by1 - inset - pr],
+      [bx0 + inset + pr, by1 - inset - pr],
+    ];
+    let pegs = null, sockets = null;
+    for (const [px, py] of corners) {
+      const pg = T(T(Manifold.cylinder(p.pegH, pr, pr, 24, false))
+                     .translate([px, py, z0]));
+      const sk = T(T(Manifold.cylinder(p.pegH + 0.4, pr + p.pegS, pr + p.pegS, 24, false))
+                     .translate([px, py, z0 - 0.2]));
+      pegs    = pegs    ? T(pegs.add(pg))    : pg;
+      sockets = sockets ? T(sockets.add(sk)) : sk;
+    }
+    lower = T(lower.add(pegs));
+    upper = T(upper.subtract(sockets));
+  }
+
+  // ---- release meter: volume locked between the halves ----
+  const bolusVol   = B.volume();
+  const trappedVol = trappedEstimate(grid, bolusVol);
+
+  // ---- rotate results back to the original frame ----
+  for (let i = rots.length - 1; i >= 0; i--) {
+    const inv = rots[i].map(a => -a);
+    upper = T(upper.rotate(inv));
+    lower = T(lower.rotate(inv));
+  }
+
+  // ---- force evaluation of the final trees, THEN free intermediates ----
+  setBusy(true, 'Evaluating solids…'); await tick();
+  upper.numTri();
+  lower.numTri();
+  const keep = new Set([upper, lower]);
+  for (const m of trash) {
+    if (!keep.has(m)) { try { m.delete(); } catch (_) { /* already freed */ } }
+  }
+
+  return {
+    top: upper, bot: lower,
+    partingZ: null,
+    drawDir: rotVecInv([0, 0, 1], rots),
+    ax, trappedVol, bolusVol,
+  };
 }
 
 function renderHalves(h, p) {
@@ -935,20 +1307,22 @@ function renderHalves(h, p) {
   app.halves.topMesh = topMesh;
   app.halves.botMesh = botMesh;
 
-  // Parting-plane hint.
-  const bx = app.bolus.bbox;
-  const planeGeo = new THREE.PlaneGeometry(
-    bx.size.x + 2 * p.wall + 20,
-    bx.size.y + 2 * p.wall + 20
-  );
-  const planeMat = new THREE.MeshBasicMaterial({
-    color: 0x4dc0b5, transparent: true, opacity: 0.14,
-    side: THREE.DoubleSide, depthWrite: false,
-  });
-  const plane = new THREE.Mesh(planeGeo, planeMat);
-  plane.position.set(bx.center.x, bx.center.y, h.partingZ);
-  moldGrp.add(plane);
-  app.halves.plane = plane;
+  // Parting-plane hint (flat mode only — shell mode's parting follows anatomy).
+  if (h.partingZ != null) {
+    const bx = app.bolus.bbox;
+    const planeGeo = new THREE.PlaneGeometry(
+      bx.size.x + 2 * p.wall + 20,
+      bx.size.y + 2 * p.wall + 20
+    );
+    const planeMat = new THREE.MeshBasicMaterial({
+      color: 0x4dc0b5, transparent: true, opacity: 0.14,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.position.set(bx.center.x, bx.center.y, h.partingZ);
+    moldGrp.add(plane);
+    app.halves.plane = plane;
+  }
 
   // Re-apply current explode + bolus-visibility state.
   applyExplode(Number($('explode').value));
@@ -994,14 +1368,26 @@ $('split').addEventListener('input', e => {
   if (app.halves.plane) app.halves.plane.position.z = Number(e.target.value);
 });
 
+$('style').addEventListener('change', () => {
+  const shell = $('style').value === 'shell';
+  $('flat-only').style.display  = shell ? 'none' : '';
+  $('axis-field').style.display = shell ? '' : 'none';
+  $('style-hint').textContent = shell
+    ? 'Core tray replicates the patient surface; cavity plug lowers over it. ' +
+      'Parting follows the anatomy — no flat-plane undercuts.'
+    : 'Single flat parting plane. Only suitable for simple solid shapes ' +
+      'without wrap-around curvature.';
+});
+
 $('explode').addEventListener('input', e => applyExplode(Number(e.target.value)));
 $('show-bolus').addEventListener('change', e => applyBolusVis(e.target.checked));
 
 function applyExplode(offset) {
   if (!app.halves.topMesh || !app.halves.botMesh) return;
-  app.halves.topMesh.position.z = +offset;
-  app.halves.botMesh.position.z = -offset;
-  if (app.halves.plane) {
+  const d = app.halves.drawDir || [0, 0, 1];
+  app.halves.topMesh.position.set( d[0]*offset,  d[1]*offset,  d[2]*offset);
+  app.halves.botMesh.position.set(-d[0]*offset, -d[1]*offset, -d[2]*offset);
+  if (app.halves.plane && app.halves.partingZ != null) {
     app.halves.plane.position.z = app.halves.partingZ + (offset > 0 ? offset * 0.5 : 0);
     app.halves.plane.material.opacity = offset > 0 ? 0.05 : 0.14;
   }
