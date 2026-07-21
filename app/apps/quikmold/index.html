@@ -339,12 +339,14 @@
           <div class="field" id="axis-field">
             <label>Pull direction</label>
             <select id="axis">
-              <option value="auto" selected>Auto (thinnest extent)</option>
+              <option value="auto" selected>Auto — best material (tries X/Y/Z)</option>
+              <option value="thin">Auto — thinnest extent (fast)</option>
               <option value="x">X axis</option>
               <option value="y">Y axis</option>
               <option value="z">Z axis</option>
             </select>
-            <div class="hint">Direction the bolus lifts off the patient.</div>
+            <div class="hint">Best-material mode estimates all three pull directions
+              and builds the one with the least printed material that still releases.</div>
           </div>
         </div>
         <div id="flat-only" style="display:none;margin-top:8px;">
@@ -855,7 +857,20 @@ btnBuild.addEventListener('click', async () => {
           `Material: plug ${halves.plugVol.toFixed(0)} + tray ${halves.trayVol.toFixed(0)} ` +
           `= ${solid.toFixed(0)} cm³ solid · ≈ ${grams.toFixed(0)} g PETG ` +
           `at 2 walls / 15 % infill · cast ${(halves.bolusVol/1000).toFixed(0)} mL` +
-        `</div>`;
+        `</div>` +
+        (halves.optReport ? (
+          `<div style="margin-top:4px;color:var(--ink-mute);">` +
+            `Optimizer: ` +
+            halves.optReport.map(e => {
+              const win = e.ax === halves.ax;
+              const bad = e.trappedPct >= 5;
+              return `${win ? '<b>' : ''}${e.ax.toUpperCase()} ` +
+                `${(e.material/1000).toFixed(0)} cm³` +
+                `${bad ? ' ⚠' + e.trappedPct.toFixed(0) + '%' : ''}` +
+                `${win ? ' ✓</b>' : ''}`;
+            }).join(' · ') +
+          `</div>`
+        ) : '');
     } else {
       setStatus('ok', 'Mold built — inspect, tweak, or export.');
     }
@@ -1296,6 +1311,75 @@ function rotVecInv(v, rotsList) {
   return [x, y, z];
 }
 
+/**
+ * Estimate a shell mold's printed material for one pull axis WITHOUT
+ * building it: rotate, raster the envelope grid, then integrate the
+ * same fields the builder uses (45° cap dilation, pocket erosion,
+ * flange crop) as column sums. Milliseconds per axis — lets the
+ * optimizer try every pull direction and build only the winner.
+ * Excludes the pour basin and pegs (identical across axes).
+ */
+function estimateForAxis(bolus, p, ax) {
+  const AXROT = { x: [0, -90, 0], y: [90, 0, 0], z: [0, 0, 0] };
+  let B = bolus.rotate(AXROT[ax]);
+  {
+    const bb = B.boundingBox();
+    const { cz } = volumeAndCentroidZ(B);
+    if (cz > (bb.min[2] + bb.max[2]) / 2) {
+      const B2 = B.rotate([180, 0, 0]); B.delete(); B = B2;
+    }
+  }
+  const bolusVol = B.volume();
+  const flangeW   = Math.max(8, p.pegD + 4);
+  const flangeThk = 6;
+  const margin    = Math.max(p.wall, flangeW + 2);
+  const bb  = B.boundingBox();
+  const bx0 = bb.min[0] - margin,  bx1 = bb.max[0] + margin;
+  const by0 = bb.min[1] - margin,  by1 = bb.max[1] + margin;
+  const bz0 = bb.min[2] - p.floor, bz1 = bb.max[2] + p.headroom;
+  const z0  = Math.max(bz0 + 1.5, bb.min[2] - 1);
+  const flangeTopZ = z0 + flangeThk;
+  const pitch = Math.min(0.8, Math.max(0.5, Math.max(bx1 - bx0, by1 - by0) / 170));
+  const grid = envelopeGrid(B, bx0, by0, bx1, by1, pitch);
+  B.delete();
+
+  const nN = grid.nx * grid.ny, ca = grid.px * grid.py;
+  const dist = distanceToCovered(grid);
+  // plug cap top — same construction as the builder
+  const raw = new Float64Array(nN);
+  for (let n = 0; n < nN; n++)
+    raw[n] = isFinite(grid.H[n]) ? grid.H[n] + p.headroom : flangeTopZ;
+  const capH = coneDilate(grid, boxBlurGrid(grid, raw, 2), 1.0);
+  // tray pocket ceiling — same construction as the builder
+  const Du = new Float64Array(nN);
+  for (let n = 0; n < nN; n++) Du[n] = isFinite(grid.L[n]) ? Infinity : 0;
+  chamferSweep(grid.nx, grid.ny, grid.px, grid.py, Du, 1);
+  const inset = Math.max(6, p.wall);
+  const pseed = new Float64Array(nN);
+  for (let n = 0; n < nN; n++)
+    pseed[n] = (Du[n] >= inset && isFinite(grid.L[n])) ? grid.L[n] - p.floor : bz0 - 1;
+  const pocketTop = coneErode(grid, pseed, 1.0);
+
+  let plug = 0, tray = 0;
+  for (let n = 0; n < nN; n++) {
+    if (dist[n] > flangeW) continue;
+    const top = Math.max(Math.min(Math.max(capH[n], raw[n]), bz1), flangeTopZ);
+    if (isFinite(grid.H[n])) {
+      plug += Math.max(0, top - Math.max(grid.H[n], z0)) * ca;
+      let t = Math.max(0, grid.L[n] - bz0) - Math.max(0, pocketTop[n] - bz0);
+      tray += Math.max(0, t) * ca;
+    } else {
+      plug += Math.max(0, top - z0) * ca;
+      tray += Math.max(0, z0 - bz0) * ca;
+    }
+  }
+  const trapped = trappedEstimate(grid, bolusVol);
+  return {
+    ax, plug, tray, material: plug + tray,
+    trappedVol: trapped, trappedPct: 100 * trapped / bolusVol,
+  };
+}
+
 async function generateShellMold(bolus, bboxOrig, p) {
   const { Manifold } = app.wasm;
 
@@ -1307,9 +1391,23 @@ async function generateShellMold(bolus, bboxOrig, p) {
   const trash = [];
   const T = (m) => { trash.push(m); return m; };
 
-  // ---- pull axis: user choice or thinnest bbox extent ----
+  // ---- pull axis: optimize, thinnest-extent heuristic, or manual ----
   let ax = p.axis;
+  let optReport = null;
   if (ax === 'auto') {
+    // Best-material search: estimate all three pull directions from the
+    // envelope heightfields (no booleans), keep releasable candidates
+    // (trapped < 5 %), pick the least material; if nothing releases,
+    // fall back to least-trapped.
+    setBusy(true, 'Optimizing pull direction…'); await tick();
+    optReport = ['x', 'y', 'z'].map(a => estimateForAxis(bolus, p, a));
+    const feasible = optReport.filter(e => e.trappedPct < 5);
+    const pick = (feasible.length ? feasible : optReport.slice())
+      .sort((a, b) => feasible.length
+        ? (a.material - b.material) || (a.trappedPct - b.trappedPct)
+        : (a.trappedPct - b.trappedPct))[0];
+    ax = pick.ax;
+  } else if (ax === 'thin') {
     const s = bboxOrig.size;
     ax = (s.x <= s.y && s.x <= s.z) ? 'x' : (s.y <= s.z ? 'y' : 'z');
   }
@@ -1533,7 +1631,7 @@ async function generateShellMold(bolus, bboxOrig, p) {
     top: upper, bot: lower,
     partingZ: null,
     drawDir: rotVecInv([0, 0, 1], rots),
-    ax, trappedVol, bolusVol, plugVol, trayVol,
+    ax, trappedVol, bolusVol, plugVol, trayVol, optReport,
     funnel: {
       tip:  rotVecInv([cx, cy, throatBotZ], rots),
       top:  rotVecInv([cx, cy, bz1 + 2], rots),
