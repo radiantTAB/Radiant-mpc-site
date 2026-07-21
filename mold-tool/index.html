@@ -343,11 +343,12 @@
         </div>
         <div class="field">
           <label>Floor (mm)</label>
-          <input type="number" id="floor"    value="5"   min="2" max="20" step="0.5"/>
+          <input type="number" id="floor"    value="4"   min="2" max="20" step="0.5"/>
         </div>
         <div class="field">
-          <label>Headroom (mm)</label>
-          <input type="number" id="headroom" value="10"  min="0" max="30" step="1"/>
+          <label>Cap thickness (mm)</label>
+          <input type="number" id="headroom" value="8"  min="4" max="30" step="1"/>
+          <div class="hint">plug lid over cavity (shell) / headroom (flat)</div>
         </div>
         <div class="field">
           <label>Cast scale ×</label>
@@ -459,9 +460,11 @@
 
     <div class="info">
       <b>Print tip (shell mode):</b> tray prints flat-bottom down, core dome up;
-      plug prints flat-top down, cavity up — <b>no supports on either half</b>.
-      If the plug binds on the tray's silhouette wall, set your slicer's XY /
-      horizontal compensation to &minus;0.1&nbsp;mm on the plug.
+      plug prints upside-down resting on its flat plateau (add a brim) —
+      <b>no supports on either half</b>; every plug slope is &le; 45&deg; by
+      construction. Molds aren't dose-relevant: 2 walls + 10&ndash;15&nbsp;%
+      gyroid infill is plenty. If the plug binds on the tray's silhouette
+      wall, set slicer XY compensation to &minus;0.1&nbsp;mm on the plug.
     </div>
 
   </aside>
@@ -872,6 +875,8 @@ btnBuild.addEventListener('click', async () => {
         setStatus('warn', `Mold built — pull ${ax}: ${tc.toFixed(1)} cm³ trapped ` +
           `(${pct.toFixed(1)}%). Try a different pull direction.`);
       }
+      const solid = halves.plugVol + halves.trayVol;
+      const grams = solid * 1.27 * 0.25;   // PETG, ~2 walls + 15% infill
       legend.innerHTML =
         `<div><b>Core/cavity mold — pull ${ax}</b></div>` +
         `<div style="margin-top:4px;">` +
@@ -880,6 +885,11 @@ btnBuild.addEventListener('click', async () => {
         `</div>` +
         `<div style="margin-top:4px;color:var(--ink-mute);">` +
           `Tray dome replicates the patient surface — the cast is formed against it.` +
+        `</div>` +
+        `<div style="margin-top:4px;color:var(--ink-mute);">` +
+          `Material: plug ${halves.plugVol.toFixed(0)} + tray ${halves.trayVol.toFixed(0)} ` +
+          `= ${solid.toFixed(0)} cm³ solid · ≈ ${grams.toFixed(0)} g PETG ` +
+          `at 2 walls / 15 % infill · cast ${(halves.bolusVol/1000).toFixed(0)} mL` +
         `</div>`;
     } else {
       setStatus('ok', 'Mold built — inspect, tweak, or export.');
@@ -1133,6 +1143,53 @@ function trappedEstimate(g, bolusVol) {
   return Math.max(0, between - bolusVol);
 }
 
+/**
+ * Two-pass chamfer sweeps over the node grid.
+ * distanceToCovered: XY distance from each node to the nearest bolus-
+ * silhouette node (0 inside). coneDilate: the lowest surface that is
+ * ≥ seed everywhere and never slopes steeper than `slope` (rise/run) —
+ * i.e. a 45°-printable relaxation of the cap surface when slope = 1.
+ */
+function chamferSweep(nx, ny, px, py, D, rate) {
+  const pd = Math.hypot(px, py);
+  const relax = (n, m, d) => { const v = D[m] + d * rate; if (v < D[n]) D[n] = v; };
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const n = j * nx + i;
+    if (i > 0)           relax(n, n - 1, px);
+    if (j > 0)           relax(n, n - nx, py);
+    if (i > 0 && j > 0)  relax(n, n - nx - 1, pd);
+    if (i < nx-1 && j>0) relax(n, n - nx + 1, pd);
+  }
+  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) {
+    const n = j * nx + i;
+    if (i < nx-1)            relax(n, n + 1, px);
+    if (j < ny-1)            relax(n, n + nx, py);
+    if (i < nx-1 && j<ny-1)  relax(n, n + nx + 1, pd);
+    if (i > 0 && j < ny-1)   relax(n, n + nx - 1, pd);
+  }
+  return D;
+}
+function distanceToCovered(g) {
+  const { nx, ny, H, px, py } = g;
+  const D = new Float64Array(nx * ny);
+  for (let n = 0; n < nx * ny; n++) D[n] = isFinite(H[n]) ? 0 : Infinity;
+  return chamferSweep(nx, ny, px, py, D, 1);
+}
+/** Upper envelope: lowest surface ≥ seed with all slopes ≤ `slope`. */
+function coneDilate(g, seed, slope) {
+  const { nx, ny, px, py } = g;
+  const D = new Float64Array(seed.length);
+  for (let i = 0; i < seed.length; i++) D[i] = -seed[i];
+  chamferSweep(nx, ny, px, py, D, slope);
+  for (let i = 0; i < D.length; i++) D[i] = -D[i];
+  return D;
+}
+/** Lower envelope: highest surface ≤ seed with all slopes ≤ `slope`. */
+function coneErode(g, seed, slope) {
+  const { nx, ny, px, py } = g;
+  return chamferSweep(nx, ny, px, py, Float64Array.from(seed), slope);
+}
+
 /** Largest connected component of a manifold (drops floating crumbs). */
 function keepLargest(m) {
   const parts = m.decompose();
@@ -1200,9 +1257,15 @@ async function generateShellMold(bolus, bboxOrig, p) {
     B = T(T(T(B.translate([-c[0], -c[1], -c[2]])).scale(p.cscale)).translate(c));
   }
 
+  // Flange: ring of flat mating surface around the silhouette — just
+  // wide enough for pegs + clamping. Everything beyond it is cropped.
+  const flangeW   = Math.max(8, p.pegD + 4);
+  const flangeThk = 6;
+  const margin    = Math.max(p.wall, flangeW + 2);
+
   const bb  = B.boundingBox();
-  const bx0 = bb.min[0] - p.wall,  bx1 = bb.max[0] + p.wall;
-  const by0 = bb.min[1] - p.wall,  by1 = bb.max[1] + p.wall;
+  const bx0 = bb.min[0] - margin,  bx1 = bb.max[0] + margin;
+  const by0 = bb.min[1] - margin,  by1 = bb.max[1] + margin;
   const bz0 = bb.min[2] - p.floor, bz1 = bb.max[2] + p.headroom;
 
   // Skirt seam just below the bolus: the silhouette wall always runs
@@ -1224,6 +1287,75 @@ async function generateShellMold(bolus, bboxOrig, p) {
   const blk   = T(T(Manifold.cube([bx1-bx0, by1-by0, bz1-bz0], false)).translate([bx0, by0, bz0]));
   let   lower = T(T(blk.subtract(B)).subtract(upper));      // exact complement
 
+  // ---- material minimization ------------------------------------
+  setBusy(true, 'Trimming excess material…'); await tick();
+  const dist = distanceToCovered(grid);
+  const flangeTopZ = z0 + flangeThk;
+
+  // Plug: conformal cap — constant-thickness lid over the anatomy,
+  // slope-relaxed to 45° (cone dilation) so it still prints
+  // support-free upside-down on its flat plateau. Outside the
+  // silhouette it drops to a thin flange; beyond the flange, gone.
+  {
+    const nN = grid.nx * grid.ny;
+    const seed = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) {
+      seed[n] = isFinite(grid.H[n]) ? grid.H[n] + p.headroom : flangeTopZ;
+    }
+    const capH = coneDilate(grid, seed, 1.0);
+    const topH = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) {
+      topH[n] = (dist[n] <= flangeW)
+        ? Math.max(Math.min(capH[n], bz1), flangeTopZ)
+        : z0 - 1;                       // outside flange: crop away
+    }
+    const capSolid = T(terrainManifold(
+      { nx: grid.nx, ny: grid.ny, H: topH, x0: grid.x0, y0: grid.y0,
+        px: grid.px, py: grid.py }, z0 - 2, z0 - 1));
+    upper = T(upper.intersect(capSolid));
+  }
+
+  // Tray: crop the slab to the same silhouette + flange footprint.
+  {
+    const nN = grid.nx * grid.ny;
+    const footH = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) {
+      footH[n] = (dist[n] <= flangeW) ? bz1 + 1 : bz0 - 1;
+    }
+    const footSolid = T(terrainManifold(
+      { nx: grid.nx, ny: grid.ny, H: footH, x0: grid.x0, y0: grid.y0,
+        px: grid.px, py: grid.py }, bz0 - 2, bz0 - 1));
+    lower = T(lower.intersect(footSolid));
+  }
+
+  // Tray: hollow the dome from below — pocket ceiling follows the
+  // patient surface `floor` mm down, slope-relaxed to 45° so the
+  // pocket prints support-free (internal dome ≤ 45°, opens at the
+  // underside). A solid ring stays around the silhouette for the
+  // flange, pegs and stiffness.
+  {
+    const nN = grid.nx * grid.ny;
+    const Du = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) Du[n] = isFinite(grid.L[n]) ? Infinity : 0;
+    chamferSweep(grid.nx, grid.ny, grid.px, grid.py, Du, 1);
+    const inset = Math.max(6, p.wall);
+    const seed = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) {
+      seed[n] = (Du[n] >= inset && isFinite(grid.L[n]))
+        ? grid.L[n] - p.floor
+        : bz0 - 1;
+    }
+    const pocketTop = coneErode(grid, seed, 1.0);
+    let worthIt = false;
+    for (let n = 0; n < nN; n++) if (pocketTop[n] > bz0 + 1.5) { worthIt = true; break; }
+    if (worthIt) {
+      const pocketSolid = T(terrainManifold(
+        { nx: grid.nx, ny: grid.ny, H: pocketTop, x0: grid.x0, y0: grid.y0,
+          px: grid.px, py: grid.py }, bz0 - 2, bz0 - 1));
+      lower = T(lower.subtract(pocketSolid));
+    }
+  }
+
   // Trapped pockets materialize as tiny disconnected mold crumbs
   // (unprintable floating debris). Keep only the main body of each
   // half — the cast simply gains that hair of silicone in the folds.
@@ -1239,17 +1371,32 @@ async function generateShellMold(bolus, bboxOrig, p) {
                       .translate([cx, cy, chanBot]));
   upper = T(upper.subtract(channel));
 
-  // ---- registration pegs on the tray ring at the skirt seam ----
+  // ---- registration pegs on the flange, at the silhouette extremes ----
+  // Sockets pierce the thin flange as through-holes: prints cleanly
+  // (no bridging) and full peg seating is visible from outside.
   if (p.pegN === 4 && p.pegD > 0 && p.pegH > 0) {
-    const inset = Math.max(3, p.pegD * 0.6), pr = p.pegD / 2;
-    const corners = [
-      [bx0 + inset + pr, by0 + inset + pr],
-      [bx1 - inset - pr, by0 + inset + pr],
-      [bx1 - inset - pr, by1 - inset - pr],
-      [bx0 + inset + pr, by1 - inset - pr],
-    ];
+    const pr = p.pegD / 2;
+    let nXmax = -1, nXmin = -1, nYmax = -1, nYmin = -1;
+    let xMax = -Infinity, xMin = Infinity, yMax = -Infinity, yMin = Infinity;
+    for (let j = 0; j < grid.ny; j++) for (let i = 0; i < grid.nx; i++) {
+      const n = j * grid.nx + i;
+      if (!isFinite(grid.H[n])) continue;
+      const x = grid.x0 + i * grid.px, y = grid.y0 + j * grid.py;
+      if (x > xMax) { xMax = x; nXmax = n; }
+      if (x < xMin) { xMin = x; nXmin = n; }
+      if (y > yMax) { yMax = y; nYmax = n; }
+      if (y < yMin) { yMin = y; nYmin = n; }
+    }
+    const nodeXY = (n) =>
+      [grid.x0 + (n % grid.nx) * grid.px, grid.y0 + Math.floor(n / grid.nx) * grid.py];
+    const off = flangeW * 0.55;
+    const spots = [];
+    if (nXmax >= 0) { const [x, y] = nodeXY(nXmax); spots.push([x + off, y]); }
+    if (nXmin >= 0) { const [x, y] = nodeXY(nXmin); spots.push([x - off, y]); }
+    if (nYmax >= 0) { const [x, y] = nodeXY(nYmax); spots.push([x, y + off]); }
+    if (nYmin >= 0) { const [x, y] = nodeXY(nYmin); spots.push([x, y - off]); }
     let pegs = null, sockets = null;
-    for (const [px, py] of corners) {
+    for (const [px, py] of spots) {
       const pg = T(T(Manifold.cylinder(p.pegH, pr, pr, 24, false))
                      .translate([px, py, z0]));
       const sk = T(T(Manifold.cylinder(p.pegH + 0.4, pr + p.pegS, pr + p.pegS, 24, false))
@@ -1257,8 +1404,8 @@ async function generateShellMold(bolus, bboxOrig, p) {
       pegs    = pegs    ? T(pegs.add(pg))    : pg;
       sockets = sockets ? T(sockets.add(sk)) : sk;
     }
-    lower = T(lower.add(pegs));
-    upper = T(upper.subtract(sockets));
+    if (pegs)    lower = T(lower.add(pegs));
+    if (sockets) upper = T(upper.subtract(sockets));
   }
 
   // ---- release meter: volume locked between the halves ----
@@ -1274,8 +1421,8 @@ async function generateShellMold(bolus, bboxOrig, p) {
 
   // ---- force evaluation of the final trees, THEN free intermediates ----
   setBusy(true, 'Evaluating solids…'); await tick();
-  upper.numTri();
-  lower.numTri();
+  const plugVol = upper.volume() / 1000;   // cm³ (also forces evaluation)
+  const trayVol = lower.volume() / 1000;
   const keep = new Set([upper, lower]);
   for (const m of trash) {
     if (!keep.has(m)) { try { m.delete(); } catch (_) { /* already freed */ } }
@@ -1285,7 +1432,7 @@ async function generateShellMold(bolus, bboxOrig, p) {
     top: upper, bot: lower,
     partingZ: null,
     drawDir: rotVecInv([0, 0, 1], rots),
-    ax, trappedVol, bolusVol,
+    ax, trappedVol, bolusVol, plugVol, trayVol,
   };
 }
 
