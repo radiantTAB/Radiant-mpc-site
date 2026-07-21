@@ -881,7 +881,7 @@ function generateMold(bolus, bb, p) {
     const collarR = rTop + p.sWall;
     const collar = Manifold.cylinder(p.sExt + 0.3, collarR, collarR, 48, false)
                      .translate([cx, cy, blockTopZ - 0.15]);
-    mold = mold.union(collar);
+    mold = mold.add(collar);
   }
   mold = mold.subtract(channel);
 
@@ -908,10 +908,10 @@ function generateMold(bolus, bb, p) {
                     .translate([px, py, partingZ]);
       const soc = Manifold.cylinder(p.pegH + 0.4, pr + p.pegS, pr + p.pegS, 24, false)
                     .translate([px, py, partingZ - 0.2]);
-      pegs    = pegs    ? pegs.union(peg)    : peg;
-      sockets = sockets ? sockets.union(soc) : soc;
+      pegs    = pegs    ? pegs.add(peg)    : peg;
+      sockets = sockets ? sockets.add(soc) : soc;
     }
-    bot = below.union(pegs);
+    bot = below.add(pegs);
     top = above.subtract(sockets);
   }
   return { top, bot, partingZ };
@@ -962,8 +962,13 @@ btnExp.addEventListener('click', () => {
     if (!app.halves.topMesh || !app.halves.botMesh) return;
     // Undo explode before exporting so the STLs are positioned at their true
     // parting-plane location (they still print separately of course).
+    // STLExporter reads mesh.matrixWorld without recomputing it, so force an
+    // update after moving the meshes — otherwise the last-rendered exploded
+    // offset gets baked into the exported coordinates.
     const explodeVal = Number($('explode').value);
     applyExplode(0);
+    app.halves.topMesh.updateMatrixWorld(true);
+    app.halves.botMesh.updateMatrixWorld(true);
     const exp = new STLExporter();
     dl(exp.parse(app.halves.topMesh, { binary: true }), 'mold_top.stl');
     dl(exp.parse(app.halves.botMesh, { binary: true }), 'mold_bottom.stl');
