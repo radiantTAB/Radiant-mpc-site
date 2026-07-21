@@ -22,13 +22,10 @@
     "run_worker_first": true
   },
 
-  // Cloudflare Email Sending. Used by the portal password-reset flow to mail
-  // one-time links. Sends from the send.radiant-mpc.com subdomain, onboarded
-  // once via `wrangler email sending enable send.radiant-mpc.com` -- NOT the
-  // apex, whose SPF/DKIM belong to Zoho business mail.
-  "send_email": [
-    { "name": "EMAIL", "allowed_sender_addresses": ["no-reply@send.radiant-mpc.com"] }
-  ],
+  // Portal password-reset mail goes out through Resend (free tier) from
+  // no-reply@send.radiant-mpc.com. Cloudflare Email Sending would be the
+  // native choice but requires a Workers Paid plan. The only config is the
+  // RESEND_API_KEY secret -- set it in the dashboard, not here.
 
   // D1 database for the License Manager.
   // database_id is filled in after the database is created in the

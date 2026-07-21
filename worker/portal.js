@@ -39,11 +39,14 @@ const IDLE_MS = IDLE_MINUTES * 60 * 1000;
 const SESSION_EPOCH = "2026-06-11T23:34:45Z";
 
 // How long a password-reset link stays valid, and the address it comes from.
-// Sent from the send.radiant-mpc.com SUBDOMAIN, not the apex: the apex SPF/DKIM
-// belongs to Zoho (business mail), and onboarding it to Cloudflare Email
-// Sending would rewrite those records. The subdomain carries its own SPF/DKIM.
+// Sent via Resend (free tier) rather than Cloudflare Email Sending, which
+// requires a Workers Paid plan. Needs the RESEND_API_KEY secret.
+//
+// From the send.radiant-mpc.com SUBDOMAIN, not the apex: the apex SPF/DKIM
+// belong to Zoho (business mail), and pointing a second sender at them would
+// break that. The subdomain carries its own SPF/DKIM.
 const RESET_TTL_MINUTES = 60;
-const RESET_FROM = "no-reply@send.radiant-mpc.com";
+const RESET_FROM = "Radiant Medical Physics <no-reply@send.radiant-mpc.com>";
 
 // Lazy one-time guard to add the last_seen column used for idle tracking.
 let _portalSchemaReady = false;
@@ -308,7 +311,7 @@ export async function handlePortalApi(request, env, url) {
   if (path === "/portal/api/forgot-password" && method === "POST") {
     // Checked before the account lookup: if mail is misconfigured we must
     // fail identically for every address, not only for real accounts.
-    if (!env.EMAIL) {
+    if (!env.RESEND_API_KEY) {
       return json(
         { error: "Password reset is temporarily unavailable. Please email info@Radiant-MPC.com." },
         500
@@ -365,26 +368,38 @@ export async function handlePortalApi(request, env, url) {
       "\n\nIf you did not request this, you can ignore this email -- your " +
       "current password still works.\n\n" +
       "Radiant Medical Physics Consulting LLC\ninfo@Radiant-MPC.com\n";
+    let sendFailed = null;
     try {
-      await env.EMAIL.send({
-        to: client.contact_email,
-        from: { email: RESET_FROM, name: "Radiant Medical Physics" },
-        subject: "Reset your Radiant client portal password",
-        text: text,
-        html:
-          '<p>A password reset was requested for your Radiant client portal account.</p>' +
-          '<p><a href="' + link + '">Set a new password</a> ' +
-          "(link expires in " + RESET_TTL_MINUTES + " minutes).</p>" +
-          "<p>If you did not request this, you can ignore this email &mdash; " +
-          "your current password still works.</p>" +
-          "<p>Radiant Medical Physics Consulting LLC<br>info@Radiant-MPC.com</p>",
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer " + env.RESEND_API_KEY,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          from: RESET_FROM,
+          to: [client.contact_email],
+          subject: "Reset your Radiant client portal password",
+          text: text,
+          html:
+            "<p>A password reset was requested for your Radiant client portal account.</p>" +
+            '<p><a href="' + link + '">Set a new password</a> ' +
+            "(link expires in " + RESET_TTL_MINUTES + " minutes).</p>" +
+            "<p>If you did not request this, you can ignore this email &mdash; " +
+            "your current password still works.</p>" +
+            "<p>Radiant Medical Physics Consulting LLC<br>info@Radiant-MPC.com</p>",
+        }),
       });
+      if (!res.ok) sendFailed = "HTTP " + res.status + " " + (await res.text());
     } catch (err) {
+      sendFailed = String((err && err.message) || err);
+    }
+    if (sendFailed) {
       // Drop the token so a retry isn't throttled behind a mail we never sent.
       await env.DB.prepare("DELETE FROM portal_resets WHERE client_id = ?")
         .bind(client.id)
         .run();
-      console.error("reset mail failed:", err && (err.code || err.message));
+      console.error("reset mail failed:", sendFailed);
       return json(
         { error: "Could not send the reset email. Please email info@Radiant-MPC.com." },
         500
