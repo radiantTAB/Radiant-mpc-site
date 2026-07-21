@@ -453,7 +453,7 @@
         <button class="primary" id="btn-build" disabled>Build mold</button>
       </div>
       <div class="row">
-        <button class="ghost" id="btn-export" disabled>Export both STLs</button>
+        <button class="ghost" id="btn-export" disabled>Export 3MF · 2 plates</button>
       </div>
       <div id="err-slot"></div>
     </div>
@@ -789,6 +789,18 @@ async function loadBolus(geo, label) {
 
   btnBuild.disabled = false;
   setStatus('ok', 'Ready — click "Build mold".');
+  setStep(2);
+}
+
+/** Advance the 1/2/3 step chips (no-op on pages without them, e.g. mold-tool). */
+function setStep(active) {
+  for (let s = 1; s <= 3; s++) {
+    const el = document.getElementById('step-' + s);
+    if (!el) continue;
+    el.classList.remove('active', 'done');
+    if (s < active) el.classList.add('done');
+    else if (s === active) el.classList.add('active');
+  }
 }
 
 // ---------- STL upload ----------
@@ -863,6 +875,7 @@ btnBuild.addEventListener('click', async () => {
     viewctl.style.display = '';
     btnExp.disabled = false;
     setBusy(false);
+    setStep(3);
 
     if (p.style === 'shell') {
       const tc  = halves.trappedVol / 1000;                       // cm³
@@ -1195,6 +1208,35 @@ function coneErode(g, seed, slope) {
   return chamferSweep(nx, ny, px, py, Float64Array.from(seed), slope);
 }
 
+/**
+ * Morphological dilation of the covered-H region: uncovered nodes that
+ * touch a covered node inherit the max finite neighbour height, `iters`
+ * times. This pushes the parting terrain a couple of cells PAST the true
+ * bolus silhouette, so the subsequent exact-B subtraction — not the grid —
+ * defines the smooth cavity-rim edge, removing the raster teeth on the rim.
+ */
+function dilateH(g, iters) {
+  const { nx, ny, H } = g;
+  let cur = Float64Array.from(H);
+  for (let it = 0; it < iters; it++) {
+    const nxt = Float64Array.from(cur);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const n = j * nx + i;
+      if (isFinite(cur[n])) continue;
+      let m = -Infinity;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+        const v = cur[jj * nx + ii];
+        if (isFinite(v) && v > m) m = v;
+      }
+      if (isFinite(m)) nxt[n] = m;
+    }
+    cur = nxt;
+  }
+  return cur;
+}
+
 /** 3×3 box blur over the node grid, `passes` times (≈ gaussian). */
 function boxBlurGrid(g, field, passes) {
   const { nx, ny } = g;
@@ -1365,11 +1407,16 @@ async function generateShellMold(bolus, bboxOrig, p) {
   const z0 = Math.max(bz0 + 1.5, bb.min[2] - 1);
 
   setBusy(true, 'Rasterizing anatomy envelope…'); await tick();
-  const pitch = Math.min(1.2, Math.max(0.6, Math.max(bx1 - bx0, by1 - by0) / 120));
+  const pitch = Math.min(0.8, Math.max(0.5, Math.max(bx1 - bx0, by1 - by0) / 170));
   const grid = envelopeGrid(B, bx0, by0, bx1, by1, pitch);
 
   setBusy(true, 'Building parting terrain…'); await tick();
-  const terrain = T(terrainManifold(grid, bz0 - 0.5, bz0 + 0.25));
+  // Dilate H past the silhouette so the exact-B cut defines the smooth rim,
+  // and lightly blur the heights — de-serrates the visible parting seam
+  // without touching the cavity (which is re-cut from B below).
+  const Hdil = dilateH(grid, 2);
+  const Hterr = boxBlurGrid({ ...grid, H: Hdil }, Hdil, 1);
+  const terrain = T(terrainManifold({ ...grid, H: Hterr }, bz0 - 0.5, bz0 + 0.25));
 
   setBusy(true, 'Cutting cavity plug…'); await tick();
   const ubox  = T(T(Manifold.cube([bx1-bx0, by1-by0, bz1-z0], false)).translate([bx0, by0, z0]));
@@ -1609,30 +1656,205 @@ function renderHalves(h, p) {
   applyBolusVis($('show-bolus').checked);
 }
 
-// ---------- exports ----------
-btnExp.addEventListener('click', () => {
+// ---------- exports: one 3MF, each half on its own Bambu plate ----------
+btnExp.addEventListener('click', async () => {
   try {
     clearErr();
-    if (!app.halves.topMesh || !app.halves.botMesh) return;
-    // Undo explode before exporting so the STLs are positioned at their true
-    // parting-plane location (they still print separately of course).
-    // STLExporter reads mesh.matrixWorld without recomputing it, so force an
-    // update after moving the meshes — otherwise the last-rendered exploded
-    // offset gets baked into the exported coordinates.
-    const explodeVal = Number($('explode').value);
-    applyExplode(0);
-    app.halves.topMesh.updateMatrixWorld(true);
-    app.halves.botMesh.updateMatrixWorld(true);
-    const exp = new STLExporter();
-    dl(exp.parse(app.halves.topMesh, { binary: true }), 'mold_top.stl');
-    dl(exp.parse(app.halves.botMesh, { binary: true }), 'mold_bottom.stl');
-    applyExplode(explodeVal);
-    setStatus('ok', 'Exported: mold_top.stl + mold_bottom.stl');
-  } catch (e) { showErr(e); }
+    if (!app.halves.top || !app.halves.bot) return;
+    setBusy(true, 'Orienting halves for print…');
+    await tick();
+
+    // Orient each half to its most stable face-down pose (plug on its
+    // plateau, tray on its flat bottom), drop to z=0, center on the plate.
+    const plug = orientForPrint(app.halves.top);   // Bambu bed is 256×256; center 128,128
+    const tray = orientForPrint(app.halves.bot);
+
+    const blob = build3mfTwoPlates([
+      { manifold: plug, name: 'mold_plug_cavity', plate: 'Plate 1 — Plug (cavity/pour side)' },
+      { manifold: tray, name: 'mold_tray_core',   plate: 'Plate 2 — Tray (core/patient side)' },
+    ]);
+    plug.delete(); tray.delete();
+
+    dl(blob, 'bolus_mold_2plates.3mf');
+    setBusy(false);
+    setStatus('ok', 'Exported bolus_mold_2plates.3mf — plate 1 = plug, plate 2 = tray.');
+    setStep(4);   // all three chips done
+  } catch (e) { setBusy(false); showErr(e); }
 });
+
+/** Flat bed-contact area at the mesh's lowest z (stable first-layer proxy). */
+function bedContact(m) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  const zmin = m.boundingBox().min[2];
+  let area = 0;
+  for (let t = 0; t < tv.length; t += 3) {
+    const a = tv[t]*np, b = tv[t+1]*np, c = tv[t+2]*np;
+    if (vp[a+2] > zmin + 0.3 || vp[b+2] > zmin + 0.3 || vp[c+2] > zmin + 0.3) continue;
+    const ux = vp[b]-vp[a], uy = vp[b+1]-vp[a+1];
+    const vx = vp[c]-vp[a], vy = vp[c+1]-vp[a+1];
+    area += Math.abs(ux*vy - uy*vx) / 2;
+  }
+  return area;
+}
+/** Best of 6 axis-aligned face-down poses (max bed contact), centered on the plate at z=0. */
+function orientForPrint(m0) {
+  const CANDS = [[0,0,0],[180,0,0],[90,0,0],[-90,0,0],[0,90,0],[0,-90,0]];
+  let best = null, bestA = -1;
+  for (const r of CANDS) {
+    const c = m0.rotate(r);
+    const a = bedContact(c);
+    if (a > bestA) { bestA = a; best?.delete(); best = c; } else c.delete();
+  }
+  const bb = best.boundingBox();
+  const placed = best.translate([
+    128 - (bb.min[0]+bb.max[0])/2,
+    128 - (bb.min[1]+bb.max[1])/2,
+    -bb.min[2],
+  ]);
+  best.delete();
+  return placed;
+}
+
+/** 3MF object XML for one manifold. */
+function objectXml(m, id, name) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  const nV = vp.length / np;
+  const out = [`<object id="${id}" type="model"><mesh><vertices>`];
+  for (let i = 0; i < nV; i++)
+    out.push(`<vertex x="${vp[i*np].toFixed(4)}" y="${vp[i*np+1].toFixed(4)}" z="${vp[i*np+2].toFixed(4)}"/>`);
+  out.push('</vertices><triangles>');
+  for (let t = 0; t < tv.length; t += 3)
+    out.push(`<triangle v1="${tv[t]}" v2="${tv[t+1]}" v3="${tv[t+2]}"/>`);
+  out.push('</triangles></mesh></object>');
+  return out.join('');
+}
+
+/** Assemble a Bambu-compatible multi-plate 3MF: one object per plate. */
+function build3mfTwoPlates(parts) {
+  const objs = parts.map((p, i) => objectXml(p.manifold, i + 1, p.name)).join('\n');
+  const items = parts.map((_, i) => `<item objectid="${i+1}" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>`).join('\n');
+  const model =
+`<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+ <metadata name="Application">Radiant QuikBolus</metadata>
+ <metadata name="Title">Bolus silicone mold — two plates</metadata>
+ <resources>
+${objs}
+ </resources>
+ <build>
+${items}
+ </build>
+</model>`;
+
+  // Bambu/Orca plate assignment: object N -> plate N.
+  const plateBlocks = parts.map((p, i) => `  <plate>
+   <metadata key="plater_id" value="${i+1}"/>
+   <metadata key="plater_name" value="${p.plate}"/>
+   <metadata key="locked" value="false"/>
+   <model_instance>
+    <metadata key="object_id" value="${i+1}"/>
+    <metadata key="instance_id" value="0"/>
+   </model_instance>
+  </plate>`).join('\n');
+  const objCfg = parts.map((p, i) => `  <object id="${i+1}">
+   <metadata key="name" value="${p.name}"/>
+   <metadata key="extruder" value="1"/>
+  </object>`).join('\n');
+  const modelSettings =
+`<?xml version="1.0" encoding="UTF-8"?>
+<config>
+${objCfg}
+${plateBlocks}
+</config>`;
+
+  const contentTypes =
+`<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+ <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+ <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+</Types>`;
+  const rels =
+`<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.openxmlformats.org/package/2006/relationships/3dmodel"/>
+</Relationships>`;
+
+  return zipStore([
+    { name: '[Content_Types].xml',            data: contentTypes },
+    { name: '_rels/.rels',                    data: rels },
+    { name: '3D/3dmodel.model',               data: model },
+    { name: 'Metadata/model_settings.config', data: modelSettings },
+  ]);
+}
+
+/** Minimal STORED (uncompressed) ZIP writer — no dependency. Returns a Blob. */
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const parts = [];        // Uint8Arrays in final order
+  const central = [];
+  let offset = 0;
+  const u16 = (n) => new Uint8Array([n & 255, (n >> 8) & 255]);
+  const u32 = (n) => new Uint8Array([n & 255, (n>>8)&255, (n>>16)&255, (n>>24)&255]);
+  const push = (arr) => { parts.push(arr); offset += arr.length; };
+
+  for (const f of files) {
+    const nameB = enc.encode(f.name);
+    const dataB = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
+    const crc = crc32(dataB);
+    const localOff = offset;
+    // local file header
+    push(u32(0x04034b50));
+    push(u16(20)); push(u16(0)); push(u16(0));       // ver, flags, method(0=store)
+    push(u16(0)); push(u16(0));                       // mod time/date
+    push(u32(crc)); push(u32(dataB.length)); push(u32(dataB.length));
+    push(u16(nameB.length)); push(u16(0));
+    push(nameB); push(dataB);
+    // central directory record (saved for later)
+    const c = [];
+    const cp = (a) => c.push(a);
+    cp(u32(0x02014b50)); cp(u16(20)); cp(u16(20)); cp(u16(0)); cp(u16(0));
+    cp(u16(0)); cp(u16(0)); cp(u32(crc)); cp(u32(dataB.length)); cp(u32(dataB.length));
+    cp(u16(nameB.length)); cp(u16(0)); cp(u16(0)); cp(u16(0)); cp(u16(0));
+    cp(u32(0)); cp(u32(localOff)); cp(nameB);
+    central.push(concatBytes(c));
+  }
+  const cdStart = offset;
+  const cd = concatBytes(central);
+  push(cd);
+  // end of central directory
+  const eocd = [];
+  eocd.push(u32(0x06054b50)); eocd.push(u16(0)); eocd.push(u16(0));
+  eocd.push(u16(files.length)); eocd.push(u16(files.length));
+  eocd.push(u32(cd.length)); eocd.push(u32(cdStart)); eocd.push(u16(0));
+  push(concatBytes(eocd));
+
+  return new Blob([concatBytes(parts)], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml' });
+}
+function concatBytes(arrs) {
+  let len = 0; for (const a of arrs) len += a.length;
+  const out = new Uint8Array(len); let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
 function dl(data, name) {
-  const blob = data instanceof DataView
-    ? new Blob([data.buffer], { type: 'application/octet-stream' })
+  const blob = data instanceof Blob ? data
+    : data instanceof DataView ? new Blob([data.buffer], { type: 'application/octet-stream' })
     : new Blob([data], { type: 'model/stl' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

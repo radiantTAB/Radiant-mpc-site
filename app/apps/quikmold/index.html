@@ -1,21 +1,20 @@
 <!DOCTYPE html>
 <!--
-  Radiant QuikMold — Silicone-Mold Designer (browser prototype)
-  Local-first, self-contained. Takes an uploaded bolus STL and produces
-  a two-part rigid mold (top + bottom halves) for casting Flexibolus or
-  comparable pourable tissue-equivalent silicones. Runs entirely in the
-  browser via three.js + manifold-3d (WASM). No server, no install.
+  Radiant QuikBolus — Design a Mold (shell core/cavity engine)
+  Self-contained page. Drops into the QuikBolus "Design a Mold" route.
+  Upload a bolus STL → shell core/cavity (or flat) mold → two printable
+  STLs. Runs 100% locally: three.js viewer + manifold-3d WASM booleans.
   (c) 2026 Radiant Medical Physics Consulting LLC
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Radiant QuikMold — Silicone Mold Designer</title>
+<title>QuikBolus — Design a Mold</title>
 <link rel="icon" type="image/png" href="/radiant-logo.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 <style>
   :root{
     --crimson:#d00008;
@@ -24,1050 +23,1841 @@
     --charcoal-soft:#4a4a4a;
     --bg:#ffffff;
     --panel:#f7f7f8;
-    --panel-border:#e3e3e6;
+    --panel-2:#fbfbfc;
+    --border:#e3e3e6;
     --ink:#222226;
     --muted:#6b6b72;
     --pass:#1e7a1e;
     --action:#c98a00;
     --fail:#b00020;
+    --viewer-bg:#14171c;
+    --font:'Montserrat',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+  html,body{margin:0;padding:0;}
   body{
-    font-family:'Montserrat',-apple-system,Segoe UI,Roboto,sans-serif;
-    background:var(--bg);color:var(--ink);
-    font-size:14px;line-height:1.5;
-    -webkit-font-smoothing:antialiased;
-    display:flex;flex-direction:column;
+    font-family:var(--font);background:var(--bg);color:var(--ink);
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
   }
+  a{color:var(--crimson);}
 
-  /* ---- Header ---- */
-  header{
+  /* ---------- top header ---------- */
+  header.qb-head{
     display:flex;align-items:center;gap:16px;
-    padding:14px 24px;
-    border-bottom:3px solid var(--crimson);
-    background:#fff;flex:0 0 auto;
+    padding:16px 28px;background:#fff;border-bottom:3px solid var(--crimson);
   }
-  header img.logo{height:44px;width:auto;display:block;}
-  .header-text h1{
-    margin:0;font-size:19px;font-weight:800;letter-spacing:.2px;
-    color:var(--charcoal);
-  }
-  .header-text .sub{
-    margin:0;font-size:11.5px;color:var(--muted);font-weight:500;
-  }
-  .header-spacer{flex:1;}
-  .header-badge{
-    font-size:10.5px;font-weight:700;color:#fff;
-    background:var(--action);padding:5px 10px;border-radius:12px;
-    letter-spacing:.5px;text-transform:uppercase;
-  }
+  header.qb-head img.logo{height:40px;width:auto;display:block;}
+  .qb-brand{display:flex;flex-direction:column;line-height:1.15;}
+  .qb-brand .name{font-size:21px;font-weight:800;letter-spacing:.2px;color:var(--charcoal);}
+  .qb-brand .name b{color:var(--crimson);font-weight:800;}
+  .qb-brand .sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;
+    text-transform:uppercase;color:var(--muted);}
+  .qb-head .spacer{flex:1;}
+  .qb-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;
+    text-transform:uppercase;color:var(--muted);text-align:right;}
+  .qb-meta .trial{color:var(--crimson);font-weight:700;}
 
-  /* ---- Main layout ---- */
-  main{
-    flex:1 1 auto;display:grid;
-    grid-template-columns:340px 1fr;
-    min-height:0;
+  /* ---------- tab nav ---------- */
+  nav.qb-tabs{
+    display:flex;gap:6px;padding:0 24px;background:var(--panel);
+    border-bottom:1px solid var(--border);
   }
-  aside.controls{
-    background:var(--panel);
-    border-right:1px solid var(--panel-border);
-    overflow-y:auto;padding:16px 18px 24px;
+  nav.qb-tabs a{
+    font-size:13px;font-weight:600;color:var(--charcoal-soft);
+    text-decoration:none;padding:13px 18px 11px;
+    border-bottom:3px solid transparent;transition:color .12s,border-color .12s;
   }
-  section.viewer-pane{
-    position:relative;
-    background:#111;
-    min-height:0;
-  }
-  #viewer-canvas{
-    display:block;width:100%;height:100%;
-  }
-  .viewer-overlay{
-    position:absolute;left:12px;top:12px;
-    background:rgba(30,30,32,.75);color:#eee;
-    padding:8px 12px;border-radius:6px;
-    font-size:11.5px;font-weight:500;
-    max-width:280px;pointer-events:none;
-  }
-  .viewer-overlay strong{color:#fff;font-weight:700;}
-  .viewer-overlay .kv{color:#ccc;}
-  .viewer-status{
-    position:absolute;left:12px;bottom:12px;
-    background:rgba(30,30,32,.85);color:#eee;
-    padding:8px 14px;border-radius:6px;
-    font-size:12px;font-weight:500;
-    display:flex;gap:14px;align-items:center;
-  }
-  .viewer-status .chip{
-    padding:3px 9px;border-radius:10px;
-    font-size:10.5px;font-weight:700;letter-spacing:.4px;
-    background:#444;color:#fff;text-transform:uppercase;
-  }
-  .viewer-status .chip.ok{background:var(--pass);}
-  .viewer-status .chip.warn{background:var(--action);}
-  .viewer-status .chip.err{background:var(--fail);}
-  .viewer-status .chip.idle{background:#666;}
+  nav.qb-tabs a:hover{color:var(--charcoal);}
+  nav.qb-tabs a.active{color:var(--charcoal);border-bottom-color:var(--crimson);background:#fff;}
 
-  /* ---- Controls ---- */
-  .ctrl-card{
-    background:#fff;border:1px solid var(--panel-border);
-    border-radius:7px;padding:14px 14px 12px;margin-bottom:12px;
-  }
-  .ctrl-card h3{
-    margin:0 0 10px;font-size:11px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.7px;color:var(--charcoal-soft);
+  /* ---------- page body ---------- */
+  main.qb-main{max-width:1240px;margin:0 auto;padding:22px 28px 48px;}
+
+  .steps{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+  .step{
     display:flex;align-items:center;gap:8px;
+    font-family:var(--mono);font-size:11.5px;font-weight:500;
+    padding:8px 14px;border-radius:6px;background:var(--panel);
+    color:var(--muted);border:1px solid var(--border);
   }
-  .ctrl-card h3 .step{
-    display:inline-flex;align-items:center;justify-content:center;
-    width:18px;height:18px;border-radius:50%;
-    background:var(--crimson);color:#fff;
-    font-size:10.5px;font-weight:800;
+  .step .n{
+    display:inline-grid;place-items:center;width:18px;height:18px;border-radius:4px;
+    background:#d8d8dc;color:#fff;font-weight:800;font-size:11px;
   }
-  .grid{
-    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:8px 12px;
+  .step.active{background:var(--crimson);color:#fff;border-color:var(--crimson);}
+  .step.active .n{background:#fff;color:var(--crimson);}
+  .step.done{background:#eef6ee;color:var(--pass);border-color:#c9e6c9;}
+  .step.done .n{background:var(--pass);color:#fff;}
+
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:1px;
+    text-transform:uppercase;color:var(--crimson);font-weight:700;margin-bottom:6px;}
+  h1.qb-title{margin:0 0 8px;font-size:28px;font-weight:800;letter-spacing:-.3px;color:var(--charcoal);}
+  p.qb-lede{margin:0 0 22px;font-size:14.5px;color:var(--charcoal-soft);max-width:900px;}
+
+  /* ---------- work area: controls + viewer ---------- */
+  .work{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start;}
+  @media (max-width:900px){ .work{grid-template-columns:1fr;} }
+
+  aside.controls{display:flex;flex-direction:column;gap:14px;}
+
+  .group{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:16px 16px 14px;}
+  .group h2{
+    margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--charcoal-soft);display:flex;align-items:center;gap:9px;
   }
-  .grid.cols-1{grid-template-columns:1fr;}
-  .field{display:flex;flex-direction:column;gap:3px;}
-  .field label{
-    font-size:10.5px;font-weight:600;color:var(--charcoal-soft);
-    text-transform:uppercase;letter-spacing:.4px;
+  .group h2 .num{
+    display:inline-grid;place-items:center;width:19px;height:19px;border-radius:5px;
+    background:var(--crimson);color:#fff;font-size:11px;font-weight:800;
   }
-  .field input[type="number"],.field input[type="text"],.field select{
-    font-family:inherit;font-size:13px;
-    padding:6px 8px;
-    border:1px solid var(--panel-border);border-radius:4px;
-    background:#fff;color:var(--ink);width:100%;
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;}
+  .grid1{display:grid;grid-template-columns:1fr;gap:9px 12px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11px;font-weight:600;color:var(--charcoal-soft);
+    text-transform:uppercase;letter-spacing:.3px;}
+  .field input[type="number"],.field select{
+    font-family:var(--mono);font-size:13px;padding:7px 9px;
+    border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--ink);width:100%;
   }
   .field input:focus,.field select:focus{
-    outline:none;border-color:var(--crimson);
-    box-shadow:0 0 0 3px rgba(208,0,8,.10);
+    outline:none;border-color:var(--crimson);box-shadow:0 0 0 3px rgba(208,0,8,.10);
   }
-  .field .hint{font-size:10px;color:var(--muted);}
-  .slider-row{display:flex;gap:8px;align-items:center;}
-  .slider-row input[type="range"]{flex:1;}
-  .slider-row .val{
-    font-family:'Courier New',monospace;font-size:11.5px;
-    color:var(--charcoal);min-width:52px;text-align:right;
-  }
+  .field .hint{font-size:10.5px;color:var(--muted);}
+  .slider{display:flex;align-items:center;gap:9px;}
+  .slider input[type="range"]{flex:1;accent-color:var(--crimson);}
+  .slider .v{font-family:var(--mono);font-size:12px;color:var(--charcoal);min-width:58px;text-align:right;}
 
-  /* ---- Buttons ---- */
-  .btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
-  button.btn{
-    font-family:inherit;font-size:12.5px;font-weight:600;
-    padding:8px 14px;border-radius:5px;cursor:pointer;
-    border:1px solid transparent;transition:background .12s,transform .05s;
-    flex:1;
+  .row{display:flex;gap:9px;margin-top:10px;}
+  button{
+    font-family:var(--font);font-size:13px;font-weight:700;
+    padding:10px 16px;border-radius:7px;border:1px solid transparent;cursor:pointer;
+    transition:background .12s,border-color .12s,transform .05s;flex:1;
   }
-  button.btn:active{transform:translateY(1px);}
-  button.btn:disabled{opacity:.45;cursor:not-allowed;}
-  button.btn-primary{background:var(--crimson);color:#fff;}
-  button.btn-primary:hover:not(:disabled){background:var(--crimson-dark);}
-  button.btn-ghost{
-    background:#fff;color:var(--charcoal);border-color:var(--panel-border);
-  }
-  button.btn-ghost:hover:not(:disabled){background:#f0f0f1;}
+  button:active:not(:disabled){transform:translateY(1px);}
+  button:disabled{opacity:.45;cursor:not-allowed;}
+  button.primary{background:var(--crimson);color:#fff;}
+  button.primary:hover:not(:disabled){background:var(--crimson-dark);}
+  button.ghost{background:#fff;color:var(--charcoal);border-color:var(--border);}
+  button.ghost:hover:not(:disabled){background:#f0f0f1;border-color:var(--crimson);color:var(--crimson);}
 
   input[type="file"]{display:none;}
-  .file-drop{
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:6px;padding:16px 12px;
-    border:2px dashed var(--panel-border);border-radius:6px;
-    background:#fafafb;cursor:pointer;
-    transition:border-color .12s,background .12s;
+  .drop{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+    padding:22px 14px;border:2px dashed var(--border);border-radius:9px;
+    background:#fff;cursor:pointer;text-align:center;color:var(--muted);
+    transition:border-color .12s,background .12s,color .12s;
   }
-  .file-drop:hover{border-color:var(--crimson);background:#fff;}
-  .file-drop.loaded{
-    border-style:solid;border-color:var(--pass);
-    background:#eef6ee;
-  }
-  .file-drop .fname{
-    font-size:12px;font-weight:600;color:var(--charcoal);
-    word-break:break-all;text-align:center;
-  }
-  .file-drop .fmsg{
-    font-size:11px;color:var(--muted);text-align:center;
-  }
-  .file-drop svg{width:26px;height:26px;color:var(--crimson);}
+  .drop:hover,.drop.hover{border-color:var(--crimson);color:var(--crimson);background:#fff8f8;}
+  .drop.loaded{border-style:solid;border-color:var(--pass);background:#eef6ee;color:var(--ink);}
+  .drop .name{font-family:var(--mono);font-size:12.5px;color:var(--charcoal);font-weight:600;word-break:break-all;}
+  .drop .msg{font-size:11px;}
+  .drop svg{width:30px;height:30px;color:var(--crimson);}
 
-  .info-line{
-    font-size:11px;color:var(--muted);
-    padding:6px 0 2px;line-height:1.5;
-  }
-  .info-line b{color:var(--charcoal);font-weight:700;}
-  .warn-box{
-    font-size:11px;color:#8a4b00;background:#fff6e6;
-    border:1px solid #f0d9a8;border-radius:4px;
-    padding:6px 9px;margin-top:8px;
-  }
-  .err-box{
-    font-size:11px;color:#8a1720;background:#fdecec;
-    border:1px solid #f0a8b0;border-radius:4px;
-    padding:6px 9px;margin-top:8px;white-space:pre-wrap;
-  }
+  .info{font-size:11.5px;color:var(--charcoal-soft);line-height:1.55;}
+  .info b{color:var(--charcoal);font-weight:700;}
+  .kv{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);
+    font-size:11.5px;color:var(--muted);padding:2px 0;}
+  .kv .k{color:var(--muted);} .kv .v{color:var(--ink);}
+  .err{font-size:11px;color:#8a1720;background:#fdecec;border:1px solid #f0a8b0;
+    border-radius:6px;padding:9px 11px;margin-top:9px;font-family:var(--mono);
+    line-height:1.45;white-space:pre-wrap;word-break:break-word;}
+  .warn{font-size:11px;color:#8a4b00;background:#fff6e6;border:1px solid #f0d9a8;
+    border-radius:6px;padding:9px 11px;margin-top:9px;}
 
-  /* ---- Loading overlay (during boolean ops) ---- */
-  .busy-overlay{
-    position:absolute;inset:0;
-    background:rgba(30,30,32,.72);
-    display:none;align-items:center;justify-content:center;
-    z-index:20;
-    font-family:inherit;color:#fff;
+  /* ---------- viewer ---------- */
+  section.viewer{
+    position:sticky;top:14px;background:var(--viewer-bg);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;height:calc(100vh - 40px);max-height:760px;
   }
-  .busy-overlay.active{display:flex;}
-  .busy-inner{
-    background:#222;border:1px solid #444;border-radius:8px;
-    padding:22px 30px;text-align:center;min-width:220px;
-  }
-  .busy-inner .msg{font-size:13px;font-weight:600;margin-bottom:8px;}
-  .busy-inner .sub{font-size:11px;color:#aaa;}
-  .spinner{
-    display:inline-block;width:20px;height:20px;
-    border:2.5px solid #555;border-top-color:var(--crimson);
-    border-radius:50%;
-    animation:spin 0.7s linear infinite;
-    margin-bottom:10px;
-  }
+  @media (max-width:900px){ section.viewer{position:relative;height:460px;} }
+  #gl{display:block;width:100%;height:100%;}
+
+  .over{position:absolute;padding:9px 13px;background:rgba(20,23,28,.85);
+    border:1px solid rgba(255,255,255,.10);border-radius:8px;font-size:11.5px;color:#e5e9f0;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+  .over b{color:#fff;}
+  .over.legend{left:14px;top:14px;max-width:300px;color:#c8ccd4;}
+  .over.legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+    margin-right:6px;vertical-align:middle;}
+  .over.status{left:14px;bottom:14px;display:flex;align-items:center;gap:10px;}
+  .chip{padding:3px 9px;border-radius:11px;font-family:var(--mono);font-size:10px;font-weight:700;
+    letter-spacing:.4px;text-transform:uppercase;background:rgba(255,255,255,.12);color:#c8ccd4;}
+  .chip.ok{background:rgba(30,122,30,.9);color:#fff;}
+  .chip.warn{background:rgba(201,138,0,.95);color:#fff;}
+  .chip.err{background:rgba(176,0,32,.95);color:#fff;}
+  .over.viewctl{right:14px;top:14px;display:flex;flex-direction:column;gap:9px;min-width:200px;}
+  .over.viewctl .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .over.viewctl label{font-size:11px;color:#c8ccd4;display:flex;align-items:center;gap:6px;}
+  .over.viewctl input[type="range"]{width:120px;accent-color:var(--crimson);}
+  .over.viewctl input[type="checkbox"]{accent-color:var(--crimson);}
+
+  .busy{position:absolute;inset:0;background:rgba(20,23,28,.74);display:none;
+    align-items:center;justify-content:center;z-index:30;}
+  .busy.on{display:flex;}
+  .busy .card{background:#1c1f25;border:1px solid rgba(255,255,255,.12);border-radius:10px;
+    padding:22px 30px;text-align:center;min-width:230px;color:#e5e9f0;}
+  .busy .spinner{width:22px;height:22px;margin:0 auto 9px;border:2.5px solid rgba(255,255,255,.18);
+    border-top-color:var(--crimson);border-radius:50%;animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
+  .busy .msg{font-size:13px;font-weight:600;}
+  .busy .sub{font-size:11px;color:#9aa3b2;margin-top:4px;}
+  .viewer-hint{position:absolute;right:14px;bottom:14px;font-family:var(--mono);
+    font-size:10px;color:rgba(255,255,255,.45);letter-spacing:.4px;}
 
-  @media (max-width:800px){
-    main{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
-    aside.controls{max-height:45vh;border-right:none;border-bottom:1px solid var(--panel-border);}
-  }
+  /* ---------- footer ---------- */
+  footer.qb-foot{max-width:1240px;margin:0 auto;padding:20px 28px 40px;
+    border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);line-height:1.6;}
+  footer.qb-foot b{color:var(--charcoal-soft);}
 </style>
 </head>
 <body>
 
-<header>
-  <img class="logo" src="/radiant-logo.png" alt="Radiant MPC" />
-  <div class="header-text">
-    <h1>Radiant QuikMold</h1>
-    <p class="sub">Silicone-mold designer — bolus STL → two-part printable mold</p>
+<header class="qb-head">
+  <img class="logo" src="/radiant-logo.png" alt="Radiant Medical Physics Consulting" />
+  <div class="qb-brand">
+    <span class="name">Quik<b>Bolus</b></span>
+    <span class="sub">Radiant Medical Physics Consulting</span>
   </div>
-  <div class="header-spacer"></div>
-  <span class="header-badge">Prototype · Not for clinical use</span>
+  <div class="spacer"></div>
+  <div class="qb-meta">
+    <div><span class="trial">Shell mold engine</span></div>
+    <div>3D&nbsp;printable&nbsp;bolus&nbsp;generator&nbsp;·&nbsp;local-first</div>
+  </div>
 </header>
 
-<main>
+<nav class="qb-tabs">
+  <a href="../../">Direct Print</a>
+  <a href="../../">Design a Bolus</a>
+  <a class="active" href="#">Design a Mold</a>
+  <a href="../../">Printers</a>
+</nav>
 
-  <!-- =========================================================
-       LEFT: CONTROLS
-       ========================================================= -->
-  <aside class="controls">
+<main class="qb-main">
 
-    <!-- 1. Bolus input -->
-    <div class="ctrl-card">
-      <h3><span class="step">1</span> Load bolus STL</h3>
-      <label class="file-drop" id="file-drop" for="stl-file">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 19h16"/>
-        </svg>
-        <div class="fname" id="file-name">Click to upload .stl</div>
-        <div class="fmsg" id="file-msg">or drop a file here</div>
-      </label>
-      <input type="file" id="stl-file" accept=".stl" />
-      <div class="btn-row">
-        <button class="btn btn-ghost" id="btn-demo">Load demo bolus</button>
+  <div class="steps">
+    <div class="step active" id="step-1"><span class="n">1</span> Upload bolus STL</div>
+    <div class="step" id="step-2"><span class="n">2</span> Design mold</div>
+    <div class="step" id="step-3"><span class="n">3</span> Export both halves</div>
+  </div>
+
+  <div class="kicker">Design a Mold</div>
+  <h1 class="qb-title">Build a two-part mold for casting silicone</h1>
+  <p class="qb-lede">
+    Upload a watertight bolus STL. The shell core/cavity engine molds it the way it
+    sits on the patient — a core tray that replicates the anatomy and a cavity plug that
+    lowers over it — so scalp, ear and other curved boluses release cleanly with no
+    flat-plane undercuts. A built-in pour funnel and registration pegs are added
+    automatically. Prints support-free in PLA or PETG.
+  </p>
+
+  <div class="work">
+    <aside class="controls">
+
+      <!-- 1. INPUT -->
+      <div class="group">
+        <h2><span class="num">1</span> Upload bolus STL</h2>
+        <label class="drop" id="drop" for="file">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 19h16"/>
+          </svg>
+          <div class="name" id="fname">Drop a bolus STL here, or click to browse</div>
+          <div class="msg" id="fmsg">A watertight mesh from QuikBolus or your slicer</div>
+        </label>
+        <input type="file" id="file" accept=".stl" />
+        <div class="row">
+          <button class="ghost" id="btn-demo">Load demo shape</button>
+        </div>
+        <div class="info" id="mesh-info" style="margin-top:8px;">No mesh loaded.</div>
       </div>
-      <div class="info-line" id="bolus-info">No mesh loaded yet.</div>
-    </div>
 
-    <!-- 2. Outer mold geometry -->
-    <div class="ctrl-card">
-      <h3><span class="step">2</span> Outer mold</h3>
-      <div class="grid">
-        <div class="field">
-          <label>Wall thickness (mm)</label>
-          <input type="number" id="p-wall" value="5" min="2" max="20" step="0.5" />
-        </div>
-        <div class="field">
-          <label>Floor thickness (mm)</label>
-          <input type="number" id="p-floor" value="5" min="2" max="20" step="0.5" />
-        </div>
-        <div class="field">
-          <label>Cavity headroom (mm)</label>
-          <input type="number" id="p-headroom" value="10" min="0" max="30" step="1" />
-        </div>
-        <div class="field">
-          <label>Cast scale (×)</label>
-          <input type="number" id="p-castscale" value="1.005" min="1.0" max="1.05" step="0.001" />
-          <div class="hint">Flexibolus ≈ 1.005; skip = 1.0</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. Sprue -->
-    <div class="ctrl-card">
-      <h3><span class="step">3</span> Pour spout (sprue)</h3>
-      <div class="grid">
-        <div class="field">
-          <label>Top Ø (mm)</label>
-          <input type="number" id="p-sprue-top" value="12" min="4" max="25" step="0.5" />
-        </div>
-        <div class="field">
-          <label>Bottom Ø (mm)</label>
-          <input type="number" id="p-sprue-bot" value="6" min="3" max="20" step="0.5" />
-        </div>
-        <div class="field">
-          <label>Spout height (mm)</label>
-          <input type="number" id="p-sprue-ext" value="8" min="0" max="30" step="1" />
-          <div class="hint">Collar above mold top</div>
-        </div>
-        <div class="field">
-          <label>Wall Ø (mm)</label>
-          <input type="number" id="p-sprue-wall" value="2.5" min="1" max="6" step="0.5" />
-          <div class="hint">Spout wall thickness</div>
+      <!-- 2. OUTER BLOCK -->
+      <div class="group">
+        <h2><span class="num">2</span> Outer block</h2>
+        <div class="grid2">
+          <div class="field">
+            <label>Wall (mm)</label>
+            <input type="number" id="wall"     value="5"   min="2" max="20" step="0.5"/>
+          </div>
+          <div class="field">
+            <label>Floor (mm)</label>
+            <input type="number" id="floor"    value="4"   min="2" max="20" step="0.5"/>
+          </div>
+          <div class="field">
+            <label>Cap thickness (mm)</label>
+            <input type="number" id="headroom" value="12"  min="4" max="30" step="1"/>
+            <div class="hint">plug lid + pour-basin depth (shell) / headroom (flat)</div>
+          </div>
+          <div class="field">
+            <label>Cast scale ×</label>
+            <input type="number" id="cscale"   value="1"   min="1" max="1.05" step="0.001"/>
+            <div class="hint">1.005 ≈ silicone shrink</div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 4. Parting plane -->
-    <div class="ctrl-card">
-      <h3><span class="step">4</span> Parting plane (Z)</h3>
-      <div class="slider-row">
-        <input type="range" id="p-parting" min="0" max="100" value="50" step="1" />
-        <span class="val" id="p-parting-val">— mm</span>
-      </div>
-      <div class="hint" style="margin-top:4px;">
-        Default = bolus mid-Z. Slide up/down to change where the two halves meet.
-      </div>
-    </div>
-
-    <!-- 5. Registration pegs -->
-    <div class="ctrl-card">
-      <h3><span class="step">5</span> Registration pegs</h3>
-      <div class="grid">
-        <div class="field">
-          <label>Count</label>
-          <select id="p-peg-count">
-            <option value="0">None</option>
-            <option value="4" selected>4 (corners)</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Diameter (mm)</label>
-          <input type="number" id="p-peg-dia" value="6" min="3" max="12" step="0.5" />
-        </div>
-        <div class="field">
-          <label>Depth (mm)</label>
-          <input type="number" id="p-peg-depth" value="8" min="4" max="15" step="0.5" />
-        </div>
-        <div class="field">
-          <label>Slip (mm)</label>
-          <input type="number" id="p-peg-slip" value="0.15" min="0" max="0.5" step="0.05" />
-          <div class="hint">Socket = peg + slip</div>
+      <!-- 3. POUR SPOUT -->
+      <div class="group">
+        <h2><span class="num">3</span> Pour spout</h2>
+        <div class="grid2">
+          <div class="field">
+            <label>Mouth Ø (mm)</label>
+            <input type="number" id="s-top" value="30" min="8" max="50" step="0.5"/>
+            <div class="hint">45° pour basin; auto-limited by cap thickness</div>
+          </div>
+          <div class="field">
+            <label>Throat Ø (mm)</label>
+            <input type="number" id="s-bot" value="8"  min="3" max="20" step="0.5"/>
+            <div class="hint">into cavity (= sprue-stub size)</div>
+          </div>
+          <div class="field">
+            <label>Collar height (mm)</label>
+            <input type="number" id="s-ext" value="10" min="0" max="30" step="1"/>
+            <div class="hint">flat mode only — shell mode uses a flush countersunk funnel</div>
+          </div>
+          <div class="field">
+            <label>Collar wall (mm)</label>
+            <input type="number" id="s-wall" value="2.5" min="1" max="6" step="0.5"/>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Actions -->
-    <div class="ctrl-card">
-      <div class="btn-row">
-        <button class="btn btn-primary" id="btn-preview" disabled>Preview mold</button>
+      <!-- 4. MOLD STYLE / PARTING -->
+      <div class="group">
+        <h2><span class="num">4</span> Mold style</h2>
+        <div class="grid1">
+          <div class="field">
+            <label>Style</label>
+            <select id="style">
+              <option value="shell" selected>Shell core/cavity — draped bolus (recommended)</option>
+              <option value="flat">Flat split — simple solid shapes</option>
+            </select>
+            <div class="hint" id="style-hint">
+              Core tray replicates the patient surface; cavity plug lowers over it.
+              Parting follows the anatomy — no flat-plane undercuts.
+            </div>
+          </div>
+          <div class="field" id="axis-field">
+            <label>Pull direction</label>
+            <select id="axis">
+              <option value="auto" selected>Auto (thinnest extent)</option>
+              <option value="x">X axis</option>
+              <option value="y">Y axis</option>
+              <option value="z">Z axis</option>
+            </select>
+            <div class="hint">Direction the bolus lifts off the patient.</div>
+          </div>
+        </div>
+        <div id="flat-only" style="display:none;margin-top:8px;">
+          <div class="slider">
+            <input type="range" id="split" min="0" max="100" value="50" step="1"/>
+            <span class="v" id="split-val">— mm</span>
+          </div>
+          <div class="hint" style="margin-top:6px;">
+            Two halves meet at this Z. Default = bolus mid-height.
+          </div>
+        </div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-ghost" id="btn-export" disabled>Export both STLs</button>
+
+      <!-- 5. PEGS -->
+      <div class="group">
+        <h2><span class="num">5</span> Registration pegs</h2>
+        <div class="grid2">
+          <div class="field">
+            <label>Count</label>
+            <select id="peg-n">
+              <option value="0">None</option>
+              <option value="4" selected>4 corners</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Diameter (mm)</label>
+            <input type="number" id="peg-d" value="6" min="3" max="12" step="0.5"/>
+          </div>
+          <div class="field">
+            <label>Depth (mm)</label>
+            <input type="number" id="peg-h" value="8" min="4" max="15" step="0.5"/>
+          </div>
+          <div class="field">
+            <label>Slip (mm)</label>
+            <input type="number" id="peg-s" value="0.15" min="0" max="0.5" step="0.05"/>
+          </div>
+        </div>
       </div>
-      <div id="error-panel"></div>
-    </div>
 
-    <div class="info-line" style="margin-top:10px;">
-      <b>Print tip:</b> each half prints parting-face-down on the build plate,
-      supports only under the sprue collar. PETG at 0.16&nbsp;mm, 4 walls,
-      25&nbsp;% infill matches the QuikBolus print guide.
-    </div>
-
-  </aside>
-
-  <!-- =========================================================
-       RIGHT: 3D VIEWER
-       ========================================================= -->
-  <section class="viewer-pane">
-    <canvas id="viewer-canvas"></canvas>
-    <div class="viewer-overlay" id="viewer-overlay">
-      <div><strong>QuikMold viewer</strong></div>
-      <div class="kv">Load a bolus STL to begin.</div>
-    </div>
-    <div class="viewer-status" id="viewer-status">
-      <span class="chip idle" id="status-chip">Idle</span>
-      <span id="status-text">Waiting for bolus.</span>
-    </div>
-    <div class="busy-overlay" id="busy-overlay">
-      <div class="busy-inner">
-        <div class="spinner"></div>
-        <div class="msg" id="busy-msg">Working…</div>
-        <div class="sub" id="busy-sub">Boolean ops can take a few seconds on large meshes.</div>
+      <!-- ACTIONS -->
+      <div class="group">
+        <div class="row">
+          <button class="primary" id="btn-build" disabled>Build mold</button>
+        </div>
+        <div class="row">
+          <button class="ghost" id="btn-export" disabled>Export 3MF · 2 plates</button>
+        </div>
+        <div id="err-slot"></div>
       </div>
-    </div>
-  </section>
+
+      <div class="info">
+        <b>Print tip (shell mode):</b> tray prints flat-bottom down, core dome up;
+        plug prints upside-down resting on its flat plateau (add a brim) —
+        <b>no supports on either half</b>; every plug slope is &le; 45&deg; by
+        construction. Molds aren't dose-relevant: 2 walls + 10&ndash;15&nbsp;%
+        gyroid infill is plenty. <b>PLA or PETG both work</b> for
+        room-temperature-cure silicone (use a mold release; avoid PLA for
+        hot-pour materials). If the plug binds on the tray's silhouette
+        wall, set slicer XY compensation to &minus;0.1&nbsp;mm on the plug.
+      </div>
+
+    </aside>
+
+    <section class="viewer">
+      <canvas id="gl"></canvas>
+
+      <div class="over legend" id="legend">
+        <div><b>Design a Mold</b></div>
+        <div style="margin-top:4px;">Upload a bolus STL to begin.</div>
+        <div style="margin-top:6px;">
+          <span class="sw" style="background:#7d8590"></span>Bolus
+          &nbsp; <span class="sw" style="background:#ff6b6b"></span>Cavity plug
+          &nbsp; <span class="sw" style="background:#4a9eff"></span>Core tray
+        </div>
+      </div>
+
+      <div class="over viewctl" id="viewctl" style="display:none;">
+        <div class="toggle">
+          <label><input type="checkbox" id="show-bolus" checked/> show bolus</label>
+        </div>
+        <div class="toggle">
+          <label>explode</label>
+          <input type="range" id="explode" min="0" max="120" value="0" step="1"/>
+        </div>
+      </div>
+
+      <div class="over status" id="status">
+        <span class="chip" id="chip">Idle</span>
+        <span id="status-text">Loading manifold-3d…</span>
+      </div>
+
+      <div class="viewer-hint">drag to orbit · double-click to toggle bolus</div>
+
+      <div class="busy" id="busy">
+        <div class="card">
+          <div class="spinner"></div>
+          <div class="msg" id="busy-msg">Working…</div>
+          <div class="sub">boolean ops on real anatomy can take a few seconds</div>
+        </div>
+      </div>
+    </section>
+  </div>
 
 </main>
 
-<!-- =========================================================
-     Script imports (ES modules, ESM.sh CDN)
-     ========================================================= -->
+<footer class="qb-foot">
+  <b>QuikBolus</b> — a tool of Radiant Medical Physics Consulting. Every generated mold
+  and cast bolus must be reviewed by a qualified medical physicist for geometric accuracy,
+  fit, and water-equivalence before clinical use. Runs 100% locally — no cloud.
+</footer>
+
 <script type="importmap">
 {
   "imports": {
-    "three": "https://esm.sh/three@0.160.0",
-    "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/",
-    "manifold-3d": "https://esm.sh/manifold-3d@3.0.1"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "manifold-3d": "https://cdn.jsdelivr.net/npm/manifold-3d@3.0.1/manifold.js"
   }
 }
 </script>
 
 <script type="module">
-/* =========================================================================
- *  Radiant QuikMold — main module
- * =========================================================================
- *  Flow:
- *    1. User uploads STL (or clicks "Load demo").
- *    2. STL → Three.js BufferGeometry → dedupe verts → manifold-3d Mesh.
- *    3. Store the bolus Manifold; render translucent in the viewer.
- *    4. On "Preview mold":
- *         block = cube around bolus AABB + wall + headroom
- *         mold  = block − bolus_scaled
- *         mold  = mold.union(sprue_collar).subtract(sprue_channel)
- *         [topHalf, botHalf] = mold.splitByPlane([0,0,1], partingZ)
- *         attach pegs to botHalf, sockets to topHalf
- *    5. Render both halves color-coded.
- *    6. On "Export both STLs": STLExporter → download.
- * ========================================================================= */
+/* ============================================================
+ *  Silicone Mold Designer
+ *  Pure browser tool. STL upload → two-part rigid mold with
+ *  pour spout and registration pegs → STL downloads.
+ *
+ *  Stack: three.js (viewer + STL I/O), manifold-3d (WASM
+ *  boolean mesh ops). No server, no build.
+ * ============================================================ */
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { STLLoader } from 'three/addons/loaders/STLLoader.js';
-import { STLExporter } from 'three/addons/exporters/STLExporter.js';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import Module from 'manifold-3d';
+import { OrbitControls }      from 'three/addons/controls/OrbitControls.js';
+import { STLLoader }          from 'three/addons/loaders/STLLoader.js';
+import { STLExporter }        from 'three/addons/exporters/STLExporter.js';
+import { mergeVertices }      from 'three/addons/utils/BufferGeometryUtils.js';
+import Module                 from 'manifold-3d';
 
-/* ---------- state ---------- */
-const state = {
-  wasm: null,          // manifold-3d module handle
+// ---------- state ----------
+const app = {
+  wasm: null,
   bolus: {
-    geometry: null,    // THREE.BufferGeometry (indexed, merged)
-    manifold: null,    // manifold-3d Manifold
-    mesh: null,        // THREE.Mesh in scene
-    bbox: null,        // {min, max, center, size}
-    fileName: null,
+    geometry:  null,
+    manifold:  null,
+    mesh:      null,   // THREE.Mesh in scene
+    bbox:      null,
   },
   halves: {
-    topManifold: null,
-    botManifold: null,
-    topMesh: null,
-    botMesh: null,
-    partingPlaneMesh: null,
+    top:      null,    // Manifold (plug / upper)
+    bot:      null,    // Manifold (tray / lower)
+    topMesh:  null,    // THREE.Mesh
+    botMesh:  null,    // THREE.Mesh
+    plane:    null,    // parting-plane preview (flat mode only)
+    partingZ: null,
+    drawDir:  [0, 0, 1],  // explode direction in original frame
   },
 };
 
-/* ---------- viewer setup ---------- */
-const canvas = document.getElementById('viewer-canvas');
+// ---------- DOM ----------
+const $ = (id) => document.getElementById(id);
+const canvas   = $('gl');
+const chip     = $('chip');
+const chipText = $('status-text');
+const legend   = $('legend');
+const viewctl  = $('viewctl');
+const busy     = $('busy');
+const busyMsg  = $('busy-msg');
+const btnBuild = $('btn-build');
+const btnExp   = $('btn-export');
+const errSlot  = $('err-slot');
+
+// ---------- three.js viewer ----------
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x181a1c);
+scene.background = new THREE.Color(0x0a0d12);
 
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
-camera.position.set(180, -180, 140);
 camera.up.set(0, 0, 1);
+camera.position.set(180, -180, 140);
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 
-/* lighting */
 scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 const key = new THREE.DirectionalLight(0xffffff, 0.9);
-key.position.set(120, -180, 200);
+key.position.set(140, -180, 220);
 scene.add(key);
-const fill = new THREE.DirectionalLight(0xffffff, 0.35);
-fill.position.set(-160, 100, 60);
-scene.add(fill);
+const rim = new THREE.DirectionalLight(0x8cd8ff, 0.3);
+rim.position.set(-180, 120, 60);
+scene.add(rim);
 
-/* build-plate grid + axes */
-const grid = new THREE.GridHelper(300, 30, 0x555555, 0x333333);
+const grid = new THREE.GridHelper(300, 30, 0x2a3140, 0x1c2029);
 grid.rotation.x = Math.PI / 2;
 scene.add(grid);
-scene.add(new THREE.AxesHelper(30));
+scene.add(new THREE.AxesHelper(24));
 
-/* group for the mold-related meshes so we can clear them easily */
-const moldGroup = new THREE.Group();
-scene.add(moldGroup);
+const moldGrp = new THREE.Group();
+scene.add(moldGrp);
 
-function resize() {
-  const rect = canvas.getBoundingClientRect();
-  const w = Math.max(2, rect.width);
-  const h = Math.max(2, rect.height);
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
+function fit() {
+  const r = canvas.getBoundingClientRect();
+  renderer.setSize(Math.max(2, r.width), Math.max(2, r.height), false);
+  camera.aspect = r.width / r.height;
   camera.updateProjectionMatrix();
 }
-window.addEventListener('resize', resize);
-new ResizeObserver(resize).observe(canvas);
-resize();
-
-function animate() {
-  requestAnimationFrame(animate);
+new ResizeObserver(fit).observe(canvas);
+addEventListener('resize', fit);
+fit();
+(function loop() {
+  requestAnimationFrame(loop);
   controls.update();
   renderer.render(scene, camera);
-}
-animate();
+})();
 
-/* ---------- UI helpers ---------- */
-const chip = document.getElementById('status-chip');
-const chipText = document.getElementById('status-text');
-const overlay = document.getElementById('viewer-overlay');
-const errorPanel = document.getElementById('error-panel');
-const busy = document.getElementById('busy-overlay');
-const busyMsg = document.getElementById('busy-msg');
-const btnPreview = document.getElementById('btn-preview');
-const btnExport = document.getElementById('btn-export');
-
-function setStatus(kind, text) {
-  chip.className = `chip ${kind}`;
+// ---------- status / busy / errors ----------
+function setStatus(kind, txt) {
+  chip.className = 'chip ' + (kind || '');
   chip.textContent =
-    kind === 'ok'   ? 'Ready'    :
-    kind === 'warn' ? 'Warning'  :
-    kind === 'err'  ? 'Error'    :
-    kind === 'idle' ? 'Idle'     : kind;
-  chipText.textContent = text;
+    kind === 'ok'   ? 'Ready'  :
+    kind === 'warn' ? 'Warn'   :
+    kind === 'err'  ? 'Error'  : 'Idle';
+  chipText.textContent = txt;
 }
 function setBusy(on, msg) {
-  busy.classList.toggle('active', !!on);
+  busy.classList.toggle('on', !!on);
   if (msg) busyMsg.textContent = msg;
 }
-function clearError() { errorPanel.innerHTML = ''; }
-function showError(err) {
-  clearError();
+function clearErr() { errSlot.innerHTML = ''; }
+function showErr(e) {
+  clearErr();
   const div = document.createElement('div');
-  div.className = 'err-box';
-  const msg = err && err.stack ? err.stack : (err && err.message) || String(err);
-  div.textContent = msg;
-  errorPanel.appendChild(div);
-  setStatus('err', 'Something went wrong. See left panel.');
+  div.className = 'err';
+  div.textContent = (e && e.stack) ? e.stack : (e && e.message) || String(e);
+  errSlot.appendChild(div);
+  setStatus('err', 'Something failed — see left panel.');
+  console.error(e);
 }
-function setOverlay(html) { overlay.innerHTML = html; }
+function tick() { return new Promise(r => requestAnimationFrame(r)); }
 
-/* ---------- manifold-3d init ---------- */
-setStatus('idle', 'Loading manifold-3d WASM…');
+// ---------- manifold-3d bootstrap ----------
 try {
   const wasm = await Module();
   wasm.setup();
-  state.wasm = wasm;
-  setStatus('idle', 'Waiting for bolus.');
+  app.wasm = wasm;
+  setStatus('', 'Load an STL to begin.');
 } catch (e) {
-  showError(new Error('Failed to load manifold-3d WASM. Check network / CSP.\n' + e));
+  showErr(new Error(
+    'Failed to load manifold-3d WASM.\n' +
+    '(Check network, CSP, or CDN block.)\n\n' + (e && e.message)
+  ));
 }
 
-/* ---------- geometry helpers ---------- */
-
-/**
- * Turn a Three.js BufferGeometry (possibly non-indexed) into a manifold Mesh.
- * Manifold requires shared vertices between adjacent faces, so we mergeVertices
- * with a small epsilon first.
- */
-function geometryToManifold(geo) {
-  const { Manifold, Mesh } = state.wasm;
-  let g = geo;
-  // Strip everything but positions so mergeVertices is unambiguous.
-  const strippedPos = g.attributes.position.array;
-  g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(strippedPos.slice(), 3));
-  if (geo.index) g.setIndex(geo.index.clone());
-  g = mergeVertices(g, 1e-4);
-
-  const positions = g.attributes.position.array;         // Float32Array, len = 3*nVerts
-  const indexArr  = g.index.array;                       // Uint16/32Array, len = 3*nTris
-
-  // Manifold expects Float32 + Uint32 typed arrays.
-  const vertProperties = positions instanceof Float32Array
-    ? positions
-    : new Float32Array(positions);
-  const triVerts = indexArr instanceof Uint32Array
-    ? indexArr
-    : new Uint32Array(indexArr);
-
-  const mesh = new Mesh({ numProp: 3, vertProperties, triVerts });
-  const m = new Manifold(mesh);
-  const status = m.status();
-  if (status && status !== 'NoError' && status !== 0) {
-    throw new Error('Manifold construction status: ' + status +
-      ' (mesh has ' + (indexArr.length / 3) + ' triangles). ' +
-      'The uploaded STL may be non-manifold or self-intersecting.');
-  }
-  return m;
+// ---------- geometry conversion helpers ----------
+function geoToManifold(geo) {
+  const { Manifold, Mesh } = app.wasm;
+  // Manifold requires an INDEXED mesh where every edge is shared. STLLoader
+  // returns unindexed vertices — mergeVertices dedupes with a small tolerance.
+  const g0 = new THREE.BufferGeometry();
+  g0.setAttribute('position',
+    new THREE.BufferAttribute(geo.attributes.position.array.slice(), 3));
+  if (geo.index) g0.setIndex(geo.index.clone());
+  const g = mergeVertices(g0, 1e-4);
+  const positions = g.attributes.position.array;
+  const indices   = g.index.array;
+  const mesh = new Mesh({
+    numProp:        3,
+    vertProperties: positions instanceof Float32Array ? positions : new Float32Array(positions),
+    triVerts:       indices   instanceof Uint32Array  ? indices   : new Uint32Array(indices),
+  });
+  return new Manifold(mesh);
 }
-
-/**
- * Turn a manifold Manifold back into a Three.js BufferGeometry.
- */
-function manifoldToGeometry(m) {
+function manifoldToGeo(m) {
   const mesh = m.getMesh();
-  const geo = new THREE.BufferGeometry();
-  // vertProperties can carry more than xyz — but we only asked for numProp=3
-  // in construction. Slice defensively to xyz just in case.
   const numProp = mesh.numProp || 3;
-  let positions;
+  let pos;
   if (numProp === 3) {
-    positions = mesh.vertProperties;
+    pos = mesh.vertProperties;
   } else {
-    const nVerts = mesh.vertProperties.length / numProp;
-    positions = new Float32Array(nVerts * 3);
-    for (let i = 0; i < nVerts; i++) {
-      positions[i*3+0] = mesh.vertProperties[i*numProp+0];
-      positions[i*3+1] = mesh.vertProperties[i*numProp+1];
-      positions[i*3+2] = mesh.vertProperties[i*numProp+2];
+    const n = mesh.vertProperties.length / numProp;
+    pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i*3]   = mesh.vertProperties[i*numProp];
+      pos[i*3+1] = mesh.vertProperties[i*numProp+1];
+      pos[i*3+2] = mesh.vertProperties[i*numProp+2];
     }
   }
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setIndex(new THREE.BufferAttribute(mesh.triVerts, 1));
   geo.computeVertexNormals();
   return geo;
 }
-
-function computeBBox(geo) {
+function bboxOf(geo) {
   geo.computeBoundingBox();
   const bb = geo.boundingBox;
   return {
-    min:    bb.min.clone(),
-    max:    bb.max.clone(),
+    min: bb.min.clone(), max: bb.max.clone(),
     center: bb.getCenter(new THREE.Vector3()),
     size:   bb.getSize(new THREE.Vector3()),
   };
 }
 
-/* ---------- bolus loading ---------- */
-
+// ---------- teardown ----------
 function clearMold() {
-  while (moldGroup.children.length) {
-    const c = moldGroup.children.pop();
-    if (c.geometry) c.geometry.dispose();
-    if (c.material) c.material.dispose();
+  while (moldGrp.children.length) {
+    const c = moldGrp.children.pop();
+    c.geometry?.dispose();
+    c.material?.dispose();
   }
-  if (state.halves.topManifold) state.halves.topManifold.delete();
-  if (state.halves.botManifold) state.halves.botManifold.delete();
-  state.halves.topManifold = null;
-  state.halves.botManifold = null;
-  state.halves.topMesh = null;
-  state.halves.botMesh = null;
-  state.halves.partingPlaneMesh = null;
-  btnExport.disabled = true;
+  app.halves.top?.delete();
+  app.halves.bot?.delete();
+  app.halves = { top:null, bot:null, topMesh:null, botMesh:null,
+                 plane:null, partingZ:null, drawDir:[0,0,1],
+                 funnelMesh:null, funnelBase:null };
+  btnExp.disabled = true;
 }
-
 function clearBolus() {
   clearMold();
-  if (state.bolus.mesh) {
-    scene.remove(state.bolus.mesh);
-    state.bolus.mesh.geometry.dispose();
-    state.bolus.mesh.material.dispose();
+  if (app.bolus.mesh) {
+    scene.remove(app.bolus.mesh);
+    app.bolus.mesh.geometry.dispose();
+    app.bolus.mesh.material.dispose();
   }
-  if (state.bolus.manifold) state.bolus.manifold.delete();
-  state.bolus = {
-    geometry: null, manifold: null, mesh: null, bbox: null,
-    fileName: null,
-  };
-  btnPreview.disabled = true;
-  btnExport.disabled = true;
+  app.bolus.manifold?.delete();
+  app.bolus = { geometry:null, manifold:null, mesh:null, bbox:null };
+  btnBuild.disabled = true;
 }
 
-function frameCamera(bbox) {
-  const s = bbox.size;
-  const maxDim = Math.max(s.x, s.y, s.z);
-  const dist = maxDim * 2.2 + 60;
-  controls.target.copy(bbox.center);
-  camera.position.set(
-    bbox.center.x + dist * 0.7,
-    bbox.center.y - dist * 0.9,
-    bbox.center.z + dist * 0.65,
-  );
-  controls.update();
-}
-
-async function ingestBolusGeometry(geo, fileName) {
+// ---------- ingest a bolus geometry (from upload or demo) ----------
+async function loadBolus(geo, label) {
   clearBolus();
-  if (!state.wasm) throw new Error('Manifold WASM not ready yet.');
+  clearErr();
+  if (!app.wasm) throw new Error('manifold-3d not loaded yet.');
 
-  // Merge verts to make an indexed mesh usable by manifold-3d.
+  setBusy(true, 'Preparing mesh…');
+  await tick();
   const merged = mergeVertices(geo, 1e-4);
-  merged.computeBoundingBox();
-  const bbox = computeBBox(merged);
-
-  setBusy(true, 'Converting mesh to manifold representation…');
-  await nextFrame();
-  const m = geometryToManifold(merged);
+  const bb     = bboxOf(merged);
+  const man    = geoToManifold(merged);
   setBusy(false);
 
-  state.bolus.geometry = merged;
-  state.bolus.manifold = m;
-  state.bolus.bbox = bbox;
-  state.bolus.fileName = fileName;
+  app.bolus = { geometry: merged, manifold: man, bbox: bb, mesh: null };
 
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xd0d0d5, transparent: true, opacity: 0.35,
-    roughness: 0.75, metalness: 0.05, side: THREE.DoubleSide,
+  const mat  = new THREE.MeshStandardMaterial({
+    color: 0x7d8590, roughness: 0.75, metalness: 0.0,
+    transparent: true, opacity: 0.35, side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(merged, mat);
-  state.bolus.mesh = mesh;
+  app.bolus.mesh = mesh;
   scene.add(mesh);
 
-  frameCamera(bbox);
-
-  // Initialise parting-plane slider to bolus mid-Z.
-  const zMin = bbox.min.z, zMax = bbox.max.z;
-  const partingSlider = document.getElementById('p-parting');
-  partingSlider.min = zMin.toFixed(2);
-  partingSlider.max = zMax.toFixed(2);
-  partingSlider.step = ((zMax - zMin) / 200).toFixed(3);
-  partingSlider.value = ((zMin + zMax) / 2).toFixed(2);
-  document.getElementById('p-parting-val').textContent =
-    Number(partingSlider.value).toFixed(1) + ' mm';
-
-  document.getElementById('bolus-info').innerHTML =
-    `<b>${fileName || 'demo'}</b><br>` +
-    `Extent: ${s(bbox.size.x)} × ${s(bbox.size.y)} × ${s(bbox.size.z)} mm<br>` +
-    `Triangles: ${merged.index.count / 3 | 0}`;
-
-  setStatus('ok', 'Bolus loaded — ready to preview mold.');
-  setOverlay(
-    `<div><strong>Bolus loaded</strong></div>` +
-    `<div class="kv">${s(bbox.size.x)} × ${s(bbox.size.y)} × ${s(bbox.size.z)} mm</div>` +
-    `<div class="kv">${(merged.index.count/3|0).toLocaleString()} triangles</div>`
+  // Camera framing.
+  const s = bb.size;
+  const maxDim = Math.max(s.x, s.y, s.z);
+  const dist   = maxDim * 2.2 + 60;
+  controls.target.copy(bb.center);
+  camera.position.set(
+    bb.center.x + dist * 0.7,
+    bb.center.y - dist * 0.9,
+    bb.center.z + dist * 0.65
   );
+  controls.update();
 
-  btnPreview.disabled = false;
+  // Parting slider bounds.
+  const sp = $('split');
+  sp.min   = bb.min.z.toFixed(2);
+  sp.max   = bb.max.z.toFixed(2);
+  sp.step  = ((bb.max.z - bb.min.z) / 200).toFixed(3);
+  sp.value = ((bb.min.z + bb.max.z) / 2).toFixed(2);
+  $('split-val').textContent = Number(sp.value).toFixed(1) + ' mm';
+
+  const nTris = merged.index.count / 3 | 0;
+  $('mesh-info').innerHTML =
+    `<div class="kv"><span class="k">source</span><span class="v">${label}</span></div>` +
+    `<div class="kv"><span class="k">extent</span><span class="v">${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm</span></div>` +
+    `<div class="kv"><span class="k">triangles</span><span class="v">${nTris.toLocaleString()}</span></div>`;
+
+  legend.innerHTML =
+    `<div><b>${label}</b></div>` +
+    `<div style="margin-top:4px;color:var(--ink-mute);">${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm · ${nTris.toLocaleString()} tris</div>` +
+    `<div style="margin-top:6px;">` +
+      `<span class="sw" style="background:#7d8590"></span>Bolus &nbsp; ` +
+      `<span class="sw" style="background:#ff6b6b"></span>Top &nbsp; ` +
+      `<span class="sw" style="background:#4a9eff"></span>Bottom` +
+    `</div>`;
+
+  btnBuild.disabled = false;
+  setStatus('ok', 'Ready — click "Build mold".');
+  setStep(2);
 }
 
-function s(n) { return n.toFixed(1); }
-function nextFrame() { return new Promise(r => requestAnimationFrame(r)); }
+/** Advance the 1/2/3 step chips (no-op on pages without them, e.g. mold-tool). */
+function setStep(active) {
+  for (let s = 1; s <= 3; s++) {
+    const el = document.getElementById('step-' + s);
+    if (!el) continue;
+    el.classList.remove('active', 'done');
+    if (s < active) el.classList.add('done');
+    else if (s === active) el.classList.add('active');
+  }
+}
 
-/* ---------- STL file upload ---------- */
-const dropZone = document.getElementById('file-drop');
-const fileInput = document.getElementById('stl-file');
-
-fileInput.addEventListener('change', (e) => {
+// ---------- STL upload ----------
+const drop = $('drop');
+const file = $('file');
+file.addEventListener('change', e => {
   const f = e.target.files[0];
-  if (f) loadStlFile(f);
+  if (f) readStl(f).catch(showErr);
 });
-;['dragenter','dragover'].forEach(ev => {
-  dropZone.addEventListener(ev, (e) => {
-    e.preventDefault(); e.stopPropagation();
-    dropZone.style.borderColor = '#d00008';
-  });
-});
-;['dragleave','drop'].forEach(ev => {
-  dropZone.addEventListener(ev, (e) => {
-    e.preventDefault(); e.stopPropagation();
-    dropZone.style.borderColor = '';
-  });
-});
-dropZone.addEventListener('drop', (e) => {
+['dragenter','dragover'].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.add('hover');
+}));
+['dragleave','drop'].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); e.stopPropagation(); drop.classList.remove('hover');
+}));
+drop.addEventListener('drop', e => {
   const f = e.dataTransfer.files && e.dataTransfer.files[0];
-  if (f) loadStlFile(f);
+  if (f) readStl(f).catch(showErr);
 });
-
-async function loadStlFile(file) {
-  try {
-    clearError();
-    setStatus('idle', 'Reading ' + file.name + '…');
-    const buf = await file.arrayBuffer();
-    const geo = new STLLoader().parse(buf);
-    document.getElementById('file-name').textContent = file.name;
-    document.getElementById('file-msg').textContent =
-      (buf.byteLength / 1024).toFixed(0) + ' KB';
-    dropZone.classList.add('loaded');
-    await ingestBolusGeometry(geo, file.name);
-  } catch (e) {
-    showError(e);
-  }
+async function readStl(f) {
+  setStatus('', 'Reading ' + f.name + '…');
+  const buf = await f.arrayBuffer();
+  const geo = new STLLoader().parse(buf);
+  $('fname').textContent = f.name;
+  $('fmsg').textContent  = (buf.byteLength / 1024).toFixed(0) + ' KB';
+  drop.classList.add('loaded');
+  await loadBolus(geo, f.name);
 }
 
-document.getElementById('btn-demo').addEventListener('click', async () => {
+// ---------- demo shape ----------
+$('btn-demo').addEventListener('click', async () => {
   try {
-    clearError();
-    setStatus('idle', 'Generating demo bolus…');
-    const geo = buildDemoBolus();
-    document.getElementById('file-name').textContent = 'demo-bolus';
-    document.getElementById('file-msg').textContent = 'flattened ellipsoid';
-    dropZone.classList.add('loaded');
-    await ingestBolusGeometry(geo, 'demo-bolus');
-  } catch (e) {
-    showError(e);
-  }
+    setStatus('', 'Generating demo…');
+    const g = new THREE.SphereGeometry(1, 96, 48);
+    // Oblate ellipsoid ~120 × 80 × 24 mm, lifted so its base sits near z=0.
+    g.scale(60, 40, 12);
+    g.translate(0, 0, 6);
+    $('fname').textContent = 'demo';
+    $('fmsg').textContent  = 'flattened ellipsoid';
+    drop.classList.add('loaded');
+    await loadBolus(g, 'demo');
+  } catch (e) { showErr(e); }
 });
 
-/**
- * Demo bolus: an oblate spheroid ~120 × 80 × 16 mm, flat side down,
- * sitting on z = 0. Stands in for a chest-wall bolus for testing.
- */
-function buildDemoBolus() {
-  const g = new THREE.SphereGeometry(1, 96, 48);
-  g.scale(60, 40, 12);          // 120 × 80 × 24 (from -12 to +12 in Z)
-  // Clip the bottom half by moving the sphere up and then slicing at z=0.
-  // Instead of an actual boolean, we just translate so the "bolus" is
-  // fully above z = 0 with its widest circle at the base.
-  g.translate(0, 0, 4);          // Now spans z = -8 to +16
-  return g;
-}
-
-/* ---------- mold generation ---------- */
-
-btnPreview.addEventListener('click', async () => {
-  if (!state.bolus.manifold) return;
+// ---------- mold generation ----------
+btnBuild.addEventListener('click', async () => {
+  if (!app.bolus.manifold) return;
   try {
-    clearError();
+    clearErr();
     setBusy(true, 'Building mold blank…');
-    await nextFrame();
+    await tick();
+    const p = readParams();
 
-    const params = readParams();
-
-    setBusy(true, 'Subtracting bolus cavity…');
-    await nextFrame();
-
-    const halves = await generateMold(state.bolus.manifold, state.bolus.bbox, params);
+    let halves;
+    if (p.style === 'shell') {
+      halves = await generateShellMold(app.bolus.manifold, app.bolus.bbox, p);
+    } else {
+      setBusy(true, 'Subtracting cavity + spout…');
+      await tick();
+      halves = generateMold(app.bolus.manifold, app.bolus.bbox, p);
+    }
 
     setBusy(true, 'Rendering…');
-    await nextFrame();
-
+    await tick();
     clearMold();
-    renderMoldHalves(halves, params);
-    state.halves.topManifold = halves.top;
-    state.halves.botManifold = halves.bot;
+    app.halves.top      = halves.top;
+    app.halves.bot      = halves.bot;
+    app.halves.partingZ = halves.partingZ;
+    app.halves.drawDir  = halves.drawDir || [0, 0, 1];
+    renderHalves(halves, p);
 
+    viewctl.style.display = '';
+    btnExp.disabled = false;
     setBusy(false);
-    setStatus('ok', 'Mold generated. Rotate to inspect, then Export.');
-    btnExport.disabled = false;
+    setStep(3);
 
-    setOverlay(
-      `<div><strong>Two-part mold</strong></div>` +
-      `<div class="kv">Top half — crimson (Ø faces up)</div>` +
-      `<div class="kv">Bottom half — teal (holds cavity + pegs)</div>` +
-      `<div class="kv">Yellow band = pour spout</div>` +
-      `<div class="kv">Cyan plane = parting plane</div>`
-    );
+    if (p.style === 'shell') {
+      const tc  = halves.trappedVol / 1000;                       // cm³
+      const pct = 100 * halves.trappedVol / halves.bolusVol;
+      const ax  = halves.ax.toUpperCase();
+      if (pct < 0.5) {
+        setStatus('ok', `Mold built — pull ${ax}: releases cleanly ` +
+          `(trapped ${tc.toFixed(2)} cm³ = ${pct.toFixed(2)}%).`);
+      } else if (pct < 5) {
+        setStatus('warn', `Mold built — pull ${ax}: ${tc.toFixed(1)} cm³ trapped ` +
+          `(${pct.toFixed(1)}%). A flexible cast should still release.`);
+      } else {
+        setStatus('warn', `Mold built — pull ${ax}: ${tc.toFixed(1)} cm³ trapped ` +
+          `(${pct.toFixed(1)}%). Try a different pull direction.`);
+      }
+      const solid = halves.plugVol + halves.trayVol;
+      const grams = solid * 1.27 * 0.25;   // PETG, ~2 walls + 15% infill
+      legend.innerHTML =
+        `<div><b>Core/cavity mold — pull ${ax}</b></div>` +
+        `<div style="margin-top:4px;">` +
+          `<span class="sw" style="background:#ff6b6b"></span>Cavity plug (pour side) &nbsp; ` +
+          `<span class="sw" style="background:#4a9eff"></span>Core tray (patient side)` +
+        `</div>` +
+        `<div style="margin-top:4px;color:var(--ink-mute);">` +
+          `Tray dome replicates the patient surface — the cast is formed against it. ` +
+          `<span style="color:#f6c453;">Yellow = pour basin</span> — wide 45° dish in the ` +
+          `plug cap, necking into the cavity. Fill it to the brim for feed head.` +
+        `</div>` +
+        `<div style="margin-top:4px;color:var(--ink-mute);">` +
+          `Material: plug ${halves.plugVol.toFixed(0)} + tray ${halves.trayVol.toFixed(0)} ` +
+          `= ${solid.toFixed(0)} cm³ solid · ≈ ${grams.toFixed(0)} g PETG ` +
+          `at 2 walls / 15 % infill · cast ${(halves.bolusVol/1000).toFixed(0)} mL` +
+        `</div>`;
+    } else {
+      setStatus('ok', 'Mold built — inspect, tweak, or export.');
+    }
   } catch (e) {
     setBusy(false);
-    showError(e);
+    showErr(e);
   }
 });
 
 function readParams() {
-  const num = (id) => Number(document.getElementById(id).value);
+  const n = id => Number($(id).value);
   return {
-    wall:        num('p-wall'),
-    floor:       num('p-floor'),
-    headroom:    num('p-headroom'),
-    castScale:   num('p-castscale'),
-    sprueTop:    num('p-sprue-top'),
-    sprueBot:    num('p-sprue-bot'),
-    sprueExt:    num('p-sprue-ext'),
-    sprueWall:   num('p-sprue-wall'),
-    partingZ:    num('p-parting'),
-    pegCount:    Number(document.getElementById('p-peg-count').value),
-    pegDia:      num('p-peg-dia'),
-    pegDepth:    num('p-peg-depth'),
-    pegSlip:     num('p-peg-slip'),
+    style:    $('style').value,
+    axis:     $('axis').value,
+    wall:     n('wall'),
+    floor:    n('floor'),
+    headroom: n('headroom'),
+    cscale:   n('cscale'),
+    sTop:     n('s-top'),
+    sBot:     n('s-bot'),
+    sExt:     n('s-ext'),
+    sWall:    n('s-wall'),
+    split:    n('split'),
+    pegN:     Number($('peg-n').value),
+    pegD:     n('peg-d'),
+    pegH:     n('peg-h'),
+    pegS:     n('peg-s'),
   };
 }
 
-/**
- * Core mold-generation pipeline. All ops via manifold-3d.
- */
-async function generateMold(bolus, bbox, p) {
-  const { Manifold } = state.wasm;
+function generateMold(bolus, bb, p) {
+  const { Manifold } = app.wasm;
+  const dx = bb.size.x, dy = bb.size.y, dz = bb.size.z;
+  const cx = bb.center.x, cy = bb.center.y, cz = bb.center.z;
 
-  const dx = bbox.size.x, dy = bbox.size.y, dz = bbox.size.z;
-  const cx = bbox.center.x, cy = bbox.center.y, cz = bbox.center.z;
-
-  // ---- block ----
-  // Extend wall on ±X, ±Y, floor on −Z, headroom on +Z.
+  // ---- outer block ----
   const blockSize = [dx + 2*p.wall, dy + 2*p.wall, dz + p.floor + p.headroom];
-  const blockCenter = [cx, cy, cz + (p.headroom - p.floor) / 2];
-  const block = Manifold.cube(blockSize, true).translate(blockCenter);
+  const blockCen  = [cx, cy, cz + (p.headroom - p.floor) / 2];
+  const block = Manifold.cube(blockSize, true).translate(blockCen);
 
-  // ---- cavity ----
-  // Optionally scale the bolus about its centroid to account for cast shrinkage.
-  let bolusForCavity = bolus;
-  if (p.castScale !== 1.0) {
-    const s = p.castScale;
-    bolusForCavity = bolus
+  // ---- optional shrink-comp scaled bolus for cavity ----
+  let cavityShape = bolus;
+  if (p.cscale !== 1) {
+    cavityShape = bolus
       .translate([-cx, -cy, -cz])
-      .scale([s, s, s])
+      .scale([p.cscale, p.cscale, p.cscale])
       .translate([cx, cy, cz]);
   }
+  let mold = block.subtract(cavityShape);
 
-  let mold = block.subtract(bolusForCavity);
+  // ---- pour spout ----
+  const blockTopZ = bb.max.z + p.headroom;
+  const rBot = p.sBot / 2;
+  const rTop = p.sTop / 2;
+  const chanBotZ = bb.max.z - 2;                    // dip into bolus for clean union
+  const chanTopZ = blockTopZ + p.sExt + 0.5;        // punch through above collar
+  const chanH    = chanTopZ - chanBotZ;
+  const channel  = Manifold.cylinder(chanH, rBot, rTop, 48, false)
+                     .translate([cx, cy, chanBotZ]);
 
-  // ---- sprue collar + channel ----
-  // Sprue axis at bolus XY-center. Bottom of channel = 2mm inside the bolus
-  // (to guarantee intersection). Top of channel = block-top + sprue extension.
-  const bolusTopZ = bbox.max.z;
-  const blockTopZ = bbox.max.z + p.headroom;
-  const collarBottomZ = blockTopZ;
-  const collarTopZ = blockTopZ + p.sprueExt;
-
-  const channelBottomZ = bolusTopZ - 2;         // dip into bolus for clean union
-  const channelTopZ = collarTopZ + 0.5;         // punch just above collar
-  const channelHeight = channelTopZ - channelBottomZ;
-  const rBot = p.sprueBot / 2;
-  const rTop = p.sprueTop / 2;
-
-  const channel = Manifold.cylinder(channelHeight, rBot, rTop, 48, false)
-    .translate([cx, cy, channelBottomZ]);
-
-  // Outer collar wall (only above the block). The collar is a straight cylinder
-  // sized to sit outside the channel's largest radius; the channel-subtract at
-  // the end punches the tapered hole through it.
-  if (p.sprueExt > 0) {
-    const collarR = rTop + p.sprueWall;
-    const collar = Manifold.cylinder(p.sprueExt + 0.3, collarR, collarR, 48, false)
-      .translate([cx, cy, collarBottomZ - 0.15]);
-    mold = mold.union(collar);
+  if (p.sExt > 0) {
+    const collarR = rTop + p.sWall;
+    const collar = Manifold.cylinder(p.sExt + 0.3, collarR, collarR, 48, false)
+                     .translate([cx, cy, blockTopZ - 0.15]);
+    mold = mold.add(collar);
   }
-
   mold = mold.subtract(channel);
 
-  // ---- parting split ----
-  const partingZ = clamp(p.partingZ, bbox.min.z + 0.5, bbox.max.z - 0.5);
-  // Manifold.splitByPlane returns [inside, outside]. Convention: normal points
-  // to "outside" (positive). So with normal +Z: first = above, second = below.
+  // ---- split ----
+  const partingZ = Math.max(bb.min.z + 0.5, Math.min(bb.max.z - 0.5, p.split));
   const [above, below] = mold.splitByPlane([0, 0, 1], partingZ);
 
   // ---- registration pegs ----
-  let topHalf = above;
-  let botHalf = below;
-
-  if (p.pegCount === 4 && p.pegDia > 0 && p.pegDepth > 0) {
-    // Peg positions: near corners of the block, inset a peg-radius + margin
-    // from each edge so they sit inside the wall material and never overlap
-    // the cavity.
-    const bxMin = bbox.min.x - p.wall;
-    const bxMax = bbox.max.x + p.wall;
-    const byMin = bbox.min.y - p.wall;
-    const byMax = bbox.max.y + p.wall;
-    const inset = Math.max(3, p.pegDia * 0.6);
-    const pr = p.pegDia / 2;
-
-    const cornerXYs = [
+  let top = above, bot = below;
+  if (p.pegN === 4 && p.pegD > 0 && p.pegH > 0) {
+    const bxMin = bb.min.x - p.wall, bxMax = bb.max.x + p.wall;
+    const byMin = bb.min.y - p.wall, byMax = bb.max.y + p.wall;
+    const inset = Math.max(3, p.pegD * 0.6);
+    const pr    = p.pegD / 2;
+    const corners = [
       [bxMin + inset + pr, byMin + inset + pr],
       [bxMax - inset - pr, byMin + inset + pr],
       [bxMax - inset - pr, byMax - inset - pr],
       [bxMin + inset + pr, byMax - inset - pr],
     ];
-
-    let pegs = null;
-    let sockets = null;
-    for (const [px, py] of cornerXYs) {
-      // Peg protrudes UPWARD from parting plane into what will be the top-half air.
-      // Actually we want the peg to sit in ONE half and be received by a socket in the other.
-      // Convention: peg belongs to bottom half → cylinder extends from parting_z UP to parting_z + depth.
-      // Then the top half needs a matching (slightly larger) socket hole from parting_z to parting_z + depth.
-      const peg = Manifold.cylinder(p.pegDepth, pr, pr, 24, false)
-        .translate([px, py, partingZ]);
-      const socket = Manifold.cylinder(p.pegDepth + 0.4, pr + p.pegSlip, pr + p.pegSlip, 24, false)
-        .translate([px, py, partingZ - 0.2]);
-      pegs = pegs ? pegs.union(peg) : peg;
-      sockets = sockets ? sockets.union(socket) : socket;
+    let pegs = null, sockets = null;
+    for (const [px, py] of corners) {
+      const peg = Manifold.cylinder(p.pegH, pr, pr, 24, false)
+                    .translate([px, py, partingZ]);
+      const soc = Manifold.cylinder(p.pegH + 0.4, pr + p.pegS, pr + p.pegS, 24, false)
+                    .translate([px, py, partingZ - 0.2]);
+      pegs    = pegs    ? pegs.add(peg)    : peg;
+      sockets = sockets ? sockets.add(soc) : soc;
     }
-
-    // Pegs live in the BOTTOM half → union pegs into below.
-    // But the pegs extend UP into the top half's Z range — that's fine geometrically,
-    // they just become vertical protrusions in the bottom half that pierce the split plane.
-    botHalf = below.union(pegs);
-    // Sockets are HOLES in the top half → subtract sockets from above.
-    topHalf = above.subtract(sockets);
+    bot = below.add(pegs);
+    top = above.subtract(sockets);
   }
-
-  return { top: topHalf, bot: botHalf, partingZ };
+  return { top, bot, partingZ, drawDir: [0, 0, 1] };
 }
 
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+/* ============================================================
+ *  Shell core/cavity mold — for draped bolus (scalp, ear,
+ *  chest wall, any anatomy-wrapped shell).
+ *
+ *  Idea: mold the bolus the way it sits on the patient.
+ *    - Pull axis d = direction the bolus lifts off the anatomy
+ *      (auto = thinnest bbox extent).
+ *    - Core TRAY: bottom half whose dome replicates the patient
+ *      surface (the bolus's inner face).
+ *    - Cavity PLUG: top half whose underside is the bolus's
+ *      outer face, with a countersunk pour funnel.
+ *    - Parting surface follows the anatomy silhouette, so a
+ *      <180°-wrap shell has NO undercuts by construction.
+ *
+ *  Construction (draw frame, pull = +Z):
+ *    1. Rasterize the bolus's top/bottom Z-envelopes onto a fine
+ *       XY grid (barycentric per-triangle — O(tris), no booleans).
+ *    2. Build a watertight "terrain" solid under the top envelope.
+ *    3. plug = box[z ≥ z0] − terrain − bolus
+ *       tray = (block − bolus) − plug   ← exact complement:
+ *              halves mate perfectly, cavity is exactly the bolus
+ *    4. trapped ≈ Σ(H−L)·cellArea − bolusVolume  ← release meter:
+ *       volume locked between the halves along the pull axis
+ *       (0 for any shell that wraps < 180°)
+ * ============================================================ */
 
-/* ---------- render mold halves ---------- */
+/** Signed volume + volume-centroid Z of a manifold (tetra sum). */
+function volumeAndCentroidZ(m) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  let V = 0, Cz = 0;
+  for (let i = 0; i < tv.length; i += 3) {
+    const a = tv[i]*np, b = tv[i+1]*np, c = tv[i+2]*np;
+    const ax=vp[a], ay=vp[a+1], az=vp[a+2];
+    const bx=vp[b], by=vp[b+1], bz=vp[b+2];
+    const cx=vp[c], cy=vp[c+1], cz=vp[c+2];
+    const v = (ax*(by*cz - bz*cy) - bx*(ay*cz - az*cy) + cx*(ay*bz - az*by)) / 6;
+    V += v; Cz += v * (az + bz + cz) / 4;
+  }
+  return { volume: Math.abs(V), cz: V !== 0 ? Cz / V : 0 };
+}
 
-function renderMoldHalves(halves, p) {
-  const topGeo = manifoldToGeometry(halves.top);
-  const botGeo = manifoldToGeometry(halves.bot);
+/**
+ * Rasterize a manifold's top (H) and bottom (L) Z-envelopes onto an
+ * XY node grid spanning [x0,x1]×[y0,y1]. Pure JS, O(tris) — each
+ * triangle is barycentrically sampled at the grid nodes inside its
+ * XY footprint. Nodes never covered keep H=-Inf / L=+Inf.
+ */
+function envelopeGrid(m, x0, y0, x1, y1, pitch) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  const nx = Math.max(2, Math.round((x1 - x0) / pitch) + 1);
+  const ny = Math.max(2, Math.round((y1 - y0) / pitch) + 1);
+  const px = (x1 - x0) / (nx - 1), py = (y1 - y0) / (ny - 1);
+  const H = new Float64Array(nx * ny).fill(-Infinity);
+  const L = new Float64Array(nx * ny).fill(+Infinity);
+  for (let t = 0; t < tv.length; t += 3) {
+    const A = tv[t]*np, B = tv[t+1]*np, C = tv[t+2]*np;
+    const ax = vp[A], ay = vp[A+1], az = vp[A+2];
+    const bx = vp[B], by = vp[B+1], bz = vp[B+2];
+    const cx = vp[C], cy = vp[C+1], cz = vp[C+2];
+    const det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    if (Math.abs(det) < 1e-12) continue;          // vertical facet — no XY footprint
+    const i0 = Math.max(0, Math.ceil((Math.min(ax,bx,cx) - x0) / px));
+    const i1 = Math.min(nx - 1, Math.floor((Math.max(ax,bx,cx) - x0) / px));
+    const j0 = Math.max(0, Math.ceil((Math.min(ay,by,cy) - y0) / py));
+    const j1 = Math.min(ny - 1, Math.floor((Math.max(ay,by,cy) - y0) / py));
+    for (let j = j0; j <= j1; j++) {
+      const yy = y0 + j * py;
+      for (let i = i0; i <= i1; i++) {
+        const xx = x0 + i * px;
+        const l1 = ((by - cy) * (xx - cx) + (cx - bx) * (yy - cy)) / det;
+        const l2 = ((cy - ay) * (xx - cx) + (ax - cx) * (yy - cy)) / det;
+        const l3 = 1 - l1 - l2;
+        if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
+        const z = l1 * az + l2 * bz + l3 * cz;
+        const n = j * nx + i;
+        if (z > H[n]) H[n] = z;
+        if (z < L[n]) L[n] = z;
+      }
+    }
+  }
+  return { nx, ny, H, L, x0, y0, px, py };
+}
 
+/**
+ * Watertight terrain solid: top surface follows the H heightfield,
+ * flat bottom at zLow, vertical skirt around the grid perimeter.
+ * Uncovered nodes sit at zUncov (a hair above zLow), so outside the
+ * bolus footprint the terrain is a thin slab below the skirt seam
+ * and subtracting it is a no-op there.
+ */
+function terrainManifold(g, zLow, zUncov) {
+  const { Manifold, Mesh } = app.wasm;
+  const { nx, ny, H, x0, y0, px, py } = g;
+  const nv = nx * ny;
+  const verts = new Float32Array(nv * 2 * 3);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const n = j * nx + i;
+    const x = x0 + i * px, y = y0 + j * py;
+    // 0.1 mm inside the bolus skin: the exact-B subtraction then makes
+    // the finish cut, leaving no coincident-surface slivers on the plug.
+    let h = isFinite(H[n]) ? H[n] - 0.1 : zUncov;
+    h = Math.max(h, zLow + 0.4);
+    verts[3*n] = x;           verts[3*n+1] = y;           verts[3*n+2] = h;
+    verts[3*(nv+n)] = x;      verts[3*(nv+n)+1] = y;      verts[3*(nv+n)+2] = zLow;
+  }
+  const tris = [];
+  const id = (i, j) => j * nx + i;
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const a = id(i, j), b = id(i+1, j), c = id(i+1, j+1), d = id(i, j+1);
+    tris.push(a, b, c,  a, c, d);                       // top, normal +Z
+    tris.push(nv+a, nv+c, nv+b,  nv+a, nv+d, nv+c);     // bottom, normal −Z
+  }
+  for (let i = 0; i < nx - 1; i++) {
+    let a = id(i, 0), b = id(i+1, 0);
+    tris.push(a, nv+a, nv+b,  a, nv+b, b);              // −Y skirt
+    a = id(i, ny-1); b = id(i+1, ny-1);
+    tris.push(a, b, nv+b,  a, nv+b, nv+a);              // +Y skirt
+  }
+  for (let j = 0; j < ny - 1; j++) {
+    let a = id(0, j), b = id(0, j+1);
+    tris.push(a, b, nv+b,  a, nv+b, nv+a);              // −X skirt
+    a = id(nx-1, j); b = id(nx-1, j+1);
+    tris.push(a, nv+a, nv+b,  a, nv+b, b);              // +X skirt
+  }
+  const mesh = new Mesh({
+    numProp: 3, vertProperties: verts, triVerts: new Uint32Array(tris),
+  });
+  return new Manifold(mesh);
+}
+
+/**
+ * Trapped volume ≈ (volume between top/bottom envelopes) − bolus volume.
+ * Exactly 0 when every pull-axis column crosses the bolus once; positive
+ * where material is locked between the halves (wrap > 180°, folds).
+ */
+function trappedEstimate(g, bolusVol) {
+  const { nx, ny, H, L, px, py } = g;
+  const ca = px * py;
+  let between = 0;
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    let s = 0, c = 0;
+    const corners = [j*nx+i, j*nx+i+1, (j+1)*nx+i, (j+1)*nx+i+1];
+    for (const n of corners) {
+      if (isFinite(H[n]) && isFinite(L[n])) { s += H[n] - L[n]; c++; }
+    }
+    if (c) between += (s / c) * ca * (c / 4);
+  }
+  return Math.max(0, between - bolusVol);
+}
+
+/**
+ * Two-pass chamfer sweeps over the node grid.
+ * distanceToCovered: XY distance from each node to the nearest bolus-
+ * silhouette node (0 inside). coneDilate: the lowest surface that is
+ * ≥ seed everywhere and never slopes steeper than `slope` (rise/run) —
+ * i.e. a 45°-printable relaxation of the cap surface when slope = 1.
+ */
+function chamferSweep(nx, ny, px, py, D, rate) {
+  const pd = Math.hypot(px, py);
+  const relax = (n, m, d) => { const v = D[m] + d * rate; if (v < D[n]) D[n] = v; };
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const n = j * nx + i;
+    if (i > 0)           relax(n, n - 1, px);
+    if (j > 0)           relax(n, n - nx, py);
+    if (i > 0 && j > 0)  relax(n, n - nx - 1, pd);
+    if (i < nx-1 && j>0) relax(n, n - nx + 1, pd);
+  }
+  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) {
+    const n = j * nx + i;
+    if (i < nx-1)            relax(n, n + 1, px);
+    if (j < ny-1)            relax(n, n + nx, py);
+    if (i < nx-1 && j<ny-1)  relax(n, n + nx + 1, pd);
+    if (i > 0 && j < ny-1)   relax(n, n + nx - 1, pd);
+  }
+  return D;
+}
+function distanceToCovered(g) {
+  const { nx, ny, H, px, py } = g;
+  const D = new Float64Array(nx * ny);
+  for (let n = 0; n < nx * ny; n++) D[n] = isFinite(H[n]) ? 0 : Infinity;
+  return chamferSweep(nx, ny, px, py, D, 1);
+}
+/** Upper envelope: lowest surface ≥ seed with all slopes ≤ `slope`. */
+function coneDilate(g, seed, slope) {
+  const { nx, ny, px, py } = g;
+  const D = new Float64Array(seed.length);
+  for (let i = 0; i < seed.length; i++) D[i] = -seed[i];
+  chamferSweep(nx, ny, px, py, D, slope);
+  for (let i = 0; i < D.length; i++) D[i] = -D[i];
+  return D;
+}
+/** Lower envelope: highest surface ≤ seed with all slopes ≤ `slope`. */
+function coneErode(g, seed, slope) {
+  const { nx, ny, px, py } = g;
+  return chamferSweep(nx, ny, px, py, Float64Array.from(seed), slope);
+}
+
+/**
+ * Morphological dilation of the covered-H region: uncovered nodes that
+ * touch a covered node inherit the max finite neighbour height, `iters`
+ * times. This pushes the parting terrain a couple of cells PAST the true
+ * bolus silhouette, so the subsequent exact-B subtraction — not the grid —
+ * defines the smooth cavity-rim edge, removing the raster teeth on the rim.
+ */
+function dilateH(g, iters) {
+  const { nx, ny, H } = g;
+  let cur = Float64Array.from(H);
+  for (let it = 0; it < iters; it++) {
+    const nxt = Float64Array.from(cur);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const n = j * nx + i;
+      if (isFinite(cur[n])) continue;
+      let m = -Infinity;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+        const v = cur[jj * nx + ii];
+        if (isFinite(v) && v > m) m = v;
+      }
+      if (isFinite(m)) nxt[n] = m;
+    }
+    cur = nxt;
+  }
+  return cur;
+}
+
+/** 3×3 box blur over the node grid, `passes` times (≈ gaussian). */
+function boxBlurGrid(g, field, passes) {
+  const { nx, ny } = g;
+  let src = Float64Array.from(field);
+  let dst = new Float64Array(field.length);
+  for (let p = 0; p < passes; p++) {
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      let s = 0, c = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+        s += src[jj * nx + ii]; c++;
+      }
+      dst[j * nx + i] = s / c;
+    }
+    [src, dst] = [dst, src];
+  }
+  return src;
+}
+
+/**
+ * Marching-squares iso-contour of a smooth scalar field at value 0
+ * (field > 0 = inside), with linear interpolation on cell edges —
+ * yields a smooth sub-pixel polygon instead of a pixel staircase.
+ * Returns the longest closed loop as [[x,y], ...].
+ */
+function isoContour(g, field, iso) {
+  const { nx, ny, x0, y0, px, py } = g;
+  const val = (i, j) => field[j * nx + i] - iso;
+  const pts = new Map(), adj = new Map();
+  const lerpH = (i, j) => { const a = val(i, j), b = val(i + 1, j); const t = a / (a - b); return [x0 + (i + t) * px, y0 + j * py]; };
+  const lerpV = (i, j) => { const a = val(i, j), b = val(i, j + 1); const t = a / (a - b); return [x0 + i * px, y0 + (j + t) * py]; };
+  const link = (k1, p1, k2, p2) => {
+    if (!pts.has(k1)) pts.set(k1, p1);
+    if (!pts.has(k2)) pts.set(k2, p2);
+    if (!adj.has(k1)) adj.set(k1, []);
+    if (!adj.has(k2)) adj.set(k2, []);
+    adj.get(k1).push(k2); adj.get(k2).push(k1);
+  };
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const a = val(i, j) > 0, b = val(i + 1, j) > 0,
+          c = val(i + 1, j + 1) > 0, d = val(i, j + 1) > 0;
+    const code = (a ? 1 : 0) | (b ? 2 : 0) | (c ? 4 : 0) | (d ? 8 : 0);
+    if (code === 0 || code === 15) continue;
+    const eB = [`h${i},${j}`,   () => lerpH(i, j)];
+    const eR = [`v${i+1},${j}`, () => lerpV(i + 1, j)];
+    const eT = [`h${i},${j+1}`, () => lerpH(i, j + 1)];
+    const eL = [`v${i},${j}`,   () => lerpV(i, j)];
+    const seg = (e1, e2) => link(e1[0], e1[1](), e2[0], e2[1]());
+    switch (code) {
+      case 1: case 14: seg(eL, eB); break;
+      case 2: case 13: seg(eB, eR); break;
+      case 4: case 11: seg(eR, eT); break;
+      case 8: case 7:  seg(eT, eL); break;
+      case 3: case 12: seg(eL, eR); break;
+      case 6: case 9:  seg(eB, eT); break;
+      case 5:  seg(eL, eB); seg(eR, eT); break;
+      case 10: seg(eB, eR); seg(eT, eL); break;
+    }
+  }
+  const visited = new Set();
+  let best = null;
+  for (const start of adj.keys()) {
+    if (visited.has(start)) continue;
+    const loop = [];
+    let cur = start, prev = null;
+    while (cur && !visited.has(cur)) {
+      visited.add(cur); loop.push(pts.get(cur));
+      let nxt = null;
+      for (const nb of (adj.get(cur) || [])) {
+        if (nb !== prev && !visited.has(nb)) { nxt = nb; break; }
+      }
+      prev = cur; cur = nxt;
+    }
+    if (!best || loop.length > best.length) best = loop;
+  }
+  return best || [];
+}
+function signedArea(loop) {
+  let s = 0;
+  for (let i = 0; i < loop.length; i++) {
+    const [x1, y1] = loop[i], [x2, y2] = loop[(i + 1) % loop.length];
+    s += x1 * y2 - x2 * y1;
+  }
+  return s / 2;
+}
+
+/** Largest connected component of a manifold (drops floating crumbs). */
+function keepLargest(m) {
+  const parts = m.decompose();
+  if (parts.length <= 1) return parts[0] || m;
+  let best = null, bestV = -1;
+  for (const p of parts) {
+    const v = p.volume();
+    if (v > bestV) { bestV = v; best = p; }
+  }
+  for (const p of parts) if (p !== best) { try { p.delete(); } catch (_) {} }
+  return best;
+}
+
+/** Apply the inverse of a list of single-axis rotations (deg) to a vector. */
+function rotVecInv(v, rotsList) {
+  let [x, y, z] = v;
+  for (let i = rotsList.length - 1; i >= 0; i--) {
+    const [rx, ry, rz] = rotsList[i].map(a => -a * Math.PI / 180);
+    if (rx) { const c = Math.cos(rx), s = Math.sin(rx); [y, z] = [y*c - z*s, y*s + z*c]; }
+    if (ry) { const c = Math.cos(ry), s = Math.sin(ry); [x, z] = [x*c + z*s, -x*s + z*c]; }
+    if (rz) { const c = Math.cos(rz), s = Math.sin(rz); [x, y] = [x*c - y*s, x*s + y*c]; }
+  }
+  return [x, y, z];
+}
+
+async function generateShellMold(bolus, bboxOrig, p) {
+  const { Manifold } = app.wasm;
+
+  // manifold-3d evaluates booleans LAZILY: results reference their
+  // operands until first read. Deleting an operand before the final
+  // meshes are evaluated corrupts the WASM heap. So: collect every
+  // intermediate here and free it only AFTER forcing evaluation of
+  // the finished halves at the end.
+  const trash = [];
+  const T = (m) => { trash.push(m); return m; };
+
+  // ---- pull axis: user choice or thinnest bbox extent ----
+  let ax = p.axis;
+  if (ax === 'auto') {
+    const s = bboxOrig.size;
+    ax = (s.x <= s.y && s.x <= s.z) ? 'x' : (s.y <= s.z ? 'y' : 'z');
+  }
+  const AXROT = { x: [0, -90, 0], y: [90, 0, 0], z: [0, 0, 0] };
+  const rots = [];
+
+  // ---- rotate into draw frame: pull axis -> +Z ----
+  let B = T(bolus.rotate(AXROT[ax]));
+  rots.push(AXROT[ax]);
+
+  // ---- orient concave (patient) side down: a draped shell has its
+  //      volume centroid on the concave side of the bbox center ----
+  {
+    const bb = B.boundingBox();
+    const { cz } = volumeAndCentroidZ(B);
+    if (cz > (bb.min[2] + bb.max[2]) / 2) {
+      const f = [180, 0, 0];
+      B = T(B.rotate(f)); rots.push(f);
+    }
+  }
+
+  // ---- cast-shrink compensation ----
+  if (p.cscale !== 1) {
+    const bb = B.boundingBox();
+    const c = [(bb.min[0]+bb.max[0])/2, (bb.min[1]+bb.max[1])/2, (bb.min[2]+bb.max[2])/2];
+    B = T(T(T(B.translate([-c[0], -c[1], -c[2]])).scale(p.cscale)).translate(c));
+  }
+
+  // Flange: ring of flat mating surface around the silhouette — just
+  // wide enough for pegs + clamping. Everything beyond it is cropped.
+  const flangeW   = Math.max(8, p.pegD + 4);
+  const flangeThk = 6;
+  const margin    = Math.max(p.wall, flangeW + 2);
+
+  const bb  = B.boundingBox();
+  const bx0 = bb.min[0] - margin,  bx1 = bb.max[0] + margin;
+  const by0 = bb.min[1] - margin,  by1 = bb.max[1] + margin;
+  const bz0 = bb.min[2] - p.floor, bz1 = bb.max[2] + p.headroom;
+
+  // Skirt seam just below the bolus: the silhouette wall always runs
+  // rim -> seam without slicing into the core dome.
+  const z0 = Math.max(bz0 + 1.5, bb.min[2] - 1);
+
+  setBusy(true, 'Rasterizing anatomy envelope…'); await tick();
+  const pitch = Math.min(0.8, Math.max(0.5, Math.max(bx1 - bx0, by1 - by0) / 170));
+  const grid = envelopeGrid(B, bx0, by0, bx1, by1, pitch);
+
+  setBusy(true, 'Building parting terrain…'); await tick();
+  // Dilate H past the silhouette so the exact-B cut defines the smooth rim,
+  // and lightly blur the heights — de-serrates the visible parting seam
+  // without touching the cavity (which is re-cut from B below).
+  const Hdil = dilateH(grid, 2);
+  const Hterr = boxBlurGrid({ ...grid, H: Hdil }, Hdil, 1);
+  const terrain = T(terrainManifold({ ...grid, H: Hterr }, bz0 - 0.5, bz0 + 0.25));
+
+  setBusy(true, 'Cutting cavity plug…'); await tick();
+  const ubox  = T(T(Manifold.cube([bx1-bx0, by1-by0, bz1-z0], false)).translate([bx0, by0, z0]));
+  let   upper = T(T(ubox.subtract(terrain)).subtract(B));   // raster-error guard
+
+  setBusy(true, 'Deriving core tray…'); await tick();
+  const blk   = T(T(Manifold.cube([bx1-bx0, by1-by0, bz1-bz0], false)).translate([bx0, by0, bz0]));
+  let   lower = T(T(blk.subtract(B)).subtract(upper));      // exact complement
+
+  // ---- material minimization ------------------------------------
+  setBusy(true, 'Trimming excess material…'); await tick();
+  const dist = distanceToCovered(grid);
+  const flangeTopZ = z0 + flangeThk;
+
+  // Plug: conformal cap — constant-thickness lid over the anatomy,
+  // slope-relaxed to 45° (cone dilation) so it still prints
+  // support-free upside-down on its flat plateau. Outside the
+  // silhouette it drops to a thin flange; beyond the flange, gone.
+  {
+    const nN = grid.nx * grid.ny;
+    const raw = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) {
+      raw[n] = isFinite(grid.H[n]) ? grid.H[n] + p.headroom : flangeTopZ;
+    }
+    // Blur the seed to kill raster texture on the visible cap surface,
+    // then re-impose the minimum thickness so smoothing never thins it.
+    const seed = boxBlurGrid(grid, raw, 2);
+    const capH = coneDilate(grid, seed, 1.0);
+    const topH = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) {
+      topH[n] = Math.max(Math.min(Math.max(capH[n], raw[n]), bz1), flangeTopZ);
+    }
+    const capSolid = T(terrainManifold(
+      { nx: grid.nx, ny: grid.ny, H: topH, x0: grid.x0, y0: grid.y0,
+        px: grid.px, py: grid.py }, z0 - 2, z0 - 1));
+    upper = T(upper.intersect(capSolid));
+  }
+
+  // Crop BOTH halves to a smooth silhouette + flange outline: a
+  // marching-squares iso-contour of the distance field (sub-pixel
+  // interpolated — no pixel staircase) extruded to a prism.
+  {
+    const negDist = new Float64Array(dist.length);
+    for (let n = 0; n < dist.length; n++) negDist[n] = flangeW - dist[n];
+    const loop = isoContour(grid, negDist, 0);
+    if (loop.length >= 8) {
+      if (signedArea(loop) < 0) loop.reverse();
+      const prism = T(T(Manifold.extrude([loop], (bz1 - bz0) + 4))
+                        .translate([0, 0, bz0 - 2]));
+      upper = T(upper.intersect(prism));
+      lower = T(lower.intersect(prism));
+    }
+  }
+
+  // Tray: hollow the dome from below — pocket ceiling follows the
+  // patient surface `floor` mm down, slope-relaxed to 45° so the
+  // pocket prints support-free (internal dome ≤ 45°, opens at the
+  // underside). A solid ring stays around the silhouette for the
+  // flange, pegs and stiffness.
+  {
+    const nN = grid.nx * grid.ny;
+    const Du = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) Du[n] = isFinite(grid.L[n]) ? Infinity : 0;
+    chamferSweep(grid.nx, grid.ny, grid.px, grid.py, Du, 1);
+    const inset = Math.max(6, p.wall);
+    const seed = new Float64Array(nN);
+    for (let n = 0; n < nN; n++) {
+      seed[n] = (Du[n] >= inset && isFinite(grid.L[n]))
+        ? grid.L[n] - p.floor
+        : bz0 - 1;
+    }
+    const pocketTop = coneErode(grid, seed, 1.0);
+    let worthIt = false;
+    for (let n = 0; n < nN; n++) if (pocketTop[n] > bz0 + 1.5) { worthIt = true; break; }
+    if (worthIt) {
+      const pocketSolid = T(terrainManifold(
+        { nx: grid.nx, ny: grid.ny, H: pocketTop, x0: grid.x0, y0: grid.y0,
+          px: grid.px, py: grid.py }, bz0 - 2, bz0 - 1));
+      lower = T(lower.subtract(pocketSolid));
+    }
+  }
+
+  // Trapped pockets materialize as tiny disconnected mold crumbs
+  // (unprintable floating debris). Keep only the main body of each
+  // half — the cast simply gains that hair of silicone in the folds.
+  upper = T(keepLargest(upper));
+  lower = T(keepLargest(lower));
+
+  // ---- pour basin: wide 45°-dished funnel mouth recessed into the
+  //      cap (a raised collar would break the flipped support-free
+  //      print — any feature above the plateau becomes the bed
+  //      contact). The basin catches the pour and contains drips,
+  //      necking to a short cylindrical throat into the cavity apex.
+  //      Mouth Ø is auto-limited by cap thickness: 45° walls need
+  //      depth, so deeper cap = wider mouth. ----
+  const cx = (bb.min[0]+bb.max[0])/2, cy = (bb.min[1]+bb.max[1])/2;
+  const rThroat = p.sBot / 2;
+  const rMouth  = Math.max(rThroat + 2,
+                    Math.min(p.sTop / 2, rThroat + (p.headroom - 1)));
+  const basinDepth = rMouth - rThroat;          // 45° dish
+  const basinBotZ  = bz1 - basinDepth;
+  const throatBotZ = bb.max[2] - 2;             // 2 mm into the bolus apex
+  const basin  = T(T(Manifold.cylinder((bz1 + 0.5) - basinBotZ, rThroat, rMouth, 64, false))
+                     .translate([cx, cy, basinBotZ]));
+  const throat = T(T(Manifold.cylinder((basinBotZ - throatBotZ) + 0.5, rThroat, rThroat, 48, false))
+                     .translate([cx, cy, throatBotZ]));
+  upper = T(T(upper.subtract(basin)).subtract(throat));
+
+  // ---- registration pegs on the flange, at the silhouette extremes ----
+  // Sockets pierce the thin flange as through-holes: prints cleanly
+  // (no bridging) and full peg seating is visible from outside.
+  if (p.pegN === 4 && p.pegD > 0 && p.pegH > 0) {
+    const pr = p.pegD / 2;
+    let nXmax = -1, nXmin = -1, nYmax = -1, nYmin = -1;
+    let xMax = -Infinity, xMin = Infinity, yMax = -Infinity, yMin = Infinity;
+    for (let j = 0; j < grid.ny; j++) for (let i = 0; i < grid.nx; i++) {
+      const n = j * grid.nx + i;
+      if (!isFinite(grid.H[n])) continue;
+      const x = grid.x0 + i * grid.px, y = grid.y0 + j * grid.py;
+      if (x > xMax) { xMax = x; nXmax = n; }
+      if (x < xMin) { xMin = x; nXmin = n; }
+      if (y > yMax) { yMax = y; nYmax = n; }
+      if (y < yMin) { yMin = y; nYmin = n; }
+    }
+    const nodeXY = (n) =>
+      [grid.x0 + (n % grid.nx) * grid.px, grid.y0 + Math.floor(n / grid.nx) * grid.py];
+    const off = flangeW * 0.55;
+    const spots = [];
+    if (nXmax >= 0) { const [x, y] = nodeXY(nXmax); spots.push([x + off, y]); }
+    if (nXmin >= 0) { const [x, y] = nodeXY(nXmin); spots.push([x - off, y]); }
+    if (nYmax >= 0) { const [x, y] = nodeXY(nYmax); spots.push([x, y + off]); }
+    if (nYmin >= 0) { const [x, y] = nodeXY(nYmin); spots.push([x, y - off]); }
+    let pegs = null, sockets = null;
+    for (const [px, py] of spots) {
+      const pg = T(T(Manifold.cylinder(p.pegH, pr, pr, 24, false))
+                     .translate([px, py, z0]));
+      const sk = T(T(Manifold.cylinder(p.pegH + 0.4, pr + p.pegS, pr + p.pegS, 24, false))
+                     .translate([px, py, z0 - 0.2]));
+      pegs    = pegs    ? T(pegs.add(pg))    : pg;
+      sockets = sockets ? T(sockets.add(sk)) : sk;
+    }
+    if (pegs)    lower = T(lower.add(pegs));
+    if (sockets) upper = T(upper.subtract(sockets));
+  }
+
+  // ---- release meter: volume locked between the halves ----
+  const bolusVol   = B.volume();
+  const trappedVol = trappedEstimate(grid, bolusVol);
+
+  // ---- rotate results back to the original frame ----
+  for (let i = rots.length - 1; i >= 0; i--) {
+    const inv = rots[i].map(a => -a);
+    upper = T(upper.rotate(inv));
+    lower = T(lower.rotate(inv));
+  }
+
+  // ---- force evaluation of the final trees, THEN free intermediates ----
+  setBusy(true, 'Evaluating solids…'); await tick();
+  const plugVol = upper.volume() / 1000;   // cm³ (also forces evaluation)
+  const trayVol = lower.volume() / 1000;
+  const keep = new Set([upper, lower]);
+  for (const m of trash) {
+    if (!keep.has(m)) { try { m.delete(); } catch (_) { /* already freed */ } }
+  }
+
+  return {
+    top: upper, bot: lower,
+    partingZ: null,
+    drawDir: rotVecInv([0, 0, 1], rots),
+    ax, trappedVol, bolusVol, plugVol, trayVol,
+    funnel: {
+      tip:  rotVecInv([cx, cy, throatBotZ], rots),
+      top:  rotVecInv([cx, cy, bz1 + 2], rots),
+      rTop: rMouth, rBot: rThroat,
+    },
+  };
+}
+
+function renderHalves(h, p) {
+  const topGeo = manifoldToGeo(h.top);
+  const botGeo = manifoldToGeo(h.bot);
   const topMat = new THREE.MeshStandardMaterial({
-    color: 0xd00008, roughness: 0.55, metalness: 0.05,
-    transparent: true, opacity: 0.9, side: THREE.DoubleSide,
+    color: 0xff6b6b, roughness: 0.55, metalness: 0.05,
+    transparent: true, opacity: 0.92, side: THREE.DoubleSide,
   });
   const botMat = new THREE.MeshStandardMaterial({
-    color: 0x1f8a99, roughness: 0.55, metalness: 0.05,
-    transparent: true, opacity: 0.9, side: THREE.DoubleSide,
+    color: 0x4a9eff, roughness: 0.55, metalness: 0.05,
+    transparent: true, opacity: 0.92, side: THREE.DoubleSide,
   });
-
   const topMesh = new THREE.Mesh(topGeo, topMat);
   const botMesh = new THREE.Mesh(botGeo, botMat);
-  moldGroup.add(topMesh);
-  moldGroup.add(botMesh);
-  state.halves.topMesh = topMesh;
-  state.halves.botMesh = botMesh;
+  moldGrp.add(topMesh);
+  moldGrp.add(botMesh);
+  app.halves.topMesh = topMesh;
+  app.halves.botMesh = botMesh;
 
-  // Faint parting plane hint (semi-transparent cyan rectangle at partingZ).
-  const bx = state.bolus.bbox;
-  const planeGeo = new THREE.PlaneGeometry(
-    bx.size.x + 2 * p.wall + 20,
-    bx.size.y + 2 * p.wall + 20,
-  );
-  const planeMat = new THREE.MeshBasicMaterial({
-    color: 0x22ccff, transparent: true, opacity: 0.15,
-    side: THREE.DoubleSide, depthWrite: false,
-  });
-  const plane = new THREE.Mesh(planeGeo, planeMat);
-  plane.position.set(bx.center.x, bx.center.y, halves.partingZ);
-  moldGroup.add(plane);
-  state.halves.partingPlaneMesh = plane;
+  // Parting-plane hint (flat mode only — shell mode's parting follows anatomy).
+  if (h.partingZ != null) {
+    const bx = app.bolus.bbox;
+    const planeGeo = new THREE.PlaneGeometry(
+      bx.size.x + 2 * p.wall + 20,
+      bx.size.y + 2 * p.wall + 20
+    );
+    const planeMat = new THREE.MeshBasicMaterial({
+      color: 0x4dc0b5, transparent: true, opacity: 0.14,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.position.set(bx.center.x, bx.center.y, h.partingZ);
+    moldGrp.add(plane);
+    app.halves.plane = plane;
+  }
 
-  // Hide the bolus preview once molds render — user can toggle by clicking bolus below.
-  if (state.bolus.mesh) state.bolus.mesh.visible = false;
+  // Pour-spout marker (shell mode): yellow cone at the funnel location
+  // so the pour entry is unmistakable in the preview.
+  if (h.funnel) {
+    const f = h.funnel;
+    const tip = new THREE.Vector3(...f.tip), top = new THREE.Vector3(...f.top);
+    const dir = top.clone().sub(tip);
+    const len = dir.length();
+    const geo = new THREE.CylinderGeometry(f.rTop, f.rBot, len, 32, 1, true);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xf6c453, transparent: true, opacity: 0.6,
+      side: THREE.DoubleSide, depthWrite: false, depthTest: false,
+    });
+    const fm = new THREE.Mesh(geo, mat);
+    fm.renderOrder = 999;               // draw last: visible through the halves
+    fm.position.copy(tip.clone().add(top).multiplyScalar(0.5));
+    fm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    moldGrp.add(fm);
+    app.halves.funnelMesh = fm;
+    app.halves.funnelBase = fm.position.clone();
+  }
+
+  // Re-apply current explode + bolus-visibility state.
+  applyExplode(Number($('explode').value));
+  applyBolusVis($('show-bolus').checked);
 }
 
-/* ---------- export ---------- */
-
-btnExport.addEventListener('click', () => {
+// ---------- exports: one 3MF, each half on its own Bambu plate ----------
+btnExp.addEventListener('click', async () => {
   try {
-    clearError();
-    if (!state.halves.topMesh || !state.halves.botMesh) return;
-    const exp = new STLExporter();
-    // Binary STL — smaller files, more universal.
-    downloadStl(exp.parse(state.halves.topMesh, { binary: true }), 'quikmold_top.stl');
-    downloadStl(exp.parse(state.halves.botMesh, { binary: true }), 'quikmold_bottom.stl');
-    setStatus('ok', 'Exported: quikmold_top.stl + quikmold_bottom.stl');
-  } catch (e) {
-    showError(e);
-  }
+    clearErr();
+    if (!app.halves.top || !app.halves.bot) return;
+    setBusy(true, 'Orienting halves for print…');
+    await tick();
+
+    // Orient each half to its most stable face-down pose (plug on its
+    // plateau, tray on its flat bottom), drop to z=0, center on the plate.
+    const plug = orientForPrint(app.halves.top);   // Bambu bed is 256×256; center 128,128
+    const tray = orientForPrint(app.halves.bot);
+
+    const blob = build3mfTwoPlates([
+      { manifold: plug, name: 'mold_plug_cavity', plate: 'Plate 1 — Plug (cavity/pour side)' },
+      { manifold: tray, name: 'mold_tray_core',   plate: 'Plate 2 — Tray (core/patient side)' },
+    ]);
+    plug.delete(); tray.delete();
+
+    dl(blob, 'bolus_mold_2plates.3mf');
+    setBusy(false);
+    setStatus('ok', 'Exported bolus_mold_2plates.3mf — plate 1 = plug, plate 2 = tray.');
+    setStep(4);   // all three chips done
+  } catch (e) { setBusy(false); showErr(e); }
 });
 
-function downloadStl(data, filename) {
-  // STLExporter with { binary: true } returns a DataView; text mode returns a string.
-  const blob = data instanceof DataView
-    ? new Blob([data.buffer], { type: 'application/octet-stream' })
+/** Flat bed-contact area at the mesh's lowest z (stable first-layer proxy). */
+function bedContact(m) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  const zmin = m.boundingBox().min[2];
+  let area = 0;
+  for (let t = 0; t < tv.length; t += 3) {
+    const a = tv[t]*np, b = tv[t+1]*np, c = tv[t+2]*np;
+    if (vp[a+2] > zmin + 0.3 || vp[b+2] > zmin + 0.3 || vp[c+2] > zmin + 0.3) continue;
+    const ux = vp[b]-vp[a], uy = vp[b+1]-vp[a+1];
+    const vx = vp[c]-vp[a], vy = vp[c+1]-vp[a+1];
+    area += Math.abs(ux*vy - uy*vx) / 2;
+  }
+  return area;
+}
+/** Best of 6 axis-aligned face-down poses (max bed contact), centered on the plate at z=0. */
+function orientForPrint(m0) {
+  const CANDS = [[0,0,0],[180,0,0],[90,0,0],[-90,0,0],[0,90,0],[0,-90,0]];
+  let best = null, bestA = -1;
+  for (const r of CANDS) {
+    const c = m0.rotate(r);
+    const a = bedContact(c);
+    if (a > bestA) { bestA = a; best?.delete(); best = c; } else c.delete();
+  }
+  const bb = best.boundingBox();
+  const placed = best.translate([
+    128 - (bb.min[0]+bb.max[0])/2,
+    128 - (bb.min[1]+bb.max[1])/2,
+    -bb.min[2],
+  ]);
+  best.delete();
+  return placed;
+}
+
+/** 3MF object XML for one manifold. */
+function objectXml(m, id, name) {
+  const mesh = m.getMesh();
+  const np = mesh.numProp || 3, vp = mesh.vertProperties, tv = mesh.triVerts;
+  const nV = vp.length / np;
+  const out = [`<object id="${id}" type="model"><mesh><vertices>`];
+  for (let i = 0; i < nV; i++)
+    out.push(`<vertex x="${vp[i*np].toFixed(4)}" y="${vp[i*np+1].toFixed(4)}" z="${vp[i*np+2].toFixed(4)}"/>`);
+  out.push('</vertices><triangles>');
+  for (let t = 0; t < tv.length; t += 3)
+    out.push(`<triangle v1="${tv[t]}" v2="${tv[t+1]}" v3="${tv[t+2]}"/>`);
+  out.push('</triangles></mesh></object>');
+  return out.join('');
+}
+
+/** Assemble a Bambu-compatible multi-plate 3MF: one object per plate. */
+function build3mfTwoPlates(parts) {
+  const objs = parts.map((p, i) => objectXml(p.manifold, i + 1, p.name)).join('\n');
+  const items = parts.map((_, i) => `<item objectid="${i+1}" transform="1 0 0 0 1 0 0 0 1 0 0 0"/>`).join('\n');
+  const model =
+`<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+ <metadata name="Application">Radiant QuikBolus</metadata>
+ <metadata name="Title">Bolus silicone mold — two plates</metadata>
+ <resources>
+${objs}
+ </resources>
+ <build>
+${items}
+ </build>
+</model>`;
+
+  // Bambu/Orca plate assignment: object N -> plate N.
+  const plateBlocks = parts.map((p, i) => `  <plate>
+   <metadata key="plater_id" value="${i+1}"/>
+   <metadata key="plater_name" value="${p.plate}"/>
+   <metadata key="locked" value="false"/>
+   <model_instance>
+    <metadata key="object_id" value="${i+1}"/>
+    <metadata key="instance_id" value="0"/>
+   </model_instance>
+  </plate>`).join('\n');
+  const objCfg = parts.map((p, i) => `  <object id="${i+1}">
+   <metadata key="name" value="${p.name}"/>
+   <metadata key="extruder" value="1"/>
+  </object>`).join('\n');
+  const modelSettings =
+`<?xml version="1.0" encoding="UTF-8"?>
+<config>
+${objCfg}
+${plateBlocks}
+</config>`;
+
+  const contentTypes =
+`<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+ <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+ <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+</Types>`;
+  const rels =
+`<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+ <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.openxmlformats.org/package/2006/relationships/3dmodel"/>
+</Relationships>`;
+
+  return zipStore([
+    { name: '[Content_Types].xml',            data: contentTypes },
+    { name: '_rels/.rels',                    data: rels },
+    { name: '3D/3dmodel.model',               data: model },
+    { name: 'Metadata/model_settings.config', data: modelSettings },
+  ]);
+}
+
+/** Minimal STORED (uncompressed) ZIP writer — no dependency. Returns a Blob. */
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const parts = [];        // Uint8Arrays in final order
+  const central = [];
+  let offset = 0;
+  const u16 = (n) => new Uint8Array([n & 255, (n >> 8) & 255]);
+  const u32 = (n) => new Uint8Array([n & 255, (n>>8)&255, (n>>16)&255, (n>>24)&255]);
+  const push = (arr) => { parts.push(arr); offset += arr.length; };
+
+  for (const f of files) {
+    const nameB = enc.encode(f.name);
+    const dataB = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
+    const crc = crc32(dataB);
+    const localOff = offset;
+    // local file header
+    push(u32(0x04034b50));
+    push(u16(20)); push(u16(0)); push(u16(0));       // ver, flags, method(0=store)
+    push(u16(0)); push(u16(0));                       // mod time/date
+    push(u32(crc)); push(u32(dataB.length)); push(u32(dataB.length));
+    push(u16(nameB.length)); push(u16(0));
+    push(nameB); push(dataB);
+    // central directory record (saved for later)
+    const c = [];
+    const cp = (a) => c.push(a);
+    cp(u32(0x02014b50)); cp(u16(20)); cp(u16(20)); cp(u16(0)); cp(u16(0));
+    cp(u16(0)); cp(u16(0)); cp(u32(crc)); cp(u32(dataB.length)); cp(u32(dataB.length));
+    cp(u16(nameB.length)); cp(u16(0)); cp(u16(0)); cp(u16(0)); cp(u16(0));
+    cp(u32(0)); cp(u32(localOff)); cp(nameB);
+    central.push(concatBytes(c));
+  }
+  const cdStart = offset;
+  const cd = concatBytes(central);
+  push(cd);
+  // end of central directory
+  const eocd = [];
+  eocd.push(u32(0x06054b50)); eocd.push(u16(0)); eocd.push(u16(0));
+  eocd.push(u16(files.length)); eocd.push(u16(files.length));
+  eocd.push(u32(cd.length)); eocd.push(u32(cdStart)); eocd.push(u16(0));
+  push(concatBytes(eocd));
+
+  return new Blob([concatBytes(parts)], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml' });
+}
+function concatBytes(arrs) {
+  let len = 0; for (const a of arrs) len += a.length;
+  const out = new Uint8Array(len); let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function dl(data, name) {
+  const blob = data instanceof Blob ? data
+    : data instanceof DataView ? new Blob([data.buffer], { type: 'application/octet-stream' })
     : new Blob([data], { type: 'model/stl' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a);
-  a.click();
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
   document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-/* ---------- live parameter sync ---------- */
-document.getElementById('p-parting').addEventListener('input', (e) => {
-  document.getElementById('p-parting-val').textContent =
-    Number(e.target.value).toFixed(1) + ' mm';
-  // Move the parting plane preview if it's on-scene.
-  if (state.halves.partingPlaneMesh && state.bolus.bbox) {
-    state.halves.partingPlaneMesh.position.z = Number(e.target.value);
-  }
+// ---------- live UI ----------
+$('split').addEventListener('input', e => {
+  $('split-val').textContent = Number(e.target.value).toFixed(1) + ' mm';
+  if (app.halves.plane) app.halves.plane.position.z = Number(e.target.value);
 });
 
-/* ---------- click bolus in scene to toggle visibility ---------- */
+$('style').addEventListener('change', () => {
+  const shell = $('style').value === 'shell';
+  $('flat-only').style.display  = shell ? 'none' : '';
+  $('axis-field').style.display = shell ? '' : 'none';
+  $('style-hint').textContent = shell
+    ? 'Core tray replicates the patient surface; cavity plug lowers over it. ' +
+      'Parting follows the anatomy — no flat-plane undercuts.'
+    : 'Single flat parting plane. Only suitable for simple solid shapes ' +
+      'without wrap-around curvature.';
+});
+
+$('explode').addEventListener('input', e => applyExplode(Number(e.target.value)));
+$('show-bolus').addEventListener('change', e => applyBolusVis(e.target.checked));
+
+function applyExplode(offset) {
+  if (!app.halves.topMesh || !app.halves.botMesh) return;
+  const d = app.halves.drawDir || [0, 0, 1];
+  app.halves.topMesh.position.set( d[0]*offset,  d[1]*offset,  d[2]*offset);
+  app.halves.botMesh.position.set(-d[0]*offset, -d[1]*offset, -d[2]*offset);
+  if (app.halves.funnelMesh && app.halves.funnelBase) {
+    // funnel travels with the plug (top half)
+    app.halves.funnelMesh.position.set(
+      app.halves.funnelBase.x + d[0]*offset,
+      app.halves.funnelBase.y + d[1]*offset,
+      app.halves.funnelBase.z + d[2]*offset,
+    );
+  }
+  if (app.halves.plane && app.halves.partingZ != null) {
+    app.halves.plane.position.z = app.halves.partingZ + (offset > 0 ? offset * 0.5 : 0);
+    app.halves.plane.material.opacity = offset > 0 ? 0.05 : 0.14;
+  }
+}
+function applyBolusVis(on) {
+  if (app.bolus.mesh) app.bolus.mesh.visible = !!on;
+}
+
+// ---------- double-click bolus toggle ----------
 canvas.addEventListener('dblclick', () => {
-  if (state.bolus.mesh) state.bolus.mesh.visible = !state.bolus.mesh.visible;
+  const cb = $('show-bolus');
+  cb.checked = !cb.checked;
+  applyBolusVis(cb.checked);
 });
 
 </script>
