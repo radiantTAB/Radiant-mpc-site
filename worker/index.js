@@ -29,7 +29,7 @@
 import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
 import { handleClientsApi } from "./clients.js";
-import { handleMeetlyApi } from "./meetly.js";
+import { handleMeetlyApi, handleMeetlyReminders } from "./meetly.js";
 import { handlePortalApi, sessionClient, readCookie } from "./portal.js";
 import {
   handleAdminAuth,
@@ -78,14 +78,23 @@ function withSecurityHeaders(resp) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const resp = await handle(request, env, url);
+    const resp = await handle(request, env, url, ctx);
     return withSecurityHeaders(resp);
+  },
+
+  // Cron Trigger: drive Meetly reminder mail. Configured in wrangler.jsonc.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      handleMeetlyReminders(env).catch((err) => {
+        console.error("meetly reminders failed:", String((err && err.message) || err));
+      })
+    );
   },
 };
 
-async function handle(request, env, url) {
+async function handle(request, env, url, ctx) {
     // Public revocation list -- not gated.
     if (url.pathname === "/api/revoked") {
       try {
@@ -99,7 +108,7 @@ async function handle(request, env, url) {
     // reads/writes; admin writes are token-gated inside the handler.
     if (url.pathname.startsWith("/api/meetly/")) {
       try {
-        return await handleMeetlyApi(request, env, url);
+        return await handleMeetlyApi(request, env, url, ctx);
       } catch (err) {
         return json({ error: String((err && err.message) || err) }, 500);
       }

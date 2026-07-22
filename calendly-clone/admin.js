@@ -106,6 +106,7 @@
         inp("host-initials", "Initials", h.initials || "", "2 letters shown in the avatar"),
         selectField("host-tz", "Timezone", TZ_LIST, h.timezone || "America/New_York")
       ) +
+      inp("host-email", "Notification email", h.email || "", "Where new-booking alerts are sent (optional)", "email") +
       '<div class="card-actions"><button class="btn btn-primary" id="saveHost">Save host</button>' +
       '<span class="save-note" id="hostNote"></span></div>'
     );
@@ -115,7 +116,7 @@
       var next = Object.assign({}, settings, {
         host: {
           name: val("host-name"), title: val("host-title"),
-          initials: val("host-initials"), timezone: val("host-tz")
+          initials: val("host-initials"), timezone: val("host-tz"), email: val("host-email")
         }
       });
       saveSettings(next, "hostNote");
@@ -129,6 +130,11 @@
         inp("rule-step", "Slot interval (minutes)", settings.slotStep, "Gap between start times, e.g. 30", "number"),
         inp("rule-buffer", "Buffer (minutes)", settings.buffer, "Padding kept free around each booking", "number")
       ) +
+      row2(
+        inp("rule-notice", "Minimum notice (minutes)", settings.minNotice, "Earliest a slot can be booked, e.g. 120", "number"),
+        inp("rule-horizon", "Booking horizon (days)", settings.horizonDays, "How far ahead people can book", "number")
+      ) +
+      inp("rule-cap", "Daily cap", settings.dailyCap, "Max bookings per day (0 = unlimited)", "number") +
       '<div class="card-actions"><button class="btn btn-primary" id="saveRules">Save rules</button>' +
       '<span class="save-note" id="rulesNote"></span></div>'
     );
@@ -136,7 +142,9 @@
   function wireRules() {
     root.querySelector("#saveRules").addEventListener("click", function () {
       var next = Object.assign({}, settings, {
-        slotStep: parseInt(val("rule-step"), 10), buffer: parseInt(val("rule-buffer"), 10)
+        slotStep: parseInt(val("rule-step"), 10), buffer: parseInt(val("rule-buffer"), 10),
+        minNotice: parseInt(val("rule-notice"), 10), horizonDays: parseInt(val("rule-horizon"), 10),
+        dailyCap: parseInt(val("rule-cap"), 10)
       });
       saveSettings(next, "rulesNote");
     });

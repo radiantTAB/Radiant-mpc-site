@@ -454,6 +454,9 @@ img { max-width: 100%; display: block; }
 
 .form-error { color: #dc2626; font-size: .9rem; margin: 12px 0 0; width: 100%; }
 
+/* Honeypot: off-screen, never shown to humans, catches naive bots. */
+.hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
 .success-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
 
 .success-check.canceled { background: #dc2626; }

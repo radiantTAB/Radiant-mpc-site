@@ -22,9 +22,12 @@
   var LS_MINE = "meetly.mybookings.v1"; // ids this browser created
 
   var DEFAULT_SETTINGS = {
-    host: { name: "Alex Lark", initials: "AL", title: "Product Advisor", timezone: "America/New_York" },
+    host: { name: "Alex Lark", initials: "AL", title: "Product Advisor", timezone: "America/New_York", email: "" },
     slotStep: 30,
     buffer: 0,
+    minNotice: 120,
+    horizonDays: 60,
+    dailyCap: 0,
     hours: { 0: [], 1: [[9, 12], [13, 17]], 2: [[9, 12], [13, 17]], 3: [[9, 12], [13, 17]], 4: [[9, 12], [13, 17]], 5: [[9, 12], [13, 16]], 6: [] }
   };
   var DEFAULT_EVENTS = [
@@ -47,6 +50,9 @@
   function computeSlots(settings, event, dateStr, bookings) {
     var windows = (settings.hours && settings.hours[weekdayOf(dateStr)]) || [];
     var step = settings.slotStep || 30, buffer = settings.buffer || 0, dur = event.duration;
+    var minNotice = settings.minNotice || 0;
+    var tz = (settings.host && settings.host.timezone) || "America/New_York";
+    var now = Date.now();
     var taken = (bookings || []).filter(function (b) { return !b.canceled; });
     var out = [];
     windows.forEach(function (w) {
@@ -54,10 +60,45 @@
       for (var m = startMin; m + dur <= endMin; m += step) {
         var s = m, e = m + dur;
         var clash = taken.some(function (b) { return s < b.end_min + buffer && b.start_min - buffer < e; });
-        if (!clash) out.push({ start: s, end: e, label: minutesLabel(s) });
+        if (clash) continue;
+        if (minNotice > 0 && (hostInstant(dateStr, s, tz) - now) < minNotice * 60000) continue;
+        out.push({ start: s, end: e, label: minutesLabel(s) });
       }
     });
     return out;
+  }
+
+  // host wall-clock -> real UTC instant (mirrors app.js / worker)
+  function tzOffsetMinutes(tz, date) {
+    var dtf = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    var p = {};
+    dtf.formatToParts(date).forEach(function (x) { p[x.type] = x.value; });
+    var hour = p.hour === "24" ? 0 : parseInt(p.hour, 10);
+    var asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, hour, +p.minute, +p.second);
+    return (asUTC - date.getTime()) / 60000;
+  }
+  function hostInstant(dateStr, minutes, tz) {
+    var p = dateStr.split("-").map(Number);
+    var guess = Date.UTC(p[0], p[1] - 1, p[2], Math.floor(minutes / 60), minutes % 60);
+    var off = tzOffsetMinutes(tz, new Date(guess));
+    var utc = guess - off * 60000;
+    var off2 = tzOffsetMinutes(tz, new Date(utc));
+    if (off2 !== off) utc = guess - off2 * 60000;
+    return utc;
+  }
+  function dateInZone(utcMs, tz) {
+    var p = {};
+    new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(utcMs)).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + "-" + p.month + "-" + p.day;
+  }
+  function withinHorizon(dateStr, settings) {
+    var horizon = settings.horizonDays || 0;
+    if (horizon <= 0) return true;
+    var tz = (settings.host && settings.host.timezone) || "America/New_York";
+    var today = dateInZone(Date.now(), tz);
+    if (dateStr < today) return false;
+    var maxDate = dateInZone(hostInstant(today, 0, tz) + horizon * 86400000, tz);
+    return dateStr <= maxDate;
   }
   function isEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
   function makeId(prefix) {
@@ -84,13 +125,16 @@
     var s = this._settings();
     var events = this._events().filter(function (e) { return e.active !== 0; })
       .sort(function (a, b) { return (a.sort - b.sort) || a.name.localeCompare(b.name); });
-    return Promise.resolve({ host: s.host, slotStep: s.slotStep, buffer: s.buffer, hours: s.hours, events: events });
+    var host = { name: s.host.name, initials: s.host.initials, title: s.host.title, timezone: s.host.timezone };
+    return Promise.resolve({ host: host, slotStep: s.slotStep, buffer: s.buffer, minNotice: s.minNotice, horizonDays: s.horizonDays, hours: s.hours, events: events });
   };
   LocalStore.prototype.getSlots = function (eventId, date) {
     var s = this._settings();
     var event = this._events().find(function (e) { return e.id === eventId; });
     if (!event) return Promise.reject(new Error("Unknown event type."));
+    if (!withinHorizon(date, s)) return Promise.resolve([]);
     var todays = this._bookings().filter(function (b) { return b.date === date && !b.canceled; });
+    if (s.dailyCap > 0 && todays.length >= s.dailyCap) return Promise.resolve([]);
     return Promise.resolve(computeSlots(s, event, date, todays));
   };
   LocalStore.prototype.createBooking = function (data) {
@@ -99,8 +143,10 @@
     if (!event) return Promise.reject(new Error("Unknown event type."));
     if (!data.name) return Promise.reject(new Error("Please enter your name."));
     if (!isEmail(data.email)) return Promise.reject(new Error("Please enter a valid email address."));
+    if (!withinHorizon(data.date, s)) return Promise.reject(new Error("That date is outside the booking window."));
     var bookings = this._bookings();
     var todays = bookings.filter(function (b) { return b.date === data.date && !b.canceled; });
+    if (s.dailyCap > 0 && todays.length >= s.dailyCap) return Promise.reject(new Error("No more bookings are available on that day."));
     var free = computeSlots(s, event, data.date, todays);
     if (!free.some(function (x) { return x.start === data.start; })) {
       return Promise.reject(new Error("That time was just taken. Please pick another."));
@@ -220,10 +266,15 @@
       hours[d] = ws.map(function (w) { return [clampInt(w[0], 0, 24, 0), clampInt(w[1], 0, 24, 0)]; }).filter(function (w) { return w[1] > w[0]; });
     }
     var timezone = String(host.timezone || current.host.timezone || "America/New_York").trim().slice(0, 64) || "America/New_York";
+    var emailRaw = String(host.email || "").trim().slice(0, 160);
+    var email = emailRaw && isEmail(emailRaw) ? emailRaw : "";
     return {
-      host: { name: name, initials: initials, title: String(host.title || current.host.title || "").trim().slice(0, 120), timezone: timezone },
+      host: { name: name, initials: initials, title: String(host.title || current.host.title || "").trim().slice(0, 120), timezone: timezone, email: email },
       slotStep: clampInt(body.slotStep, 5, 240, current.slotStep),
       buffer: clampInt(body.buffer, 0, 240, current.buffer),
+      minNotice: clampInt(body.minNotice, 0, 43200, current.minNotice),
+      horizonDays: clampInt(body.horizonDays, 1, 730, current.horizonDays),
+      dailyCap: clampInt(body.dailyCap, 0, 100, current.dailyCap),
       hours: hours
     };
   }

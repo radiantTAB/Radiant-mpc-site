@@ -162,7 +162,7 @@
       var date = new Date(year, month, day);
       var iso = isoDate(date);
       var past = date < today;
-      var hasSlots = !past && dayHasWindows(iso); // cheap check; exact slots load on click
+      var hasSlots = !past && dayHasWindows(iso) && withinHorizon(iso); // cheap check; exact slots load on click
       var isToday = sameDay(date, today);
       var isSel = state.selectedDate === iso;
       var cls = ["cal-day"];
@@ -272,6 +272,7 @@
       '<div><span class="mi" aria-hidden="true">🌐</span><span>' + escapeHtml(shortTz(state.tz)) + "</span></div></div></aside>" +
       '<div class="sched-main"><h3 data-autofocus tabindex="-1">Enter Details</h3>' +
       '<form class="confirm-form" id="confirmForm" novalidate>' +
+      '<div class="hp-field" aria-hidden="true"><label>Company<input type="text" name="company" tabindex="-1" autocomplete="off" /></label></div>' +
       field("name", "Name", "text", state.form.name, true, "Please enter your name.") +
       field("email", "Email", "email", state.form.email, true, "Please enter a valid email address.") +
       '<div class="field" id="f-notes"><label for="i-notes">Please share anything that will help prepare for our meeting</label>' +
@@ -295,7 +296,7 @@
 
       var btn = app.querySelector("#submitBtn");
       btn.disabled = true; btn.textContent = "Scheduling…";
-      var payload = { event: state.event.id, date: state.selectedDate, start: state.selectedTime.start, name: name, email: email, notes: notes, tz: state.tz };
+      var payload = { event: state.event.id, date: state.selectedDate, start: state.selectedTime.start, name: name, email: email, notes: notes, tz: state.tz, company: form.company ? form.company.value : "" };
       store.createBooking(payload).then(function (booking) {
         // Reschedule: the new booking is in, cancel the old one.
         if (state.rescheduleId) {
@@ -527,9 +528,19 @@
     return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
   function dayHasWindows(iso) {
-    var wd = new Date(iso.split("-").map(Number)[0], iso.split("-").map(Number)[1] - 1, iso.split("-").map(Number)[2]).getDay();
+    var p = iso.split("-").map(Number);
+    var wd = new Date(p[0], p[1] - 1, p[2]).getDay();
     var w = CFG.hours && CFG.hours[wd];
     return !!(w && w.length);
+  }
+  function withinHorizon(iso) {
+    var horizon = CFG.horizonDays || 0;
+    if (horizon <= 0) return true;
+    var tz = hostTz();
+    var today = dateInZone(Date.now(), tz);
+    if (iso < today) return false;
+    var maxDate = dateInZone(hostInstant(today, 0) + horizon * 86400000, tz);
+    return iso <= maxDate;
   }
   function minutesLabel(min) {
     var h = Math.floor(min / 60), m = min % 60, ampm = h >= 12 ? "pm" : "am";
