@@ -313,7 +313,7 @@ export async function handlePortalApi(request, env, url) {
     // fail identically for every address, not only for real accounts.
     if (!env.RESEND_API_KEY) {
       return json(
-        { error: "Password reset is temporarily unavailable. Please email info@Radiant-MPC.com." },
+        { error: "Password reset is temporarily unavailable. Please email tbernath@radiant-mpc.com." },
         500
       );
     }
@@ -367,7 +367,7 @@ export async function handlePortalApi(request, env, url) {
       link +
       "\n\nIf you did not request this, you can ignore this email -- your " +
       "current password still works.\n\n" +
-      "Radiant Medical Physics Consulting LLC\ninfo@Radiant-MPC.com\n";
+      "Radiant Medical Physics Consulting LLC\ntbernath@radiant-mpc.com\n";
     let sendFailed = null;
     try {
       const res = await fetch("https://api.resend.com/emails", {
@@ -387,7 +387,7 @@ export async function handlePortalApi(request, env, url) {
             "(link expires in " + RESET_TTL_MINUTES + " minutes).</p>" +
             "<p>If you did not request this, you can ignore this email &mdash; " +
             "your current password still works.</p>" +
-            "<p>Radiant Medical Physics Consulting LLC<br>info@Radiant-MPC.com</p>",
+            "<p>Radiant Medical Physics Consulting LLC<br>tbernath@radiant-mpc.com</p>",
         }),
       });
       if (!res.ok) sendFailed = "HTTP " + res.status + " " + (await res.text());
@@ -401,7 +401,7 @@ export async function handlePortalApi(request, env, url) {
         .run();
       console.error("reset mail failed:", sendFailed);
       return json(
-        { error: "Could not send the reset email. Please email info@Radiant-MPC.com." },
+        { error: "Could not send the reset email. Please email tbernath@radiant-mpc.com." },
         500
       );
     }
@@ -455,7 +455,7 @@ export async function handlePortalApi(request, env, url) {
   if (path === "/portal/api/trial-request" && method === "POST") {
     if (!env.LICENSE_SIGNING_KEY) {
       return json(
-        { error: "Trial signup is temporarily unavailable. Please email info@Radiant-MPC.com." },
+        { error: "Trial signup is temporarily unavailable. Please email tbernath@radiant-mpc.com." },
         500
       );
     }
@@ -492,7 +492,7 @@ export async function handlePortalApi(request, env, url) {
         {
           error:
             "An account already exists for this email. Sign in at /portal/login.html " +
-            "or email info@Radiant-MPC.com if you need help recovering access.",
+            "or email tbernath@radiant-mpc.com if you need help recovering access.",
         },
         409
       );
