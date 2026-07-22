@@ -519,8 +519,9 @@ function displayLine(booking, settings) {
 }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function b64(str) {
-  if (typeof btoa === "function") return btoa(unescape(encodeURIComponent(str)));
-  return Buffer.from(str, "utf8").toString("base64");
+  // btoa is a global in the Workers runtime (and Node 18+); encode UTF-8 first
+  // so non-ASCII (e.g. accented names) survives base64.
+  return btoa(unescape(encodeURIComponent(str)));
 }
 
 // ---- reminders (driven by the Cron Trigger via handleMeetlyReminders) -----
