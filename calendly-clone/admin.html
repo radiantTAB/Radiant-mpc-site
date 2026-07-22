@@ -3,32 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Book a time — Meetly</title>
-  <meta name="description" content="Pick an event type, choose a date and time, and confirm your booking. A working Calendly-style scheduling flow." />
+  <title>Admin — Meetly</title>
+  <meta name="robots" content="noindex" />
+  <meta name="description" content="Edit host details, availability, event types, and view bookings." />
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230a66ff'/><text x='50' y='72' font-size='64' text-anchor='middle' fill='white' font-family='Arial' font-weight='bold'>M</text></svg>" />
 </head>
 <body>
-
   <header class="site-header">
     <div class="container">
-      <a href="index.html" class="brand">
-        <span class="logo-mark">M</span> Meetly
-      </a>
+      <a href="index.html" class="brand"><span class="logo-mark">M</span> Meetly</a>
       <div class="nav-actions">
-        <a class="btn btn-ghost" href="index.html">← Back to site</a>
+        <span class="admin-mode" id="modeBadge"></span>
+        <a class="btn btn-ghost" href="booking.html">View booking page →</a>
       </div>
     </div>
   </header>
 
   <main class="booking-wrap">
     <div class="container">
-      <!-- The whole flow renders here -->
-      <div id="app"></div>
+      <div id="admin"></div>
     </div>
   </main>
 
   <script src="store.js"></script>
-  <script src="app.js"></script>
+  <script src="admin.js"></script>
 </body>
 </html>

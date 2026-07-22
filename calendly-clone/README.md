@@ -1,64 +1,116 @@
 # Meetly — a Calendly-style scheduling app (personal clone)
 
-A self-contained, static clone of a Calendly-style meeting-scheduling website,
-built for **personal / learning use**. No build step, no dependencies, no
-backend — just open the HTML files in a browser.
+A self-contained clone of a Calendly-style meeting-scheduling website, built
+for **personal / learning use**. It runs with **no backend at all** (bookings
+persist in the browser via `localStorage`) and **auto-upgrades to a real D1
+backend** when the Cloudflare Worker is deployed — the front end never changes.
 
 > Not affiliated with, endorsed by, or connected to Calendly. All copy, styling,
 > and assets here are original. "Meetly" is a placeholder brand for the demo.
 
-## What's inside
+## Files
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Marketing landing page — hero, features, how-it-works, pricing, footer. |
-| `booking.html` | The scheduling experience (mounts the app). |
-| `app.js` | The full booking flow logic (vanilla JS, no libraries). |
-| `styles.css` | All styling for both pages. |
+| `index.html` | Marketing landing page. |
+| `booking.html` | The public booking experience (mounts `app.js`). |
+| `admin.html` | Admin / settings console (mounts `admin.js`). |
+| `store.js` | Data layer — one interface, two backends (localStorage / API). |
+| `app.js` | Booking flow logic. |
+| `admin.js` | Settings + bookings management. |
+| `styles.css` | All styling, light + dark themes. |
 
-## The booking flow
+The backend lives with the rest of the site's Worker code:
 
-`booking.html` reproduces the core Calendly experience entirely client-side:
+| File | Purpose |
+|------|---------|
+| `../worker/meetly.js` | D1-backed API under `/api/meetly/*`. |
+| `../worker/meetly.test.mjs` | Node test for the booking logic (`node worker/meetly.test.mjs`). |
 
-1. **Choose an event type** — 15-min intro, 30-min meeting, or 60-min deep dive.
-2. **Pick a date** — a month calendar highlights days that have open slots;
-   past days and days off are disabled. Navigate months with ‹ / ›.
-3. **Pick a time** — time slots are generated from the host's business hours and
-   the selected event's duration. Some slots are deterministically marked
-   "busy" so availability looks realistic; past times on the current day are
-   hidden. Click a slot, then **Next** (Calendly-style two-tap confirm).
+## The booking flow (`booking.html`)
+
+1. **Choose an event type** — 15-min intro, 30-min meeting, 60-min deep dive (editable).
+2. **Pick a date** — month calendar highlights days with availability; past/off days disabled; keyboard-navigable (arrow keys).
+3. **Pick a time** — slots come from the host's availability, the event duration, the **slot interval**, and a **buffer** kept free around existing bookings. Times are **converted to the visitor's timezone** (selector in the sidebar), with a `+1d/−1d` marker when the local day differs. Past times on the current day are hidden.
 4. **Enter details** — name + email (validated) and optional notes.
-5. **Confirmation** — a success screen with a booking summary and confirmation
-   code, plus "book another meeting".
+5. **Confirmation** — summary with a confirmation code, an **Add to calendar** `.ics` download, and a **Manage booking** link.
 
-Everything runs in memory — nothing is sent anywhere, and there's no persistence.
+**Manage / reschedule / cancel** — the confirmation's *Manage booking* link
+(`booking.html?manage=<id>`) reopens a booking to **reschedule** (pick a new
+time; the old slot is freed only after the new one is confirmed) or **cancel**
+it (which frees the slot for others).
 
-## Customizing
+## Admin / settings (`admin.html`)
 
-Open `app.js` and edit the data near the top:
+Edit the **host** (name, title, initials, timezone), **scheduling rules** (slot
+interval, buffer), **weekly availability** (per-day time windows), and **event
+types** (add / edit / activate / remove), plus review and **cancel bookings**.
+Changes drive the public booking page immediately.
 
-- `HOST` — name, initials, title (timezone is auto-detected from the browser).
-- `EVENT_TYPES` — add/remove meeting types, change durations and locations.
-- `HOURS` — weekly availability windows per weekday (`[startHour, endHour]`,
-  24-hour clock). An empty array means a day off.
-- `SLOT_STEP` — minutes between slot start times.
+## Storage: works now, scales later
 
-Branding (name, colors) lives in `styles.css` (`:root` variables) and the
-markup in `index.html` / `booking.html`.
+`store.js` probes `GET /api/meetly/config` once on load:
 
-## Running it
+- **No backend (default)** — falls back to **`localStorage`**. Bookings persist
+  in that browser, slots are blocked so the same time can't be double-booked,
+  and the admin page edits the local copy. Perfect for a personal, single-user
+  link or a static host (GitHub Pages, etc.).
+- **Worker deployed** — uses the **`/api/meetly/*` D1 API**, so bookings are
+  shared across everyone and double-booking is prevented server-side.
 
-No server needed:
+Either way the app calls the same methods; it never knows which backend it's on.
 
-```bash
-# just open the file
-open calendly-clone/index.html      # macOS
-xdg-open calendly-clone/index.html  # Linux
-```
+## Deploying the real backend (optional)
 
-Or serve the folder statically if you prefer:
+The API is already wired into this repo's Worker (`worker/index.js` routes
+`/api/meetly/*` to `worker/meetly.js`) and uses the existing `DB` D1 binding —
+no new infrastructure. Tables are created on first use.
+
+1. Deploy the Worker as usual (the repo is Git-connected to the
+   `radiant-mpc-site` Worker).
+2. To use the admin console against the live backend, set a secret:
+   ```
+   npx wrangler secret put MEETLY_ADMIN_TOKEN
+   ```
+   Then open `admin.html`, and enter that token when prompted. **If the secret
+   is unset, the admin API is refused entirely** — an unconfigured deploy can
+   never expose open settings writes. (The public booking endpoints stay open,
+   as a scheduling link should.)
+
+Endpoints:
+
+| Method + path | Auth | Purpose |
+|---------------|------|---------|
+| `GET /api/meetly/config` | public | Host, event types, availability. |
+| `GET /api/meetly/slots?event=&date=` | public | Free slots for a day. |
+| `POST /api/meetly/bookings` | public | Create a booking (re-validates the slot). |
+| `GET /api/meetly/bookings/<id>` | public | Look up a booking. |
+| `POST /api/meetly/bookings/<id>/cancel` | public | Cancel a booking. |
+| `GET /api/meetly/admin/settings` | token | Read settings + all event types. |
+| `PUT /api/meetly/admin/settings` | token | Update host / rules / availability. |
+| `PUT /api/meetly/admin/events` | token | Replace the event-type set. |
+| `GET /api/meetly/admin/bookings[?all=1]` | token | List bookings. |
+
+The slot algorithm in `worker/meetly.js` (`computeSlots`) is mirrored in
+`store.js` for the offline path; both are covered by `worker/meetly.test.mjs`.
+
+## Customizing without the admin UI
+
+Defaults live at the top of `worker/meetly.js` (`DEFAULT_SETTINGS`,
+`DEFAULT_EVENT_TYPES`) and mirror `store.js`. `styles.css` `:root` holds the
+palette; the brand name is in the HTML.
+
+## Running locally
+
+No build step. Open `calendly-clone/index.html` directly, or serve the folder:
 
 ```bash
 python3 -m http.server 8000
 # then visit http://localhost:8000/calendly-clone/
+```
+
+Run the backend test:
+
+```bash
+node worker/meetly.test.mjs
 ```
