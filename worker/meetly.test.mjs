@@ -217,6 +217,29 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   r = await call(env7, "GET", "/api/meetly/bookings/" + r.data.booking.id);
   ok(r.data.booking.answers.Topic === "Pricing", "answer readable via lookup");
 
+  // --- outbound webhooks (fetch mocked) ---
+  const wh = makeDb(); const env8 = { DB: wh.DB, MEETLY_ADMIN_TOKEN: "t" };
+  seed(wh.state);
+  await call(env8, "PUT", "/api/meetly/admin/settings", { token: "t", body: { webhookUrl: "https://hook.example.com/x", webhookSecret: "shh" } });
+  r = await call(env8, "GET", "/api/meetly/admin/settings", { token: "t" });
+  ok(r.data.settings.webhookUrl === "https://hook.example.com/x", "webhook url saved");
+  await call(env8, "PUT", "/api/meetly/admin/settings", { token: "t", body: { webhookUrl: "ftp://bad" } });
+  r = await call(env8, "GET", "/api/meetly/admin/settings", { token: "t" });
+  ok(r.data.settings.webhookUrl === "https://hook.example.com/x", "non-http webhook url rejected (kept previous)");
+  let hookCalls = [];
+  const realFetch2 = globalThis.fetch;
+  globalThis.fetch = async (u, init) => { hookCalls.push({ url: String(u), body: JSON.parse(init.body), headers: init.headers }); return new Response("{}", { status: 200 }); };
+  const ws = (await call(env8, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON)).data.slots;
+  r = await call(env8, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: ws[0].start, name: "W", email: "w@x.com" } });
+  const created = hookCalls.find((c) => c.body.type === "booking.created");
+  ok(r.status === 201 && created && created.url === "https://hook.example.com/x", "webhook fired on booking.created");
+  ok(created.headers["x-meetly-secret"] === "shh", "webhook carries signing secret header");
+  ok(created.body.booking.email === "w@x.com", "webhook payload includes booking");
+  hookCalls = [];
+  await call(env8, "POST", "/api/meetly/bookings/" + r.data.booking.id + "/cancel");
+  ok(hookCalls.some((c) => c.body.type === "booking.cancelled"), "webhook fired on booking.cancelled");
+  globalThis.fetch = realFetch2;
+
   // --- .ics generation ---
   const ics = buildIcs({ id: "ml_x", event_id: "meeting-30", event_name: "30 Minute Meeting", date: MON, start_min: 540, end_min: 570, location: "Zoom" }, { host: { name: "Alex Lark", timezone: "America/New_York" } });
   ok(/BEGIN:VCALENDAR/.test(ics) && /BEGIN:VEVENT/.test(ics) && /DTSTART:\d{8}T\d{6}Z/.test(ics), "ics has calendar + event + DTSTART");
