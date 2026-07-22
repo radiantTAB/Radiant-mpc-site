@@ -297,6 +297,7 @@ function updateSite(id,fields){var s=DB.sites.find(function(x){return x.id===id;
 function deleteSite(id){DB.sites=DB.sites.filter(function(s){return s.id!==id;});DB.weeks=DB.weeks.filter(function(w){return w.site_id!==id;});saveDB();}
 function addRate(siteId,rate,eff,weeks){var s=DB.sites.find(function(x){return x.id===siteId;});if(!s)return;s.rates=s.rates||[];s.rates.push({id:newId(),rate:Number(rate),effective_date:eff,proj_weeks:Number(weeks)});saveDB();}
 function updateRateWeeks(rateId,weeks){DB.sites.forEach(function(s){(s.rates||[]).forEach(function(r){if(r.id===rateId)r.proj_weeks=Number(weeks);});});saveDB();}
+function updateRateAvg(rateId,val){DB.sites.forEach(function(s){(s.rates||[]).forEach(function(r){if(r.id===rateId)r.avg_hours=(val===''?null:Number(val));});});saveDB();}
 function deleteRate(rateId){DB.sites.forEach(function(s){s.rates=(s.rates||[]).filter(function(r){return r.id!==rateId;});});saveDB();}
 function upsertWeek(siteId,date,hours,income){var idx=DB.weeks.findIndex(function(w){return w.site_id===siteId&&w.week_ending===date;});if(hours===0&&income===0){if(idx>=0){DB.weeks.splice(idx,1);saveDB();}return {deleted:true};}if(idx>=0){DB.weeks[idx].hours=hours;DB.weeks[idx].income=income;}else{DB.weeks.push({id:newId(),site_id:siteId,week_ending:date,hours:hours,income:income,notes:''});}saveDB();return {deleted:false};}
 function deleteWeekRow(date){DB.weeks=DB.weeks.filter(function(w){return w.week_ending!==date;});saveDB();}
@@ -321,10 +322,20 @@ function projectSite(s){
   if(method==='income_runrate'){out.projIncome=avgI*WEEKS_IN_YEAR;out.projHours=avgH*WEEKS_IN_YEAR;return out;}
   if(method==='actual'){out.projHours=ytdH;out.projIncome=ytdH*(rate||0);out.segments=[{weeks:null,rate:rate,hours:ytdH,income:out.projIncome,label:'actual'}];return out;}
   if(method==='manual'){var mh=num(s.manual_hours);out.projHours=mh;out.projIncome=mh*(rate||0);out.segments=[{weeks:null,rate:rate,hours:mh,income:out.projIncome,label:'manual'}];return out;}
-  // runrate: sum over rate segments (each with its own proj_weeks)
+  // runrate: sum over rate segments. Each segment projects at its own
+  // rate for its own number of weeks, using either an explicit per-segment
+  // average (avg_hours override, e.g. the base period averaged over all
+  // weeks vs the new period averaged from week 2) or, when unset, the
+  // site's live average weekly hours from recorded weeks.
   var rates=(s.rates||[]).slice().sort(function(a,b){return a.effective_date<b.effective_date?-1:1;});
   if(!rates.length){out.projHours=avgH*WEEKS_IN_YEAR;out.projIncome=avgH*WEEKS_IN_YEAR*0;return out;}
-  rates.forEach(function(r){var w=r.proj_weeks!=null?Number(r.proj_weeks):WEEKS_IN_YEAR;var h=avgH*w;var inc=h*r.rate;out.projHours+=h;out.projIncome+=inc;out.segments.push({weeks:w,rate:r.rate,hours:h,income:inc,eff:r.effective_date});});
+  rates.forEach(function(r){
+    var a=(r.avg_hours!=null&&r.avg_hours!=='')?Number(r.avg_hours):avgH;
+    var w=r.proj_weeks!=null?Number(r.proj_weeks):WEEKS_IN_YEAR;
+    var h=a*w;var inc=h*r.rate;
+    out.projHours+=h;out.projIncome+=inc;
+    out.segments.push({weeks:w,rate:r.rate,hours:h,income:inc,eff:r.effective_date,avg:a,avgSet:(r.avg_hours!=null&&r.avg_hours!=='')});
+  });
   return out;
 }
 function totalProjection(){var t=0;S.sites.forEach(function(s){t+=projectSite(s).projIncome;});return t;}
@@ -371,7 +382,7 @@ function renderProjection(){
     var p=projectSite(s);
     var rateTxt;
     if(s.method==='income_runrate'||s.method==='income_actual')rateTxt='<span class="muted">— $ direct —</span>';
-    else if(p.segments.length&&s.method==='runrate')rateTxt=p.segments.map(function(g){return usd2.format(g.rate)+'×'+nf(g.weeks,0)+'w';}).join(' + ');
+    else if(p.segments.length&&s.method==='runrate')rateTxt=p.segments.map(function(g){return usd2.format(g.rate)+'×'+nf(g.weeks,0)+'w@'+nf(g.avg,2)+'h';}).join(' + ');
     else rateTxt=p.rate!=null?usd2.format(p.rate)+'/hr':'—';
     return '<tr><td>'+esc(s.name)+'</td><td class="muted" style="font-size:12px">'+methodLabel(s.method)+'</td>'+
       '<td class="num">'+p.weeks+'</td><td class="num">'+nf(p.avgHours,2)+'</td>'+
@@ -486,9 +497,14 @@ function renderSites(){
   el.innerHTML=sitesSorted().map(function(s){
     var usesRate=(s.method!=='income_runrate'&&s.method!=='income_actual');
     var rates=(s.rates||[]).slice().sort(function(a,b){return a.effective_date<b.effective_date?1:-1;});
+    var liveAvg=projectSite(s).avgHours;
     var chips=rates.map(function(r){
-      var wk=(s.method==='runrate')?' · <input type="number" min="0" step="1" data-rateweeks="'+r.id+'" value="'+(r.proj_weeks==null?52:r.proj_weeks)+'"> wk':'';
-      return '<span class="rate-chip">'+usd2.format(r.rate)+'/hr from '+r.effective_date+wk+' <button title="Delete rate" data-delrate="'+r.id+'">✕</button></span>';
+      var extra='';
+      if(s.method==='runrate'){
+        extra=' · <input type="number" min="0" step="1" data-rateweeks="'+r.id+'" value="'+(r.proj_weeks==null?52:r.proj_weeks)+'" title="Projection weeks at this rate"> wk'
+          +' · avg <input type="number" min="0" step="0.0001" data-rateavg="'+r.id+'" value="'+(r.avg_hours==null?'':r.avg_hours)+'" placeholder="'+nf(liveAvg,2)+'" title="Average weekly hours for this segment (blank = live average from recorded weeks)"> hr';
+      }
+      return '<span class="rate-chip">'+usd2.format(r.rate)+'/hr from '+r.effective_date+extra+' <button title="Delete rate" data-delrate="'+r.id+'">✕</button></span>';
     }).join(' ');
     if(usesRate&&!rates.length)chips='<span class="hint">no rates set — add one</span>';
     var methodSel='<select class="method-sel" data-method="'+s.id+'">'+
@@ -506,6 +522,7 @@ function renderSites(){
   el.querySelectorAll('[data-delsite]').forEach(function(b){b.addEventListener('click',function(){delSiteUI(b.getAttribute('data-delsite'));});});
   el.querySelectorAll('[data-delrate]').forEach(function(b){b.addEventListener('click',function(){if(confirm('Delete this rate?')){deleteRate(b.getAttribute('data-delrate'));renderAll();}});});
   el.querySelectorAll('[data-rateweeks]').forEach(function(inp){inp.addEventListener('change',function(){updateRateWeeks(inp.getAttribute('data-rateweeks'),inp.value);renderProjection();renderProjYear();renderSummary();});});
+  el.querySelectorAll('[data-rateavg]').forEach(function(inp){inp.addEventListener('change',function(){updateRateAvg(inp.getAttribute('data-rateavg'),inp.value);renderProjection();renderProjYear();renderSummary();});});
   el.querySelectorAll('[data-method]').forEach(function(sel){sel.addEventListener('change',function(){updateSite(sel.getAttribute('data-method'),{method:sel.value});renderAll();});});
   el.querySelectorAll('[data-manual]').forEach(function(inp){inp.addEventListener('change',function(){updateSite(inp.getAttribute('data-manual'),{manual_hours:inp.value===''?null:Number(inp.value)});renderProjection();renderProjYear();renderSummary();});});
 }
