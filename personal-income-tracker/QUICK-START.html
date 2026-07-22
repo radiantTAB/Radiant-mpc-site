@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Income Tracker — Quick Start</title>
+<style>
+@page{size:letter;margin:0.45in}
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --accent:#d00008;--accent2:#a80006;--text:#1a1a1a;--mute:#555;--dim:#8a8a8a;
+  --line:#e2e2e5;--card:#f6f6f7;--gk:#d00008;--ro:#1666c4;
+}
+html,body{background:#fff}
+body{font-family:'Segoe UI',system-ui,-apple-system,Helvetica,Arial,sans-serif;color:var(--text);font-size:9.4px;line-height:1.42}
+.sheet{max-width:7.6in;margin:0 auto;padding:2px}
+header{display:flex;align-items:center;justify-content:space-between;border-bottom:2.5px solid var(--accent);padding-bottom:7px;margin-bottom:9px}
+.brand{display:flex;align-items:center;gap:8px}
+.dot{width:15px;height:15px;border-radius:50%;background:conic-gradient(var(--accent) 0 50%,transparent 50% 100%);border:2px solid var(--accent)}
+h1{font-size:17px;font-weight:800;letter-spacing:-.02em}
+h1 span{color:var(--accent)}
+.tagline{font-size:8.6px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;font-family:'Consolas',monospace}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.box{border:1px solid var(--line);border-radius:7px;padding:8px 10px;margin-bottom:9px;break-inside:avoid}
+.box.accent{border-left:3px solid var(--accent)}
+.box.warn{border-left:3px solid #e0a021;background:#fdf7ec}
+h2{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+h2 .n{background:var(--accent);color:#fff;border-radius:50%;width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;font-size:9px}
+h3{font-size:9.6px;font-weight:800;margin:5px 0 2px}
+ol,ul{margin:0 0 0 15px}
+li{margin-bottom:2.5px}
+b{font-weight:800}
+.tab{display:inline-block;font-weight:800;color:var(--accent)}
+.pill{display:inline-block;border:1px solid var(--line);border-radius:4px;padding:0 4px;font-family:'Consolas',monospace;font-size:8.6px;background:var(--card);white-space:nowrap}
+.gk{color:var(--gk);font-weight:800}.ro{color:var(--ro);font-weight:800}
+.rhythm{display:grid;grid-template-columns:auto 1fr;gap:3px 9px;align-items:baseline}
+.rhythm .when{font-weight:800;color:var(--accent2);white-space:nowrap}
+footer{margin-top:8px;border-top:1px solid var(--line);padding-top:6px;color:var(--dim);font-size:8.3px;display:flex;justify-content:space-between}
+.big{font-size:9.8px}
+.hl{background:#fdecec;border-radius:3px;padding:0 3px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header>
+    <div class="brand">
+      <span class="dot"></span>
+      <div><h1>Income&nbsp;<span>Tracker</span></h1></div>
+    </div>
+    <div class="tagline">Quick Start · Standalone · Runs offline</div>
+  </header>
+
+  <div class="box accent">
+    <h2><span class="n">1</span>First-time setup — do this once</h2>
+    <ol>
+      <li><b>Save</b> <span class="pill">index.html</span> to a permanent folder (e.g. "Income Tracker"). <b>Don't move or rename it afterward</b> — the browser ties your saved data to that exact file.</li>
+      <li><b>Double-click</b> it to open in your browser. No internet needed.</li>
+      <li>Click <b>Restore</b> (top-right) → choose your data file <span class="pill">income-tracker-…-migrated.json</span>. Loads all years.</li>
+      <li>It now <b>saves automatically</b> as you type. Reopen the same file next time.</li>
+    </ol>
+  </div>
+
+  <div class="cols">
+    <div>
+      <div class="box">
+        <h2>Income tab — your dashboard</h2>
+        <ul>
+          <li>Pick the <b>Year</b> (top-left). 2026 shows the live projection; past years show actual totals.</li>
+          <li><b>Weekly entry grid:</b> type <b>hours</b> per site — dollars auto-fill from the rate. Clear both cells to remove a week. <span class="pill">Add week</span> / <span class="pill">+7 days</span> add rows.</li>
+          <li><b>Sites &amp; rates:</b> change a rate, add a mid-year rate (each rate has its own weeks + average), or change how a site projects (run-rate / actual hours / manual).</li>
+          <li><b>Year-over-year</b> and <b>Total projection by year</b> tables — click any cell to edit.</li>
+        </ul>
+      </div>
+
+      <div class="box">
+        <h2>Kettering detail tab</h2>
+        <h3>Timeclock &amp; pay periods</h3>
+        <ul>
+          <li><span class="pill">New pay period</span> → <span class="pill">Add entry</span> → type date, clock in/out, pick <span class="gk">GK</span> or <span class="ro">RO</span>.</li>
+          <li>Hours and Week 1/2 fill in automatically; tiles total GK/RO per week + grand total.</li>
+          <li>Click <span class="hl">Push GK/RO hrs → Income grid</span> to send those hours to the Income tab (no double-typing).</li>
+        </ul>
+        <h3>Charts by day &amp; Co-Reg</h3>
+        <ul>
+          <li>Add a week, enter RO charts by day + Co-Reg + hours. Season totals &amp; per-day averages compute at the bottom.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="box">
+        <h2>DP PRN Log tab</h2>
+        <ul>
+          <li>Toggle <b>OnSite</b> ↔ <b>Remote</b> at the top — each is saved separately.</li>
+          <li><span class="pill">New week</span> (any date snaps to Monday). Page through weeks with the dropdown.</li>
+          <li>Fill the per-day task grid (Closeout, Fusions, SPC, Peer, IMRT QA, Plan Checks, SRS/SBRT, Hours).</li>
+          <li>Use the <b>free-text box under each day</b> for anything not in the table.</li>
+          <li>Fill <b>Totals by location</b> (hours). <span class="pill">Export CSV</span> for a copy.</li>
+        </ul>
+      </div>
+
+      <div class="box warn">
+        <h2 style="color:#a06a10"><span class="n" style="background:#e0a021">!</span>The one rule: Backup</h2>
+        <p class="big">Your data lives <b>only in that browser</b>. Click <b>Backup</b> regularly — it saves a dated <span class="pill">.json</span> copy you control.</p>
+        <ul style="margin-top:4px">
+          <li>It's your <b>safety copy</b> if the browser is ever cleared (then just <b>Restore</b> it).</li>
+          <li>It's how you <b>move to a new computer</b>: copy both files over, open, Restore.</li>
+          <li><b>Restore replaces everything</b> — back up before restoring an older file.</li>
+        </ul>
+      </div>
+
+      <div class="box accent">
+        <h2>Typical rhythm</h2>
+        <div class="rhythm">
+          <span class="when">Weekly</span><span>Enter hours in the Income grid · log the DP PRN week · add the Kettering charts week.</span>
+          <span class="when">Each pay period</span><span>Log clock in/out in the timeclock, then <b>Push</b> to the grid.</span>
+          <span class="when">Rate change</span><span>Add a new rate to that site (effective date + weeks).</span>
+          <span class="when">Now &amp; then</span><span><b>Backup.</b></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Personal Income Tracker — standalone. Not connected to any website; nothing is uploaded.</span>
+    <span>Keep this next to the app.</span>
+  </footer>
+</div>
+</body>
+</html>
