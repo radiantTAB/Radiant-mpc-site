@@ -19,7 +19,6 @@
 //   /portal/api/*             -> Client portal API (own session auth)
 //   /admin/api/clients*       -> Client Setup API (behind Cloudflare Access)
 //   /admin/api/locations*     -> Client Setup API (behind Cloudflare Access)
-//   /admin/api/income*        -> Income Tracker API (behind admin login)
 //   /admin/api/*              -> License Manager API (behind Cloudflare Access)
 //
 // IMPORTANT: the Cloudflare Access policy that gates /admin/* must be
@@ -30,8 +29,7 @@
 import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
 import { handleClientsApi } from "./clients.js";
-import { handleIncomeApi } from "./income.js";
-import { handleMeetlyApi } from "./meetly.js";
+import { handleMeetlyApi, handleMeetlyReminders } from "./meetly.js";
 import { handlePortalApi, sessionClient, readCookie } from "./portal.js";
 import {
   handleAdminAuth,
@@ -80,14 +78,23 @@ function withSecurityHeaders(resp) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const resp = await handle(request, env, url);
+    const resp = await handle(request, env, url, ctx);
     return withSecurityHeaders(resp);
+  },
+
+  // Cron Trigger: drive Meetly reminder mail. Configured in wrangler.jsonc.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      handleMeetlyReminders(env).catch((err) => {
+        console.error("meetly reminders failed:", String((err && err.message) || err));
+      })
+    );
   },
 };
 
-async function handle(request, env, url) {
+async function handle(request, env, url, ctx) {
     // Public revocation list -- not gated.
     if (url.pathname === "/api/revoked") {
       try {
@@ -101,7 +108,7 @@ async function handle(request, env, url) {
     // reads/writes; admin writes are token-gated inside the handler.
     if (url.pathname.startsWith("/api/meetly/")) {
       try {
-        return await handleMeetlyApi(request, env, url);
+        return await handleMeetlyApi(request, env, url, ctx);
       } catch (err) {
         return json({ error: String((err && err.message) || err) }, 500);
       }
@@ -136,9 +143,6 @@ async function handle(request, env, url) {
           url.pathname.startsWith("/admin/api/locations")
         ) {
           return await handleClientsApi(request, env, url);
-        }
-        if (url.pathname.startsWith("/admin/api/income")) {
-          return await handleIncomeApi(request, env, url);
         }
         return await handleApi(request, env, url);
       } catch (err) {

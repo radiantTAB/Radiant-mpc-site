@@ -6,3 +6,6 @@ schema.sql
 .gitignore
 README.md
 design-docs
+
+# Standalone personal tool — not part of the public site.
+personal-income-tracker
