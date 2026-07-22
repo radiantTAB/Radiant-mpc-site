@@ -87,6 +87,7 @@
       (store.mode === "local" ? " You're editing this browser's local copy." : "") + "</p>" +
       summarySection(bookings) +
       hostSection() +
+      teamSection() +
       rulesSection() +
       integrationsSection() +
       availabilitySection() +
@@ -94,7 +95,7 @@
       eventsSection() +
       bookingsSection(bookings) +
       "</div>";
-    wireHost(); wireRules(); wireIntegrations(); wireAvailability(); wireOverrides(); wireEvents(); wireBookings(bookings);
+    wireHost(); wireTeam(); wireRules(); wireIntegrations(); wireAvailability(); wireOverrides(); wireEvents(); wireBookings(bookings);
   }
 
   // ---- summary / analytics (computed client-side from the bookings list) ----
@@ -240,6 +241,51 @@
     });
   }
 
+  // ---- team (for round-robin event types) ----
+  function teamSection() {
+    var team = settings.team || [];
+    return card("Team", "👥",
+      '<p class="hint">Add team members, then assign them to event types below for round-robin scheduling. Each member can be booked once per time slot, so two members double the capacity.</p>' +
+      '<div class="team-list" id="teamList">' + team.map(memberRow).join("") + "</div>" +
+      '<button class="btn btn-ghost btn-sm" id="addMember" type="button">+ Add member</button>' +
+      '<div class="card-actions"><button class="btn btn-primary" id="saveTeam">Save team</button>' +
+      '<span class="save-note" id="teamNote"></span></div>'
+    );
+  }
+  function memberRow(m) {
+    m = m || { id: "", name: "", initials: "", email: "" };
+    return '<div class="member-row" data-id="' + esc(m.id) + '">' +
+      '<input class="mem-name" placeholder="Name" value="' + esc(m.name) + '" aria-label="Member name" />' +
+      '<input class="mem-initials" placeholder="AB" maxlength="3" value="' + esc(m.initials) + '" aria-label="Initials" />' +
+      '<input class="mem-email" placeholder="email@…" value="' + esc(m.email || "") + '" aria-label="Member email" />' +
+      '<button class="win-remove mem-remove" type="button" aria-label="Remove member">✕</button></div>';
+  }
+  function wireTeam() {
+    var list = root.querySelector("#teamList");
+    list.querySelectorAll(".member-row").forEach(bindMemberRemove);
+    root.querySelector("#addMember").addEventListener("click", function () {
+      var wrap = document.createElement("div"); wrap.innerHTML = memberRow(null);
+      var r = wrap.firstChild; list.appendChild(r); bindMemberRemove(r);
+    });
+    root.querySelector("#saveTeam").addEventListener("click", function () {
+      var team = [];
+      list.querySelectorAll(".member-row").forEach(function (r) {
+        var name = r.querySelector(".mem-name").value.trim();
+        if (!name) return;
+        team.push({ id: r.dataset.id || "", name: name, initials: r.querySelector(".mem-initials").value.trim(), email: r.querySelector(".mem-email").value.trim() });
+      });
+      var note = root.querySelector("#teamNote");
+      note.textContent = "Saving…"; note.className = "save-note";
+      store.adminSaveSettings(Object.assign({}, settings, { team: team }), token).then(function (d) {
+        settings = d.settings; note.textContent = "Saved ✓"; note.className = "save-note ok";
+        // Re-render events so their host checkboxes reflect the new team.
+        root.querySelector("#teamList").innerHTML = (settings.team || []).map(memberRow).join(""); wireTeam();
+        var ed = root.querySelector("#eventEditor"); if (ed) { ed.innerHTML = events.map(eventRow).join(""); wireEvents(); }
+      }).catch(function (err) { note.textContent = err.message || "Save failed"; note.className = "save-note err"; });
+    });
+  }
+  function bindMemberRemove(r) { r.querySelector(".mem-remove").addEventListener("click", function () { r.remove(); }); }
+
   // ---- integrations (webhook) ----
   function integrationsSection() {
     var localNote = store.mode === "local" ? '<p class="hint">Webhooks only fire from the deployed backend, not in this local browser mode.</p>' : "";
@@ -331,10 +377,20 @@
       '<label class="ee-active"><input type="checkbox" class="ee-active-cb" ' + (e.active === 0 ? "" : "checked") + " /> Active</label>" +
       '<button class="win-remove ee-remove" type="button" aria-label="Remove event type">✕</button>' +
       "</div>" +
+      hostsBlock(e) +
       '<div class="ee-questions"><div class="eeq-head">Custom questions asked when booking</div>' +
       '<div class="eeq-list">' + qs.map(questionEditorRow).join("") + "</div>" +
       '<button class="btn btn-ghost btn-sm add-question" type="button">+ Add question</button></div>' +
       "</div>";
+  }
+  function hostsBlock(e) {
+    var team = settings.team || [];
+    if (!team.length) return '<div class="ee-hosts"><div class="eeq-head">Hosts</div><p class="hint">Add team members in the Team section to enable round-robin. Unassigned events use the primary host.</p></div>';
+    var assigned = e.hosts || [];
+    var boxes = team.map(function (m) {
+      return '<label class="host-check"><input type="checkbox" class="ee-host" value="' + esc(m.id) + '"' + (assigned.indexOf(m.id) > -1 ? " checked" : "") + " /> " + esc(m.name) + "</label>";
+    }).join("");
+    return '<div class="ee-hosts"><div class="eeq-head">Hosts (round-robin — none = primary host)</div><div class="host-checks">' + boxes + "</div></div>";
   }
   function questionEditorRow(q) {
     q = q || { label: "", type: "text", required: false };
@@ -361,6 +417,8 @@
           if (!label) return;
           questions.push({ label: label, type: qr.querySelector(".q-type").value, required: qr.querySelector(".q-required").checked });
         });
+        var hosts = [];
+        rowEl.querySelectorAll(".ee-host:checked").forEach(function (cb) { hosts.push(cb.value); });
         list.push({
           id: rowEl.dataset.id || "",
           name: rowEl.querySelector(".ee-name").value.trim(),
@@ -368,7 +426,8 @@
           location: rowEl.querySelector(".ee-location").value.trim(),
           description: rowEl.querySelector(".ee-desc").value.trim(),
           active: rowEl.querySelector(".ee-active-cb").checked,
-          questions: questions
+          questions: questions,
+          hosts: hosts
         });
       });
       var note = root.querySelector("#eventsNote");
@@ -421,7 +480,7 @@
     var when = humanDate(b.date) + " · " + b.label;
     return '<tr data-id="' + esc(b.id) + '" class="' + (b.canceled ? "bk-canceled" : "") + '">' +
       "<td>" + esc(when) + "</td>" +
-      "<td>" + esc(b.eventName || b.event) + "</td>" +
+      "<td>" + esc(b.eventName || b.event) + (b.hostName && (settings.team || []).length ? '<br><span class="bk-email">' + esc(b.hostName) + "</span>" : "") + "</td>" +
       "<td>" + esc(b.name) + "<br><span class=\"bk-email\">" + esc(b.email) + "</span></td>" +
       "<td>" + (b.canceled ? '<span class="pill pill-off">Cancelled</span>' : '<span class="pill pill-on">Confirmed</span>') + "</td>" +
       "<td>" + (b.canceled ? "" : '<button class="btn btn-danger btn-sm bk-cancel" type="button">Cancel</button>') + "</td></tr>";

@@ -37,6 +37,9 @@ const DEFAULT_SETTINGS = {
   dailyCap: 0,         // max bookings per day (0 = unlimited)
   webhookUrl: "",      // POST booking events here (Slack/Zapier/etc.)
   webhookSecret: "",   // sent as X-Meetly-Secret so the receiver can verify
+  // Team members for round-robin / collective event types. Each is
+  // { id, name, initials, email }. Availability + timezone are shared.
+  team: [],
   // Date-specific exceptions keyed "YYYY-MM-DD". A value overrides that day's
   // weekly windows entirely; an empty array [] blocks the day (holiday/PTO).
   overrides: {},
@@ -67,7 +70,7 @@ export async function ensureMeetlySchema(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS meetly_event_types (" +
       "id TEXT PRIMARY KEY, name TEXT NOT NULL, duration INTEGER NOT NULL, " +
-      "description TEXT, location TEXT, sort INTEGER DEFAULT 0, active INTEGER DEFAULT 1, questions TEXT)"
+      "description TEXT, location TEXT, sort INTEGER DEFAULT 0, active INTEGER DEFAULT 1, questions TEXT, hosts TEXT)"
   ).run();
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS meetly_bookings (" +
@@ -75,13 +78,15 @@ export async function ensureMeetlySchema(env) {
       "email TEXT NOT NULL, notes TEXT, date TEXT NOT NULL, " +
       "start_min INTEGER NOT NULL, end_min INTEGER NOT NULL, tz TEXT, " +
       "created_at TEXT NOT NULL, canceled INTEGER DEFAULT 0, " +
-      "ip TEXT, reminded_24 INTEGER DEFAULT 0, reminded_1 INTEGER DEFAULT 0, answers TEXT)"
+      "ip TEXT, reminded_24 INTEGER DEFAULT 0, reminded_1 INTEGER DEFAULT 0, answers TEXT, host_id TEXT)"
   ).run();
   // Self-healing: add newer columns if an older table exists.
-  for (const col of ["ip TEXT", "reminded_24 INTEGER DEFAULT 0", "reminded_1 INTEGER DEFAULT 0", "answers TEXT"]) {
+  for (const col of ["ip TEXT", "reminded_24 INTEGER DEFAULT 0", "reminded_1 INTEGER DEFAULT 0", "answers TEXT", "host_id TEXT"]) {
     try { await env.DB.prepare("ALTER TABLE meetly_bookings ADD COLUMN " + col).run(); } catch (_) {}
   }
-  try { await env.DB.prepare("ALTER TABLE meetly_event_types ADD COLUMN questions TEXT").run(); } catch (_) {}
+  for (const col of ["questions TEXT", "hosts TEXT"]) {
+    try { await env.DB.prepare("ALTER TABLE meetly_event_types ADD COLUMN " + col).run(); } catch (_) {}
+  }
 
   const s = await env.DB.prepare("SELECT id FROM meetly_settings WHERE id = ?").bind(SETTINGS_ID).first();
   if (!s) {
@@ -114,6 +119,7 @@ async function readSettings(env) {
     dailyCap: s.dailyCap != null ? s.dailyCap : DEFAULT_SETTINGS.dailyCap,
     webhookUrl: s.webhookUrl || "",
     webhookSecret: s.webhookSecret || "",
+    team: Array.isArray(s.team) ? s.team : [],
     overrides: s.overrides && typeof s.overrides === "object" ? s.overrides : {},
     hours: s.hours || DEFAULT_SETTINGS.hours,
   };
@@ -130,9 +136,28 @@ function windowsFor(settings, date) {
 
 async function readEventTypes(env) {
   const { results } = await env.DB.prepare(
-    "SELECT id, name, duration, description, location, sort, questions FROM meetly_event_types WHERE active = 1 ORDER BY sort, name"
+    "SELECT id, name, duration, description, location, sort, questions, hosts FROM meetly_event_types WHERE active = 1 ORDER BY sort, name"
   ).all();
-  return (results || []).map((e) => ({ ...e, questions: parseQuestions(e.questions) }));
+  return (results || []).map((e) => ({ ...e, questions: parseQuestions(e.questions), hosts: parseJsonArray(e.hosts) }));
+}
+function parseJsonArray(s) {
+  try { const a = JSON.parse(s || "[]"); return Array.isArray(a) ? a : []; } catch (_) { return []; }
+}
+// The team members who can host an event type. Empty assignment (or no team)
+// falls back to the primary host as a single pseudo-member with id "".
+function eventMembers(settings, event) {
+  const team = settings.team || [];
+  const ids = event.hosts || [];
+  const members = ids.map((id) => team.find((m) => m.id === id)).filter(Boolean);
+  if (members.length) return members;
+  const h = settings.host || {};
+  return [{ id: "", name: h.name, initials: h.initials, email: h.email || "" }];
+}
+function memberById(settings, id) {
+  const h = settings.host || {};
+  if (!id) return { id: "", name: h.name, initials: h.initials, email: h.email || "" };
+  const m = (settings.team || []).find((x) => x.id === id);
+  return m || { id: "", name: h.name, initials: h.initials, email: h.email || "" };
 }
 function parseQuestions(s) {
   try { const a = JSON.parse(s || "[]"); return Array.isArray(a) ? a : []; } catch (_) { return []; }
@@ -151,6 +176,26 @@ function sanitizeQuestions(qs) {
   }
   return out;
 }
+function sanitizeTeam(team, fallback) {
+  if (!Array.isArray(team)) return fallback || [];
+  const out = [];
+  for (const m of team) {
+    const name = String((m && m.name) || "").trim().slice(0, 80);
+    if (!name) continue;
+    let initials = String((m && m.initials) || "").trim().slice(0, 3).toUpperCase();
+    if (!initials) initials = name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+    const emailRaw = String((m && m.email) || "").trim().slice(0, 160);
+    out.push({ id: String((m && m.id) || "").trim() || makeId("mem_"), name, initials, email: emailRaw && isEmail(emailRaw) ? emailRaw : "" });
+    if (out.length >= 25) break;
+  }
+  return out;
+}
+function sanitizeHosts(hosts) {
+  if (!Array.isArray(hosts)) return [];
+  const out = [];
+  for (const h of hosts) { const id = String(h || "").trim(); if (id && out.indexOf(id) === -1) out.push(id); }
+  return out;
+}
 
 // ---------------------------------------------------- slot computation -----
 // Pure function so it is unit-testable and identical to the browser copy.
@@ -164,6 +209,7 @@ export function computeSlots(settings, event, date, bookings, nowMs) {
   const tz = (settings.host && settings.host.timezone) || "America/New_York";
   const now = nowMs != null ? nowMs : Date.now();
   const dur = event.duration;
+  const members = eventMembers(settings, event);
   const taken = (bookings || []).filter((b) => !b.canceled);
   const out = [];
   for (const w of windows) {
@@ -172,8 +218,11 @@ export function computeSlots(settings, event, date, bookings, nowMs) {
     for (let m = startMin; m + dur <= endMin; m += step) {
       const s = m;
       const e = m + dur;
-      const clash = taken.some((b) => s < b.end_min + buffer && b.start_min - buffer < e);
-      if (clash) continue;
+      // Offered if at least one assigned member is free — no booking of theirs
+      // (matched by host_id) overlaps [s,e] expanded by the buffer.
+      const anyFree = members.some((mem) =>
+        !taken.some((b) => (b.host_id || "") === mem.id && s < b.end_min + buffer && b.start_min - buffer < e));
+      if (!anyFree) continue;
       // Minimum notice: the slot's real instant must be far enough ahead.
       if (minNotice > 0) {
         const instant = hostInstant(date, s, tz);
@@ -183,6 +232,19 @@ export function computeSlots(settings, event, date, bookings, nowMs) {
     }
   }
   return out;
+}
+// Choose which member gets a new booking: a free member, load-balanced
+// (fewest bookings that day), stable by team order on ties.
+export function assignMember(settings, event, start, end, dayBookings) {
+  const buffer = settings.buffer || 0;
+  const members = eventMembers(settings, event);
+  const taken = (dayBookings || []).filter((b) => !b.canceled);
+  const free = members.filter((mem) =>
+    !taken.some((b) => (b.host_id || "") === mem.id && start < b.end_min + buffer && b.start_min - buffer < end));
+  if (!free.length) return null;
+  const loadOf = (mem) => taken.filter((b) => (b.host_id || "") === mem.id).length;
+  free.sort((a, b) => loadOf(a) - loadOf(b));
+  return free[0];
 }
 
 // Is `date` within [today, today+horizon] in the host timezone?
@@ -332,31 +394,34 @@ async function sendWebhook(settings, type, booking, event) {
 }
 
 async function sendConfirmation(env, booking, settings, event) {
+  const assigned = memberById(settings, booking.host_id || "");
+  const hostName = assigned.name;
   const when = displayLine(booking, settings);
   const manage = baseUrl(env) + "/booking.html?manage=" + encodeURIComponent(booking.id);
   const ics = buildIcs({ ...booking, event_name: event.name, location: event.location }, settings, { stampMs: Date.now() });
   const icsB64 = b64(ics);
   const text =
     "Your meeting is booked.\n\n" +
-    event.name + " with " + settings.host.name + "\n" + when + "\n" +
+    event.name + " with " + hostName + "\n" + when + "\n" +
     (event.location ? event.location + "\n" : "") +
     "\nManage or cancel: " + manage + "\n";
   const html =
-    "<h2>You're booked</h2><p><strong>" + esc(event.name) + "</strong> with " + esc(settings.host.name) + "</p>" +
+    "<h2>You're booked</h2><p><strong>" + esc(event.name) + "</strong> with " + esc(hostName) + "</p>" +
     "<p>" + esc(when) + "<br>" + (event.location ? esc(event.location) : "") + "</p>" +
     '<p><a href="' + manage + '">Manage or cancel your booking</a></p>' +
     "<p>Added to your calendar? The invite is attached.</p>";
   const attachments = [{ filename: "meeting.ics", content: icsB64 }];
 
   // Invitee confirmation.
-  await resendSend(env, { from: MEETLY_FROM, to: [booking.email], subject: "Confirmed: " + event.name + " with " + settings.host.name, text, html, attachments });
-  // Host notification (if an address is set).
-  if (settings.host.email && isEmail(settings.host.email)) {
+  await resendSend(env, { from: MEETLY_FROM, to: [booking.email], subject: "Confirmed: " + event.name + " with " + hostName, text, html, attachments });
+  // Host notification — to the assigned member if they have an email, else the primary host.
+  const notifyEmail = (assigned.email && isEmail(assigned.email)) ? assigned.email : (settings.host.email && isEmail(settings.host.email) ? settings.host.email : "");
+  if (notifyEmail) {
     const ans = booking.answers && typeof booking.answers === "object" ? Object.entries(booking.answers) : [];
     const ansText = ans.length ? "\n" + ans.map(([k, v]) => k + ": " + v).join("\n") + "\n" : "";
     const ansHtml = ans.length ? "<ul>" + ans.map(([k, v]) => "<li><strong>" + esc(k) + ":</strong> " + esc(v) + "</li>").join("") + "</ul>" : "";
     await resendSend(env, {
-      from: MEETLY_FROM, to: [settings.host.email],
+      from: MEETLY_FROM, to: [notifyEmail],
       subject: "New booking: " + booking.name + " — " + event.name,
       text: booking.name + " (" + booking.email + ") booked " + event.name + "\n" + when + "\n" + (booking.notes ? "\nNotes: " + booking.notes + "\n" : "") + ansText + "\nManage: " + manage,
       html: "<p><strong>" + esc(booking.name) + "</strong> (" + esc(booking.email) + ") booked <strong>" + esc(event.name) + "</strong></p><p>" + esc(when) + "</p>" + (booking.notes ? "<p>Notes: " + esc(booking.notes) + "</p>" : "") + ansHtml,
@@ -466,7 +531,8 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     const events = await readEventTypes(env);
     // host.email is private — never exposed in the public config.
     const host = { name: settings.host.name, initials: settings.host.initials, title: settings.host.title, timezone: settings.host.timezone };
-    return json({ host, slotStep: settings.slotStep, buffer: settings.buffer, minNotice: settings.minNotice, horizonDays: settings.horizonDays, overrides: settings.overrides, events });
+    const team = (settings.team || []).map((m) => ({ id: m.id, name: m.name, initials: m.initials })); // no emails
+    return json({ host, team, slotStep: settings.slotStep, buffer: settings.buffer, minNotice: settings.minNotice, horizonDays: settings.horizonDays, overrides: settings.overrides, events });
   }
 
   // Host calendar subscription feed. Authenticated by a token in the URL
@@ -498,7 +564,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     if (!event) return json({ error: "Unknown event type." }, 404);
     if (!withinHorizon(date, settings)) return json({ date, event: event.id, slots: [] });
     const { results } = await env.DB.prepare(
-      "SELECT start_min, end_min, canceled FROM meetly_bookings WHERE date = ? AND canceled = 0"
+      "SELECT start_min, end_min, canceled, host_id FROM meetly_bookings WHERE date = ? AND canceled = 0"
     ).bind(date).all();
     if (settings.dailyCap > 0 && (results || []).length >= settings.dailyCap) {
       return json({ date, event: event.id, slots: [] });
@@ -553,27 +619,28 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     }
 
     const { results } = await env.DB.prepare(
-      "SELECT start_min, end_min, canceled FROM meetly_bookings WHERE date = ? AND canceled = 0"
+      "SELECT start_min, end_min, canceled, host_id FROM meetly_bookings WHERE date = ? AND canceled = 0"
     ).bind(date).all();
     if (settings.dailyCap > 0 && (results || []).length >= settings.dailyCap) {
       return json({ error: "No more bookings are available on that day." }, 409);
     }
-    const free = computeSlots(settings, event, date, results || []);
-    if (!free.some((s) => s.start === start)) {
+    const end = start + event.duration;
+    // Pick a free team member (round-robin). Null means no capacity left.
+    const member = assignMember(settings, event, start, end, results || []);
+    if (!member) {
       return json({ error: "That time is no longer available. Please pick another." }, 409);
     }
 
     const id = makeId("ml_");
-    const end = start + event.duration;
     const createdAt = new Date().toISOString();
     const answersJson = JSON.stringify(answers);
     await env.DB.prepare(
-      "INSERT INTO meetly_bookings (id, event_id, name, email, notes, date, start_min, end_min, tz, created_at, canceled, ip, answers) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)"
-    ).bind(id, event.id, name, email, notes, date, start, end, tz, createdAt, ip, answersJson).run();
+      "INSERT INTO meetly_bookings (id, event_id, name, email, notes, date, start_min, end_min, tz, created_at, canceled, ip, answers, host_id) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)"
+    ).bind(id, event.id, name, email, notes, date, start, end, tz, createdAt, ip, answersJson, member.id).run();
 
     // Fire-and-forget confirmation mail + webhook so neither blocks the response.
-    const bookingRow = { id, event_id: event.id, name, email, notes, date, start_min: start, end_min: end, tz, created_at: createdAt, answers };
+    const bookingRow = { id, event_id: event.id, name, email, notes, date, start_min: start, end_min: end, tz, created_at: createdAt, answers, host_id: member.id };
     const side = Promise.all([
       sendConfirmation(env, bookingRow, settings, event).catch(() => {}),
       sendWebhook(settings, "booking.created", bookingRow, event).catch(() => {}),
@@ -586,6 +653,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         id, event: event.id, eventName: event.name, duration: event.duration,
         location: event.location, name, email, notes, date, start, end,
         label: minutesLabel(start), tz, created_at: createdAt, answers,
+        host_id: member.id, hostName: member.name,
       },
     }, 201);
   }
@@ -594,7 +662,8 @@ export async function handleMeetlyApi(request, env, url, ctx) {
   if (mGet && method === "GET") {
     const row = await env.DB.prepare("SELECT * FROM meetly_bookings WHERE id = ?").bind(mGet[1]).first();
     if (!row) return json({ error: "No booking found with that code." }, 404);
-    return json({ booking: bookingOut(row) });
+    const settings = await readSettings(env);
+    return json({ booking: bookingOut(row, settings) });
   }
 
   const mCancel = path.match(/^\/api\/meetly\/bookings\/([^/]+)\/cancel$/);
@@ -628,9 +697,9 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     if (path === "/api/meetly/admin/settings" && method === "GET") {
       const settings = await readSettings(env);
       const { results } = await env.DB.prepare(
-        "SELECT id, name, duration, description, location, sort, active, questions FROM meetly_event_types ORDER BY sort, name"
+        "SELECT id, name, duration, description, location, sort, active, questions, hosts FROM meetly_event_types ORDER BY sort, name"
       ).all();
-      const evs = (results || []).map((e) => ({ ...e, questions: parseQuestions(e.questions) }));
+      const evs = (results || []).map((e) => ({ ...e, questions: parseQuestions(e.questions), hosts: parseJsonArray(e.hosts) }));
       return json({ settings, events: evs });
     }
 
@@ -646,6 +715,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         dailyCap: clampInt(body.dailyCap, 0, 100, current.dailyCap),
         webhookUrl: sanitizeUrl(body.webhookUrl, current.webhookUrl),
         webhookSecret: String(body.webhookSecret != null ? body.webhookSecret : current.webhookSecret || "").trim().slice(0, 200),
+        team: sanitizeTeam(body.team, current.team),
         overrides: sanitizeOverrides(body.overrides, current.overrides),
         hours: sanitizeHours(body.hours, current.hours),
       };
@@ -671,14 +741,15 @@ export async function handleMeetlyApi(request, env, url, ctx) {
           sort: i,
           active: e.active === false ? 0 : 1,
           questions: sanitizeQuestions(e.questions),
+          hosts: sanitizeHosts(e.hosts),
         });
       }
       if (!clean.length) return json({ error: "Keep at least one event type." }, 400);
       await env.DB.prepare("DELETE FROM meetly_event_types").run();
       for (const e of clean) {
         await env.DB.prepare(
-          "INSERT INTO meetly_event_types (id, name, duration, description, location, sort, active, questions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(e.id, e.name, e.duration, e.description, e.location, e.sort, e.active, JSON.stringify(e.questions)).run();
+          "INSERT INTO meetly_event_types (id, name, duration, description, location, sort, active, questions, hosts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(e.id, e.name, e.duration, e.description, e.location, e.sort, e.active, JSON.stringify(e.questions), JSON.stringify(e.hosts)).run();
       }
       return json({ ok: true, events: clean });
     }
@@ -689,7 +760,8 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         ? "SELECT * FROM meetly_bookings ORDER BY date DESC, start_min DESC"
         : "SELECT * FROM meetly_bookings WHERE canceled = 0 ORDER BY date DESC, start_min DESC";
       const { results } = await env.DB.prepare(q).all();
-      return json({ bookings: (results || []).map(bookingOut) });
+      const settings = await readSettings(env);
+      return json({ bookings: (results || []).map((row) => bookingOut(row, settings)) });
     }
 
     return json({ error: "Not found." }, 404);
@@ -698,12 +770,13 @@ export async function handleMeetlyApi(request, env, url, ctx) {
   return json({ error: "Not found." }, 404);
 }
 
-function bookingOut(row) {
+function bookingOut(row, settings) {
   return {
     id: row.id, event: row.event_id, name: row.name, email: row.email,
     notes: row.notes || "", date: row.date, start: row.start_min, end: row.end_min,
     label: minutesLabel(row.start_min), tz: row.tz || "", created_at: row.created_at,
     canceled: !!row.canceled, answers: parseAnswers(row.answers),
+    host_id: row.host_id || "", hostName: settings ? memberById(settings, row.host_id || "").name : undefined,
   };
 }
 

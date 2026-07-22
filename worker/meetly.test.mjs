@@ -22,7 +22,7 @@ function makeDb() {
 
     if (/SELECT id FROM meetly_event_types LIMIT 1/.test(sql)) return { _first: state.events[0] || null };
     if (/INSERT INTO meetly_event_types/.test(sql)) {
-      state.events.push({ id: a[0], name: a[1], duration: a[2], description: a[3], location: a[4], sort: a[5], active: a[6] === undefined ? 1 : a[6], questions: a[7] });
+      state.events.push({ id: a[0], name: a[1], duration: a[2], description: a[3], location: a[4], sort: a[5], active: a[6] === undefined ? 1 : a[6], questions: a[7], hosts: a[8] });
       return { _run: { meta: { changes: 1 } } };
     }
     if (/DELETE FROM meetly_event_types/.test(sql)) { const n = state.events.length; state.events = []; return { _run: { meta: { changes: n } } }; }
@@ -32,14 +32,14 @@ function makeDb() {
       return { _all: [...state.events].sort(bySort) };
 
     if (/INSERT INTO meetly_bookings/.test(sql)) {
-      state.bookings.push({ id: a[0], event_id: a[1], name: a[2], email: a[3], notes: a[4], date: a[5], start_min: a[6], end_min: a[7], tz: a[8], created_at: a[9], canceled: 0, ip: a[10], reminded_24: 0, reminded_1: 0, answers: a[11] });
+      state.bookings.push({ id: a[0], event_id: a[1], name: a[2], email: a[3], notes: a[4], date: a[5], start_min: a[6], end_min: a[7], tz: a[8], created_at: a[9], canceled: 0, ip: a[10], reminded_24: 0, reminded_1: 0, answers: a[11], host_id: a[12] });
       return { _run: { meta: { changes: 1 } } };
     }
     if (/SELECT COUNT\(\*\) AS n FROM meetly_bookings WHERE ip = \? AND created_at > \?/.test(sql)) {
       const n = state.bookings.filter((b) => b.ip === a[0] && b.created_at > a[1]).length;
       return { _first: { n } };
     }
-    if (/SELECT start_min, end_min, canceled FROM meetly_bookings.*date = \?/s.test(sql))
+    if (/FROM meetly_bookings WHERE date = \? AND canceled = 0/.test(sql))
       return { _all: state.bookings.filter((b) => b.date === a[0] && b.canceled === 0) };
     if (/UPDATE meetly_bookings SET canceled = 1 WHERE id = \? AND canceled = 0/.test(sql)) {
       const b = state.bookings.find((x) => x.id === a[0] && x.canceled === 0);
@@ -239,6 +239,30 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   await call(env8, "POST", "/api/meetly/bookings/" + r.data.booking.id + "/cancel");
   ok(hookCalls.some((c) => c.body.type === "booking.cancelled"), "webhook fired on booking.cancelled");
   globalThis.fetch = realFetch2;
+
+  // --- round-robin / multi-host ---
+  const rr = makeDb(); const env9 = { DB: rr.DB, MEETLY_ADMIN_TOKEN: "t" };
+  seed(rr.state);
+  await call(env9, "PUT", "/api/meetly/admin/settings", { token: "t", body: { team: [{ name: "Ada Lovelace" }, { name: "Ben Reed" }] } });
+  const cfgA = (await call(env9, "GET", "/api/meetly/admin/settings", { token: "t" })).data;
+  const ada = cfgA.settings.team[0], ben = cfgA.settings.team[1];
+  ok(ada.id && ben.id && ada.initials === "AL", "team members created with ids + initials");
+  await call(env9, "PUT", "/api/meetly/admin/events", { token: "t", body: { events: [{ id: "meeting-30", name: "30 Minute Meeting", duration: 30, hosts: [ada.id, ben.id] }] } });
+  r = await call(env9, "GET", "/api/meetly/config");
+  ok(r.data.team.length === 2 && r.data.team[0].email === undefined, "config exposes team without emails");
+  const rslots = (await call(env9, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON)).data.slots;
+  const st = rslots[0].start;
+  const rb1 = await call(env9, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: st, name: "C1", email: "c1@x.com" } });
+  const rb2 = await call(env9, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: st, name: "C2", email: "c2@x.com" } });
+  ok(rb1.status === 201 && rb2.status === 201, "two members -> two concurrent bookings at one slot");
+  ok(rb1.data.booking.host_id !== rb2.data.booking.host_id, "round-robin assigns different members");
+  ok([ada.name, ben.name].indexOf(rb1.data.booking.hostName) > -1, "booking carries assigned host name");
+  const rb3 = await call(env9, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: st, name: "C3", email: "c3@x.com" } });
+  ok(rb3.status === 409, "third booking at full slot -> 409 (capacity 2)");
+  r = await call(env9, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON);
+  ok(!r.data.slots.some((x) => x.start === st), "full slot removed from availability");
+  const otherStart = rslots[1].start;
+  ok(r.data.slots.some((x) => x.start === otherStart), "other slots still available");
 
   // --- .ics generation ---
   const ics = buildIcs({ id: "ml_x", event_id: "meeting-30", event_name: "30 Minute Meeting", date: MON, start_min: 540, end_min: 570, location: "Zoom" }, { host: { name: "Alex Lark", timezone: "America/New_York" } });
