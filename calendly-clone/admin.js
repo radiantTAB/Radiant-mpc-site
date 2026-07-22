@@ -88,12 +88,13 @@
       summarySection(bookings) +
       hostSection() +
       rulesSection() +
+      integrationsSection() +
       availabilitySection() +
       overridesSection() +
       eventsSection() +
       bookingsSection(bookings) +
       "</div>";
-    wireHost(); wireRules(); wireAvailability(); wireOverrides(); wireEvents(); wireBookings(bookings);
+    wireHost(); wireRules(); wireIntegrations(); wireAvailability(); wireOverrides(); wireEvents(); wireBookings(bookings);
   }
 
   // ---- summary / analytics (computed client-side from the bookings list) ----
@@ -236,6 +237,25 @@
         dailyCap: parseInt(val("rule-cap"), 10)
       });
       saveSettings(next, "rulesNote");
+    });
+  }
+
+  // ---- integrations (webhook) ----
+  function integrationsSection() {
+    var localNote = store.mode === "local" ? '<p class="hint">Webhooks only fire from the deployed backend, not in this local browser mode.</p>' : "";
+    return card("Integrations", "🔌",
+      '<p class="hint">POST a JSON payload to this URL when a booking is created or cancelled (Slack, Zapier, Make, your own endpoint…).</p>' +
+      inp("wh-url", "Webhook URL", settings.webhookUrl || "", "https://… — leave blank to disable") +
+      inp("wh-secret", "Signing secret", settings.webhookSecret || "", "Sent as the X-Meetly-Secret header (optional)") +
+      localNote +
+      '<div class="card-actions"><button class="btn btn-primary" id="saveIntegrations">Save integrations</button>' +
+      '<span class="save-note" id="intNote"></span></div>'
+    );
+  }
+  function wireIntegrations() {
+    root.querySelector("#saveIntegrations").addEventListener("click", function () {
+      var next = Object.assign({}, settings, { webhookUrl: val("wh-url"), webhookSecret: val("wh-secret") });
+      saveSettings(next, "intNote");
     });
   }
 

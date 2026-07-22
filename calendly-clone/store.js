@@ -28,6 +28,8 @@
     minNotice: 120,
     horizonDays: 60,
     dailyCap: 0,
+    webhookUrl: "",
+    webhookSecret: "",
     overrides: {},
     hours: { 0: [], 1: [[9, 12], [13, 17]], 2: [[9, 12], [13, 17]], 3: [[9, 12], [13, 17]], 4: [[9, 12], [13, 17]], 5: [[9, 12], [13, 16]], 6: [] }
   };
@@ -291,9 +293,16 @@
       minNotice: clampInt(body.minNotice, 0, 43200, current.minNotice),
       horizonDays: clampInt(body.horizonDays, 1, 730, current.horizonDays),
       dailyCap: clampInt(body.dailyCap, 0, 100, current.dailyCap),
+      webhookUrl: sanitizeUrl(body.webhookUrl, current.webhookUrl),
+      webhookSecret: String(body.webhookSecret != null ? body.webhookSecret : current.webhookSecret || "").trim().slice(0, 200),
       overrides: sanitizeOverrides(body.overrides, current.overrides),
       hours: hours
     };
+  }
+  function sanitizeUrl(v, fallback) {
+    var s = String(v != null ? v : "").trim().slice(0, 500);
+    if (!s) return v != null ? "" : (fallback || "");
+    return /^https?:\/\//i.test(s) ? s : (fallback || "");
   }
   function sanitizeOverrides(ov, fallback) {
     if (!ov || typeof ov !== "object") return fallback || {};

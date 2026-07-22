@@ -63,6 +63,23 @@ token is passed in the URL (calendar clients can't send auth headers), so treat
 the whole URL as a secret. The admin console shows the ready-made URL with a
 copy button when running against the deployed backend.
 
+### Webhooks
+
+Set a **webhook URL** in the admin Integrations card and Meetly will POST a JSON
+payload there whenever a booking is **created** or **cancelled** — for Slack,
+Zapier, Make, or your own endpoint. An optional signing secret is sent as the
+`X-Meetly-Secret` header so the receiver can verify it. Payload shape:
+
+```json
+{ "type": "booking.created",
+  "booking": { "id": "ml_…", "event": "meeting-30", "eventName": "30 Minute Meeting",
+    "name": "…", "email": "…", "date": "2026-08-03", "start": 540, "end": 570,
+    "tz": "…", "notes": "…", "answers": { "Topic": "…" } } }
+```
+
+Webhooks fire from the deployed Worker only (fire-and-forget, failures logged,
+never block a booking); local browser mode stores the setting but doesn't send.
+
 ### Custom questions per event type
 
 Each event type can define extra **questions** asked at booking time (short or

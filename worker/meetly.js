@@ -35,6 +35,8 @@ const DEFAULT_SETTINGS = {
   minNotice: 120,      // earliest a slot may be booked, minutes from now
   horizonDays: 60,     // furthest ahead a date may be booked
   dailyCap: 0,         // max bookings per day (0 = unlimited)
+  webhookUrl: "",      // POST booking events here (Slack/Zapier/etc.)
+  webhookSecret: "",   // sent as X-Meetly-Secret so the receiver can verify
   // Date-specific exceptions keyed "YYYY-MM-DD". A value overrides that day's
   // weekly windows entirely; an empty array [] blocks the day (holiday/PTO).
   overrides: {},
@@ -110,6 +112,8 @@ async function readSettings(env) {
     minNotice: s.minNotice != null ? s.minNotice : DEFAULT_SETTINGS.minNotice,
     horizonDays: s.horizonDays != null ? s.horizonDays : DEFAULT_SETTINGS.horizonDays,
     dailyCap: s.dailyCap != null ? s.dailyCap : DEFAULT_SETTINGS.dailyCap,
+    webhookUrl: s.webhookUrl || "",
+    webhookSecret: s.webhookSecret || "",
     overrides: s.overrides && typeof s.overrides === "object" ? s.overrides : {},
     hours: s.hours || DEFAULT_SETTINGS.hours,
   };
@@ -303,6 +307,29 @@ async function resendSend(env, payload) {
 }
 
 function baseUrl(env) { return env.MEETLY_BASE_URL || "https://radiant-mpc.com/calendly-clone"; }
+
+// Fire an outbound webhook for a booking lifecycle event. Fire-and-forget;
+// failures are logged, never surfaced to the booker.
+async function sendWebhook(settings, type, booking, event) {
+  const urlStr = settings.webhookUrl;
+  if (!urlStr || !/^https?:\/\//i.test(urlStr)) return { skipped: true };
+  const payload = {
+    type, // "booking.created" | "booking.cancelled"
+    booking: {
+      id: booking.id, event: booking.event_id, eventName: (event && event.name) || booking.event_id,
+      name: booking.name, email: booking.email, date: booking.date,
+      start: booking.start_min, end: booking.end_min, tz: booking.tz || "",
+      notes: booking.notes || "", answers: booking.answers || {},
+    },
+  };
+  const headers = { "content-type": "application/json", "user-agent": "Meetly-Webhook" };
+  if (settings.webhookSecret) headers["x-meetly-secret"] = settings.webhookSecret;
+  try {
+    const res = await fetch(urlStr, { method: "POST", headers, body: JSON.stringify(payload) });
+    if (!res.ok) console.error("meetly webhook non-2xx:", res.status);
+    return { ok: res.ok };
+  } catch (err) { console.error("meetly webhook error:", String((err && err.message) || err)); return { ok: false }; }
+}
 
 async function sendConfirmation(env, booking, settings, event) {
   const when = displayLine(booking, settings);
@@ -545,10 +572,13 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)"
     ).bind(id, event.id, name, email, notes, date, start, end, tz, createdAt, ip, answersJson).run();
 
-    // Fire-and-forget confirmation mail so it never blocks the response.
+    // Fire-and-forget confirmation mail + webhook so neither blocks the response.
     const bookingRow = { id, event_id: event.id, name, email, notes, date, start_min: start, end_min: end, tz, created_at: createdAt, answers };
-    const mail = sendConfirmation(env, bookingRow, settings, event);
-    if (ctx && ctx.waitUntil) ctx.waitUntil(mail); else await mail.catch(() => {});
+    const side = Promise.all([
+      sendConfirmation(env, bookingRow, settings, event).catch(() => {}),
+      sendWebhook(settings, "booking.created", bookingRow, event).catch(() => {}),
+    ]);
+    if (ctx && ctx.waitUntil) ctx.waitUntil(side); else await side;
 
     return json({
       ok: true,
@@ -578,6 +608,16 @@ export async function handleMeetlyApi(request, env, url, ctx) {
       if (!exists) return json({ error: "No booking found with that code." }, 404);
       return json({ ok: true, id: mCancel[1], canceled: true, already: true });
     }
+    // Notify the webhook (if configured) that a booking was cancelled.
+    const settings = await readSettings(env);
+    if (settings.webhookUrl) {
+      const row = await env.DB.prepare("SELECT * FROM meetly_bookings WHERE id = ?").bind(mCancel[1]).first();
+      if (row) {
+        row.answers = parseAnswers(row.answers);
+        const hook = sendWebhook(settings, "booking.cancelled", row, null);
+        if (ctx && ctx.waitUntil) ctx.waitUntil(hook); else await hook.catch(() => {});
+      }
+    }
     return json({ ok: true, id: mCancel[1], canceled: true });
   }
 
@@ -604,6 +644,8 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         minNotice: clampInt(body.minNotice, 0, 43200, current.minNotice),
         horizonDays: clampInt(body.horizonDays, 1, 730, current.horizonDays),
         dailyCap: clampInt(body.dailyCap, 0, 100, current.dailyCap),
+        webhookUrl: sanitizeUrl(body.webhookUrl, current.webhookUrl),
+        webhookSecret: String(body.webhookSecret != null ? body.webhookSecret : current.webhookSecret || "").trim().slice(0, 200),
         overrides: sanitizeOverrides(body.overrides, current.overrides),
         hours: sanitizeHours(body.hours, current.hours),
       };
@@ -674,6 +716,11 @@ function sanitizeHost(host, fallback) {
   const emailRaw = String(host.email || "").trim().slice(0, 160);
   const email = emailRaw && isEmail(emailRaw) ? emailRaw : "";
   return { name, initials, title: String(host.title || fallback.title || "").trim().slice(0, 120), timezone, email };
+}
+function sanitizeUrl(v, fallback) {
+  const s = String(v != null ? v : "").trim().slice(0, 500);
+  if (!s) return v != null ? "" : (fallback || ""); // explicit empty clears it
+  return /^https?:\/\//i.test(s) ? s : (fallback || "");
 }
 function sanitizeOverrides(ov, fallback) {
   if (!ov || typeof ov !== "object") return fallback || {};
