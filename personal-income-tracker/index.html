@@ -122,6 +122,28 @@ table.grid td.runtot{font-family:var(--font-mono);color:var(--text-mute);backgro
 table.edit input{width:88px;text-align:right;font-family:var(--font-mono);font-size:13px;border:1px solid transparent;background:transparent;padding:4px 6px;border-radius:5px}
 table.edit input:hover{border-color:var(--line)}
 table.edit input:focus{border-color:var(--accent);background:#fff}
+/* Tabs */
+.tabbar{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:24px;flex-wrap:wrap}
+.tabbtn{font:inherit;font-weight:700;font-size:14px;cursor:pointer;background:transparent;border:none;padding:11px 18px;color:var(--text-mute);border-bottom:3px solid transparent;margin-bottom:-2px;display:inline-flex;align-items:center;gap:8px}
+.tabbtn:hover{color:var(--text)}
+.tabbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tabbtn .ic{width:17px;height:17px}
+.tabpane[hidden]{display:none}
+.subhead{font-family:var(--font-display);font-weight:700;font-size:17px;margin:6px 0 12px}
+.pp-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:14px 0}
+.pp-cell{background:var(--bg-card);border:1px solid var(--line);border-radius:9px;padding:12px 14px;text-align:center}
+.pp-cell .k{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)}
+.pp-cell .v{font-family:var(--font-display);font-weight:800;font-size:20px;margin-top:3px}
+.pp-cell.grand{border-top:3px solid var(--accent)}
+table.kt input,table.kt select{width:100%;font:inherit;font-size:13px;border:1px solid transparent;background:transparent;padding:5px 6px;border-radius:5px;font-family:var(--font-mono)}
+table.kt input:hover,table.kt select:hover{border-color:var(--line)}
+table.kt input:focus,table.kt select:focus{border-color:var(--accent);background:#fff;outline:none}
+table.kt td,table.kt th{text-align:center}
+table.kt th:first-child,table.kt td:first-child{text-align:left}
+.cc-gk{color:var(--accent);font-weight:600}.cc-ro{color:#1666c4;font-weight:600}
+.plan-card{background:var(--bg-card);border:1px solid var(--line);border-left:3px solid var(--accent-warm);border-radius:10px;padding:20px 24px;margin-bottom:16px}
+.plan-card h4{font-family:var(--font-display);font-size:15px;margin-bottom:8px}
+.plan-card ul{margin:8px 0 0 20px;font-size:14px;color:var(--text-mute);line-height:1.7}
 .footer{padding:30px var(--pad-x);border-top:1px solid var(--line);background:var(--bg-elev);color:var(--text-dim);font-size:13px;position:relative;z-index:2}
 .footer-inner{max-width:var(--max-w);margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
 @media(max-width:720px){.brand-name{font-size:16px}}
@@ -160,6 +182,13 @@ table.edit input:focus{border-color:var(--accent);background:#fff}
 <main class="wrap">
   <div class="banner" id="storageWarn"></div>
 
+  <div class="tabbar" id="tabbar">
+    <button class="tabbtn active" data-tab="income"><svg class="ic"><use href="#i-chart"/></svg>Income</button>
+    <button class="tabbtn" data-tab="kettering"><svg class="ic"><use href="#i-cal"/></svg>Kettering detail</button>
+    <button class="tabbtn" data-tab="dp"><svg class="ic"><use href="#i-grid"/></svg>DP PRN Log</button>
+  </div>
+
+  <div id="tab-income" class="tabpane">
   <div class="toolbar">
     <label class="fld">Year <select id="yearSel"></select></label>
     <button class="btn btn-sm" id="addYearBtn"><svg class="ic"><use href="#i-plus"/></svg>Year</button>
@@ -209,6 +238,55 @@ table.edit input:focus{border-color:var(--accent);background:#fff}
     <div class="section-title"><svg class="ic"><use href="#i-sites"/></svg>Sites &amp; rates</div>
     <div id="sitesManager"></div>
   </section>
+  </div><!-- /tab-income -->
+
+  <!-- ===== KETTERING DETAIL ===== -->
+  <div id="tab-kettering" class="tabpane" hidden>
+
+    <section class="section">
+      <div class="section-title"><svg class="ic"><use href="#i-cal"/></svg>Timeclock &amp; pay periods</div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <label class="fld">Pay period <select id="ppSel"></select></label>
+        <button class="btn btn-sm" id="addPPBtn"><svg class="ic"><use href="#i-plus"/></svg>New pay period</button>
+        <button class="btn btn-sm" id="delPPBtn">Delete period</button>
+        <div class="spacer"></div>
+        <button class="btn btn-sm" id="addEntryBtn"><svg class="ic"><use href="#i-plus"/></svg>Add entry</button>
+      </div>
+      <div class="tbl-scroll"><table class="kt" id="ppTable"><thead></thead><tbody></tbody></table></div>
+      <div class="pp-summary" id="ppSummary"></div>
+      <p class="hint">Each entry: date, clock in/out (hours auto-calc), and cost center GK or RO. Week 1 = the pay-period start week; week 2 = the following week. Totals split GK/RO per week, matching the KMC pay-period sheet.</p>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><svg class="ic"><use href="#i-chart"/></svg>RadOnc charts by day &amp; Gamma Knife Co-Reg</div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <label class="fld">Week ending <input type="date" id="ktNewWeek"></label>
+        <button class="btn btn-sm" id="ktAddWeekBtn"><svg class="ic"><use href="#i-plus"/></svg>Add week</button>
+        <button class="btn btn-sm" id="ktNextWeekBtn">+7 days</button>
+      </div>
+      <div class="tbl-scroll"><table class="kt" id="ktWeekTable"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+      <p class="hint">RO charts are bucketed Sun/Mon · Tue · Wed · Thu · Fri/Sat (weekly total auto-sums). The footer shows season totals and per-day averages across the weeks recorded — like the "Kettering Charts" block on your sheet.</p>
+    </section>
+
+  </div><!-- /tab-kettering -->
+
+  <!-- ===== DP PRN LOG (plan) ===== -->
+  <div id="tab-dp" class="tabpane" hidden>
+    <section class="section">
+      <div class="section-title"><svg class="ic"><use href="#i-grid"/></svg>DP PRN Log — planned</div>
+      <div class="plan-card">
+        <h4>Two weekly logs: OnSite (Dayton Physicians) &amp; Remote</h4>
+        <p class="hint" style="margin-bottom:6px">A toggle at the top switches between the two logs; each is saved per week and you can page back through weeks.</p>
+        <ul>
+          <li><strong>Per-day columns</strong> Mon–Sun, each with the task rows from your sheet: Weekly Closeout, Fusions, SPC, Peer (Plans), IMRT QA (Plans / Analyze / Upload), Plan Checks, SRS/SBRT Plan Reviews, and Hours.</li>
+          <li><strong>Free-text box under each day's column</strong> to type anything you did that isn't captured by the task rows.</li>
+          <li><strong>Totals by Location</strong> grid at the bottom — MVN, GDCC, AMC, MVHS, UVMC (<strong>WCC removed</strong>) × Mon–Sun, with per-day and grand totals, plus the weekly Total Hours.</li>
+          <li>Saved weekly in this file (Backup/Restore includes them); Export CSV per log.</li>
+        </ul>
+      </div>
+      <p class="hint">Confirm this layout and I'll build it into this tab next.</p>
+    </section>
+  </div><!-- /tab-dp -->
 </main>
 
 <!-- Site modal -->
@@ -278,10 +356,10 @@ function seedDB(){
     '2026':{'DP-R':35.83,'DP-OS':112.5,'K-GK':7.22,'K-RO':9.37,'OMPC-OS':474.72,'OMPC-R':392.5}
   }};
   var projYear={'2022':446079.96,'2023':655226,'2024':577119.01,'2025':616608.03};
-  return {version:2,sites:sites,weeks:[],yoy:yoy,projYear:projYear};
+  return {version:2,sites:sites,weeks:[],yoy:yoy,projYear:projYear,kettering:{payPeriods:[],weeks:[]}};
 }
 function loadDB(){
-  try{var raw=localStorage.getItem(STORE_KEY);if(raw){var d=JSON.parse(raw);if(d&&Array.isArray(d.sites)&&Array.isArray(d.weeks)){d.yoy=d.yoy||{cols:[],rows:{}};d.projYear=d.projYear||{};return d;}}}catch(e){}
+  try{var raw=localStorage.getItem(STORE_KEY);if(raw){var d=JSON.parse(raw);if(d&&Array.isArray(d.sites)&&Array.isArray(d.weeks)){d.yoy=d.yoy||{cols:[],rows:{}};d.projYear=d.projYear||{};d.kettering=d.kettering||{payPeriods:[],weeks:[]};return d;}}}catch(e){}
   return seedDB();
 }
 function saveDB(){try{localStorage.setItem(STORE_KEY,JSON.stringify(DB));persistOK=true;}catch(e){persistOK=false;}updateStorageWarn();}
@@ -569,9 +647,124 @@ document.querySelectorAll('[data-close]').forEach(function(b){b.addEventListener
 function download(name,text,mime){var blob=new Blob([text],{type:mime||'text/plain'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},100);}
 document.getElementById('backupBtn').addEventListener('click',function(){download('income-tracker-backup-'+todayISO()+'.json',JSON.stringify({app:'income-tracker',version:DB.version||2,exported:new Date().toISOString(),data:DB},null,2),'application/json');toast('Backup downloaded');});
 document.getElementById('restoreBtn').addEventListener('click',function(){document.getElementById('restoreFile').click();});
-document.getElementById('restoreFile').addEventListener('change',function(e){var file=e.target.files&&e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(){try{var parsed=JSON.parse(reader.result);var incoming=parsed&&parsed.data?parsed.data:parsed;if(!incoming||!Array.isArray(incoming.sites)||!Array.isArray(incoming.weeks))throw new Error('bad');if(!confirm('Restore will REPLACE all current data ('+incoming.sites.length+' sites, '+incoming.weeks.length+' week entries). Continue?'))return;DB={version:incoming.version||2,sites:incoming.sites,weeks:incoming.weeks,yoy:incoming.yoy||{cols:[],rows:{}},projYear:incoming.projYear||{}};saveDB();renderAll();toast('Data restored');}catch(err){alert('That file could not be read as an Income Tracker backup.');}finally{e.target.value='';}};reader.readAsText(file);});
+document.getElementById('restoreFile').addEventListener('change',function(e){var file=e.target.files&&e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(){try{var parsed=JSON.parse(reader.result);var incoming=parsed&&parsed.data?parsed.data:parsed;if(!incoming||!Array.isArray(incoming.sites)||!Array.isArray(incoming.weeks))throw new Error('bad');if(!confirm('Restore will REPLACE all current data ('+incoming.sites.length+' sites, '+incoming.weeks.length+' week entries). Continue?'))return;DB={version:incoming.version||2,sites:incoming.sites,weeks:incoming.weeks,yoy:incoming.yoy||{cols:[],rows:{}},projYear:incoming.projYear||{},kettering:incoming.kettering||{payPeriods:[],weeks:[]}};saveDB();renderAll();toast('Data restored');}catch(err){alert('That file could not be read as an Income Tracker backup.');}finally{e.target.value='';}};reader.readAsText(file);});
 function csvCell(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 document.getElementById('csvBtn').addEventListener('click',function(){if(!DB.weeks.length){toast('Nothing to export yet');return;}var rows=[['Site','Week ending','Year','Hours','Income']];DB.weeks.slice().sort(function(a,b){return a.week_ending<b.week_ending?-1:1;}).forEach(function(w){var s=DB.sites.find(function(x){return x.id===w.site_id;});rows.push([s?s.name:w.site_id,w.week_ending,yearOf(w),w.hours,w.income]);});download('income-tracker-'+todayISO()+'.csv',rows.map(function(r){return r.map(csvCell).join(',');}).join('\n'),'text/csv');toast('CSV exported');});
+
+// =====================================================================
+//  Tabs
+// =====================================================================
+function switchTab(name){
+  document.querySelectorAll('.tabbtn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===name);});
+  ['income','kettering','dp'].forEach(function(t){document.getElementById('tab-'+t).hidden=(t!==name);});
+  if(name==='kettering')renderKettering();
+}
+document.querySelectorAll('.tabbtn').forEach(function(b){b.addEventListener('click',function(){switchTab(b.getAttribute('data-tab'));});});
+
+// =====================================================================
+//  Kettering detail — timeclock pay periods + RO charts / GK Co-Reg
+// =====================================================================
+function ktEnsure(){DB.kettering=DB.kettering||{payPeriods:[],weeks:[]};DB.kettering.payPeriods=DB.kettering.payPeriods||[];DB.kettering.weeks=DB.kettering.weeks||[];}
+// Hours between two 'HH:MM' clock strings; wraps past midnight if out<in.
+function clockHours(inT,outT){
+  if(!inT||!outT)return 0;
+  var a=inT.split(':'),b=outT.split(':');
+  if(a.length<2||b.length<2)return 0;
+  var m1=(+a[0])*60+(+a[1]),m2=(+b[0])*60+(+b[1]);
+  var d=m2-m1;if(d<0)d+=1440;
+  return Math.round((d/60)*100)/100;
+}
+function daysBetween(a,b){return Math.floor((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);}
+function ppLabel(pp){
+  if(!pp.start)return 'Pay period';
+  var end=new Date(pp.start+'T00:00:00');end.setDate(end.getDate()+13);
+  return pp.start+' → '+end.toISOString().slice(0,10);
+}
+function ppSummary(pp){
+  var s={gk1:0,ro1:0,gk2:0,ro2:0};
+  (pp.entries||[]).forEach(function(e){
+    var h=clockHours(e.start,e.stop);
+    var wk=(pp.start&&e.date&&daysBetween(pp.start,e.date)>=7)?2:1;
+    var cc=(e.cc==='RO')?'ro':'gk';
+    s[cc+wk]+=h;
+  });
+  s.gkTot=s.gk1+s.gk2;s.roTot=s.ro1+s.ro2;s.grand=s.gkTot+s.roTot;
+  return s;
+}
+// ---- mutations ----
+function ktAddPP(start){ktEnsure();var pp={id:newId(),start:start,entries:[]};DB.kettering.payPeriods.push(pp);saveDB();return pp.id;}
+function ktDelPP(id){ktEnsure();DB.kettering.payPeriods=DB.kettering.payPeriods.filter(function(p){return p.id!==id;});saveDB();}
+function ktActivePP(){ktEnsure();var pps=DB.kettering.payPeriods;if(!pps.length)return null;var found=pps.filter(function(p){return p.id===S.ktPP;})[0];return found||pps[pps.length-1];}
+function ktAddEntry(ppId){var pp=DB.kettering.payPeriods.filter(function(p){return p.id===ppId;})[0];if(!pp)return;pp.entries.push({id:newId(),date:pp.start||todayISO(),start:'',stop:'',cc:'GK'});saveDB();}
+function ktUpdEntry(ppId,eId,field,val){var pp=DB.kettering.payPeriods.filter(function(p){return p.id===ppId;})[0];if(!pp)return;var e=pp.entries.filter(function(x){return x.id===eId;})[0];if(e){e[field]=val;saveDB();}}
+function ktDelEntry(ppId,eId){var pp=DB.kettering.payPeriods.filter(function(p){return p.id===ppId;})[0];if(!pp)return;pp.entries=pp.entries.filter(function(x){return x.id!==eId;});saveDB();}
+function ktAddWeek(date){ktEnsure();if(DB.kettering.weeks.some(function(w){return w.week_ending===date;}))return;DB.kettering.weeks.push({id:newId(),week_ending:date,gk_hours:0,coreg:0,ro_hours:0,sunmon:0,tue:0,wed:0,thu:0,frisat:0,qc:0});saveDB();}
+function ktUpdWeek(id,field,val){ktEnsure();var w=DB.kettering.weeks.filter(function(x){return x.id===id;})[0];if(w){w[field]=val;saveDB();}}
+function ktDelWeek(id){ktEnsure();DB.kettering.weeks=DB.kettering.weeks.filter(function(x){return x.id!==id;});saveDB();}
+function chartsTot(w){return num(w.sunmon)+num(w.tue)+num(w.wed)+num(w.thu)+num(w.frisat);}
+
+// ---- render ----
+function renderKettering(){ktEnsure();renderPPSelect();renderPPTable();renderPPSummary();renderKtWeeks();}
+function renderPPSelect(){
+  var sel=document.getElementById('ppSel');var pps=DB.kettering.payPeriods;
+  var act=ktActivePP();S.ktPP=act?act.id:null;
+  sel.innerHTML=pps.length?pps.map(function(p){return '<option value="'+p.id+'"'+(act&&p.id===act.id?' selected':'')+'>'+esc(ppLabel(p))+'</option>';}).join(''):'<option value="">— none —</option>';
+}
+function renderPPTable(){
+  var t=document.getElementById('ppTable');var pp=ktActivePP();
+  if(!pp){t.querySelector('thead').innerHTML='';t.querySelector('tbody').innerHTML='<tr><td class="empty">No pay period. Click &ldquo;New pay period&rdquo;.</td></tr>';return;}
+  t.querySelector('thead').innerHTML='<tr><th style="width:130px">Date</th><th>Clock in</th><th>Clock out</th><th>Hours</th><th>Wk</th><th>Cost center</th><th></th></tr>';
+  var rows=(pp.entries||[]).slice().sort(function(a,b){return (a.date||'')<(b.date||'')?-1:1;}).map(function(e){
+    var h=clockHours(e.start,e.stop);
+    var wk=(pp.start&&e.date&&daysBetween(pp.start,e.date)>=7)?2:1;
+    return '<tr>'+
+      '<td><input type="date" data-e="'+e.id+'" data-f="date" value="'+(e.date||'')+'"></td>'+
+      '<td><input type="time" data-e="'+e.id+'" data-f="start" value="'+(e.start||'')+'"></td>'+
+      '<td><input type="time" data-e="'+e.id+'" data-f="stop" value="'+(e.stop||'')+'"></td>'+
+      '<td class="num">'+nf(h,2)+'</td>'+
+      '<td class="num muted">'+wk+'</td>'+
+      '<td><select data-e="'+e.id+'" data-f="cc" class="'+(e.cc==='RO'?'cc-ro':'cc-gk')+'"><option value="GK"'+(e.cc!=='RO'?' selected':'')+'>GK</option><option value="RO"'+(e.cc==='RO'?' selected':'')+'>RO</option></select></td>'+
+      '<td><button class="wk-del" data-dele="'+e.id+'">✕</button></td></tr>';
+  }).join('');
+  t.querySelector('tbody').innerHTML=rows||'<tr><td colspan="7" class="empty">No entries yet — click &ldquo;Add entry&rdquo;.</td></tr>';
+  t.querySelectorAll('[data-e]').forEach(function(inp){inp.addEventListener('change',function(){ktUpdEntry(pp.id,inp.getAttribute('data-e'),inp.getAttribute('data-f'),inp.value);renderPPTable();renderPPSummary();});});
+  t.querySelectorAll('[data-dele]').forEach(function(b){b.addEventListener('click',function(){ktDelEntry(pp.id,b.getAttribute('data-dele'));renderPPTable();renderPPSummary();});});
+}
+function renderPPSummary(){
+  var el=document.getElementById('ppSummary');var pp=ktActivePP();
+  if(!pp){el.innerHTML='';return;}
+  var s=ppSummary(pp);
+  var cells=[['GK · Wk 1',s.gk1],['RO · Wk 1',s.ro1],['GK · Wk 2',s.gk2],['RO · Wk 2',s.ro2],['GK total',s.gkTot],['RO total',s.roTot]];
+  el.innerHTML=cells.map(function(c){return '<div class="pp-cell"><div class="k">'+c[0]+'</div><div class="v">'+nf(c[1],2)+'</div></div>';}).join('')+
+    '<div class="pp-cell grand"><div class="k">Pay-period total</div><div class="v">'+nf(s.grand,2)+'</div></div>';
+}
+function renderKtWeeks(){
+  var t=document.getElementById('ktWeekTable');var ws=DB.kettering.weeks.slice().sort(function(a,b){return a.week_ending<b.week_ending?-1:1;});
+  t.querySelector('thead').innerHTML='<tr><th style="width:120px">Week ending</th><th>GK hrs</th><th>Co-Reg</th><th>RO hrs</th><th>Sun/Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri/Sat</th><th>Charts tot</th><th>QC</th><th></th></tr>';
+  if(!ws.length){t.querySelector('tbody').innerHTML='<tr><td colspan="12" class="empty">No weeks yet — add one above.</td></tr>';t.querySelector('tfoot').innerHTML='';return;}
+  var F=['gk_hours','coreg','ro_hours','sunmon','tue','wed','thu','frisat','qc'];
+  t.querySelector('tbody').innerHTML=ws.map(function(w){
+    function inp(f,step){return '<td><input type="number" min="0" step="'+(step||'1')+'" data-w="'+w.id+'" data-f="'+f+'" value="'+(w[f]?w[f]:'')+'"></td>';}
+    return '<tr><td class="num">'+w.week_ending+'</td>'+inp('gk_hours','0.25')+inp('coreg')+inp('ro_hours','0.25')+inp('sunmon')+inp('tue')+inp('wed')+inp('thu')+inp('frisat')+
+      '<td class="num"><strong>'+nf(chartsTot(w),0)+'</strong></td>'+inp('qc')+'<td><button class="wk-del" data-delw="'+w.id+'">✕</button></td></tr>';
+  }).join('');
+  // season totals + averages
+  var n=ws.length,tot={gk_hours:0,coreg:0,ro_hours:0,sunmon:0,tue:0,wed:0,thu:0,frisat:0,qc:0,ct:0};
+  ws.forEach(function(w){F.forEach(function(f){tot[f]+=num(w[f]);});tot.ct+=chartsTot(w);});
+  function tc(v,dec){return '<td class="num">'+nf(v,dec===undefined?0:dec)+'</td>';}
+  var totalRow='<tr><td>Totals ('+n+' wk)</td>'+tc(tot.gk_hours,1)+tc(tot.coreg)+tc(tot.ro_hours,1)+tc(tot.sunmon)+tc(tot.tue)+tc(tot.wed)+tc(tot.thu)+tc(tot.frisat)+tc(tot.ct)+tc(tot.qc)+'<td></td></tr>';
+  var avgRow='<tr><td>Avg / wk</td>'+tc(tot.gk_hours/n,2)+tc(tot.coreg/n,1)+tc(tot.ro_hours/n,2)+tc(tot.sunmon/n,1)+tc(tot.tue/n,1)+tc(tot.wed/n,1)+tc(tot.thu/n,1)+tc(tot.frisat/n,1)+tc(tot.ct/n,1)+tc(tot.qc/n,1)+'<td></td></tr>';
+  t.querySelector('tfoot').innerHTML=totalRow+avgRow;
+  t.querySelectorAll('[data-w]').forEach(function(inp){inp.addEventListener('change',function(){ktUpdWeek(inp.getAttribute('data-w'),inp.getAttribute('data-f'),inp.value===''?0:num(inp.value));renderKtWeeks();});});
+  t.querySelectorAll('[data-delw]').forEach(function(b){b.addEventListener('click',function(){ktDelWeek(b.getAttribute('data-delw'));renderKtWeeks();});});
+}
+// ---- kettering toolbar ----
+document.getElementById('ppSel').addEventListener('change',function(e){S.ktPP=e.target.value;renderPPTable();renderPPSummary();});
+document.getElementById('addPPBtn').addEventListener('click',function(){var d=prompt('Pay-period start date (YYYY-MM-DD, first Monday):',todayISO());if(!d)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('Use YYYY-MM-DD');return;}S.ktPP=ktAddPP(d);renderKettering();toast('Pay period added');});
+document.getElementById('delPPBtn').addEventListener('click',function(){var pp=ktActivePP();if(!pp){return;}if(!confirm('Delete this pay period and its '+(pp.entries||[]).length+' entries?'))return;ktDelPP(pp.id);S.ktPP=null;renderKettering();toast('Pay period deleted');});
+document.getElementById('addEntryBtn').addEventListener('click',function(){var pp=ktActivePP();if(!pp){toast('Add a pay period first');return;}ktAddEntry(pp.id);renderPPTable();renderPPSummary();});
+document.getElementById('ktAddWeekBtn').addEventListener('click',function(){var d=document.getElementById('ktNewWeek').value;if(!d){toast('Pick a week-ending date');return;}ktAddWeek(d);renderKtWeeks();});
+document.getElementById('ktNextWeekBtn').addEventListener('click',function(){var ws=DB.kettering.weeks.slice().sort(function(a,b){return a.week_ending<b.week_ending?-1:1;});var base;if(ws.length){base=new Date(ws[ws.length-1].week_ending+'T00:00:00');base.setDate(base.getDate()+7);}else{base=new Date(todayISO()+'T00:00:00');}var d=base.toISOString().slice(0,10);ktAddWeek(d);document.getElementById('ktNewWeek').value=d;renderKtWeeks();});
 
 renderAll();updateStorageWarn();
 </script>
