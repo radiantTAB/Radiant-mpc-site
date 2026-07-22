@@ -29,6 +29,7 @@
 import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
 import { handleClientsApi } from "./clients.js";
+import { handleMeetlyApi } from "./meetly.js";
 import { handlePortalApi, sessionClient, readCookie } from "./portal.js";
 import {
   handleAdminAuth,
@@ -89,6 +90,16 @@ async function handle(request, env, url) {
     if (url.pathname === "/api/revoked") {
       try {
         return await handleRevokedList(env);
+      } catch (err) {
+        return json({ error: String((err && err.message) || err) }, 500);
+      }
+    }
+
+    // Meetly scheduling demo API (calendly-clone/). Public for booking-side
+    // reads/writes; admin writes are token-gated inside the handler.
+    if (url.pathname.startsWith("/api/meetly/")) {
+      try {
+        return await handleMeetlyApi(request, env, url);
       } catch (err) {
         return json({ error: String((err && err.message) || err) }, 500);
       }
