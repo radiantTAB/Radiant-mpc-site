@@ -72,6 +72,10 @@ Connect the host's Google Calendar (admin → Google Calendar → Connect) to:
   still works rather than blocking).
 - **Add bookings to your calendar** — each booking creates a Google Calendar
   event (with the invitee as an attendee).
+- **Auto Google Meet links** — the created event requests a Meet conference,
+  and the join link is shown on the confirmation screen, in the confirmation
+  email, in the `.ics`, and in the webhook payload. (No separate Zoom setup —
+  Meet comes free with the Calendar connection.)
 
 **Setup (required, done once):**
 

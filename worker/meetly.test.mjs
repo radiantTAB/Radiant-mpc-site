@@ -5,7 +5,7 @@
 // .ics generation, and reminder selection + sending (Resend fetch mocked).
 import assert from "node:assert";
 import { handleMeetlyApi, computeSlots, ensureMeetlySchema, hostInstant, buildIcs, buildFeedIcs, busyMinutes, dueReminders, handleMeetlyReminders } from "./meetly.js";
-import { googleAuthUrl } from "./meetly-google.js";
+import { googleAuthUrl, meetLinkFrom } from "./meetly-google.js";
 
 // ---- Minimal in-memory D1 mock (only the queries meetly.js issues) --------
 function makeDb() {
@@ -53,6 +53,9 @@ function makeDb() {
       const b = state.bookings.find((x) => x.id === a[0] && x.canceled === 0);
       if (b) { b.canceled = 1; return { _run: { meta: { changes: 1 } } }; }
       return { _run: { meta: { changes: 0 } } };
+    }
+    if (/UPDATE meetly_bookings SET meet_link = \? WHERE id = \?/.test(sql)) {
+      const b = state.bookings.find((x) => x.id === a[1]); if (b) b.meet_link = a[0]; return { _run: { meta: { changes: 1 } } };
     }
     if (/UPDATE meetly_bookings SET reminded_24 = 1 WHERE id = \?/.test(sql)) {
       const b = state.bookings.find((x) => x.id === a[0]); if (b) b.reminded_24 = 1; return { _run: { meta: { changes: 1 } } };
@@ -308,11 +311,17 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   r = await call(env10, "GET", "/api/meetly/admin/google/status", { token: "t" });
   ok(r.data.connected === true && r.data.email === "host@example.com", "status now connected");
 
-  // Now slots should exclude the host's Google busy time (freebusy mocked).
+  // meetLinkFrom (pure)
+  ok(meetLinkFrom({ hangoutLink: "https://meet.google.com/aaa" }) === "https://meet.google.com/aaa", "meetLinkFrom reads hangoutLink");
+  ok(meetLinkFrom({ conferenceData: { entryPoints: [{ entryPointType: "video", uri: "https://meet.google.com/bbb" }] } }) === "https://meet.google.com/bbb", "meetLinkFrom reads entryPoints");
+
+  // Now slots should exclude the host's Google busy time (freebusy mocked),
+  // and a booking on a free slot gets a Meet link from the created event.
   globalThis.fetch = async (u, init) => {
     u = String(u);
     if (u.indexOf("oauth2.googleapis.com/token") > -1) return new Response(JSON.stringify({ access_token: "at2", expires_in: 3600 }), { status: 200 });
     if (u.indexOf("freeBusy") > -1) return new Response(JSON.stringify({ calendars: { primary: { busy: [{ start: bStart, end: bEnd }] } } }), { status: 200 });
+    if (u.indexOf("/events") > -1) return new Response(JSON.stringify({ id: "ev1", hangoutLink: "https://meet.google.com/abc-defg-hij" }), { status: 200 });
     return new Response("{}", { status: 200 });
   };
   r = await call(env10, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON);
@@ -321,6 +330,11 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   // Booking a busy slot is refused.
   r = await call(env10, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: 600, name: "Z", email: "z@x.com" } });
   ok(r.status === 409, "booking a Google-busy slot -> 409");
+  // Booking a free slot gets a Meet link.
+  r = await call(env10, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: 540, name: "M", email: "m@x.com" } });
+  ok(r.status === 201 && r.data.booking.meetLink === "https://meet.google.com/abc-defg-hij", "booking gets a Meet link");
+  const mlBooking = gd.state.bookings.find((b) => b.id === r.data.booking.id);
+  ok(mlBooking && mlBooking.meet_link === "https://meet.google.com/abc-defg-hij", "meet link persisted on the booking");
   globalThis.fetch = realFetch3;
 
   // Callback with a bad state is rejected.

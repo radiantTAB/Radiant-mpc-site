@@ -451,6 +451,7 @@
       '<div class="row"><span class="mi" aria-hidden="true">👤</span><div><b>' + escapeHtml(b.hostName || CFG.host.name) + "</b><span>with " + escapeHtml(b.name) + "</span></div></div>" +
       '<div class="row"><span class="mi" aria-hidden="true">📅</span><div><b>' + escapeHtml(when) + "</b><span>" + b.duration + " minutes · " + escapeHtml(shortTz(b.tz || state.tz)) + "</span></div></div>" +
       (b.location ? '<div class="row"><span class="mi" aria-hidden="true">📍</span><div><b>' + escapeHtml(b.location) + "</b><span>Details in your invitation</span></div></div>" : "") +
+      (b.meetLink ? '<div class="row"><span class="mi" aria-hidden="true">🎥</span><div><b><a href="' + escapeAttr(b.meetLink) + '" target="_blank" rel="noopener">Join the video call</a></b><span>Google Meet</span></div></div>' : "") +
       (b.notes ? '<div class="row"><span class="mi" aria-hidden="true">📝</span><div><b>Notes</b><span>' + escapeHtml(b.notes) + "</span></div></div>" : "") +
       answerRows(b) +
       "</div>";

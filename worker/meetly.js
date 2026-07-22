@@ -80,10 +80,10 @@ export async function ensureMeetlySchema(env) {
       "email TEXT NOT NULL, notes TEXT, date TEXT NOT NULL, " +
       "start_min INTEGER NOT NULL, end_min INTEGER NOT NULL, tz TEXT, " +
       "created_at TEXT NOT NULL, canceled INTEGER DEFAULT 0, " +
-      "ip TEXT, reminded_24 INTEGER DEFAULT 0, reminded_1 INTEGER DEFAULT 0, answers TEXT, host_id TEXT)"
+      "ip TEXT, reminded_24 INTEGER DEFAULT 0, reminded_1 INTEGER DEFAULT 0, answers TEXT, host_id TEXT, meet_link TEXT)"
   ).run();
   // Self-healing: add newer columns if an older table exists.
-  for (const col of ["ip TEXT", "reminded_24 INTEGER DEFAULT 0", "reminded_1 INTEGER DEFAULT 0", "answers TEXT", "host_id TEXT"]) {
+  for (const col of ["ip TEXT", "reminded_24 INTEGER DEFAULT 0", "reminded_1 INTEGER DEFAULT 0", "answers TEXT", "host_id TEXT", "meet_link TEXT"]) {
     try { await env.DB.prepare("ALTER TABLE meetly_bookings ADD COLUMN " + col).run(); } catch (_) {}
   }
   for (const col of ["questions TEXT", "hosts TEXT"]) {
@@ -339,13 +339,15 @@ export function buildIcs(booking, settings, opts) {
   const endUtc = hostInstant(booking.date, booking.end_min, tz);
   const z = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const esc = (s) => String(s == null ? "" : s).replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  const meet = booking.meet_link || "";
   const lines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Meetly//Scheduling//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     "BEGIN:VEVENT", "UID:" + booking.id + "@meetly", "DTSTAMP:" + z(opts.stampMs || startUtc),
     "DTSTART:" + z(startUtc), "DTEND:" + z(endUtc),
     "SUMMARY:" + esc((booking.event_name || booking.event_id) + " with " + settings.host.name),
-    "DESCRIPTION:" + esc("Booked via Meetly." + (booking.notes ? " Notes: " + booking.notes : "")),
-    booking.location ? "LOCATION:" + esc(booking.location) : "",
+    "DESCRIPTION:" + esc("Booked via Meetly." + (booking.notes ? " Notes: " + booking.notes : "") + (meet ? " Join: " + meet : "")),
+    (booking.location || meet) ? "LOCATION:" + esc(booking.location || meet) : "",
+    meet ? "URL:" + esc(meet) : "",
     "END:VEVENT", "END:VCALENDAR",
   ].filter(Boolean);
   return lines.join("\r\n");
@@ -418,26 +420,30 @@ async function googleBusyFor(env, settings, dateStr) {
   }
 }
 
-// Create a Google Calendar event for a booking (fire-and-forget).
+// Create a Google Calendar event for a booking, requesting a Meet link.
+// Returns the join URL (or "" if unavailable / not connected / on failure).
 async function googleCreateEvent(env, settings, booking, event) {
-  if (!G.googleConfigured(env)) return;
+  if (!G.googleConfigured(env)) return "";
   const row = await readGoogle(env);
-  if (!googleConnected(row)) return;
+  if (!googleConnected(row)) return "";
   try {
     const tz = (settings.host && settings.host.timezone) || "America/New_York";
     const token = await G.accessToken(env, row.refresh_token);
     const startUtc = hostInstant(booking.date, booking.start_min, tz);
     const endUtc = hostInstant(booking.date, booking.end_min, tz);
-    await G.insertEvent(token, row.calendar_id, {
+    const created = await G.insertEvent(token, row.calendar_id, {
       summary: (event.name || "Meeting") + " with " + booking.name,
       description: "Booked via Meetly." + (booking.notes ? " Notes: " + booking.notes : ""),
       location: event.location || "",
       start: { dateTime: new Date(startUtc).toISOString() },
       end: { dateTime: new Date(endUtc).toISOString() },
       attendees: [{ email: booking.email }],
+      conferenceData: { createRequest: { requestId: makeId("mt_"), conferenceSolutionKey: { type: "hangoutsMeet" } } },
     });
+    return G.meetLinkFrom(created);
   } catch (err) {
     console.error("meetly google event error:", String((err && err.message) || err));
+    return "";
   }
 }
 
@@ -452,7 +458,7 @@ async function sendWebhook(settings, type, booking, event) {
       id: booking.id, event: booking.event_id, eventName: (event && event.name) || booking.event_id,
       name: booking.name, email: booking.email, date: booking.date,
       start: booking.start_min, end: booking.end_min, tz: booking.tz || "",
-      notes: booking.notes || "", answers: booking.answers || {},
+      notes: booking.notes || "", answers: booking.answers || {}, meetLink: booking.meet_link || "",
     },
   };
   const headers = { "content-type": "application/json", "user-agent": "Meetly-Webhook" };
@@ -471,14 +477,17 @@ async function sendConfirmation(env, booking, settings, event) {
   const manage = baseUrl(env) + "/booking.html?manage=" + encodeURIComponent(booking.id);
   const ics = buildIcs({ ...booking, event_name: event.name, location: event.location }, settings, { stampMs: Date.now() });
   const icsB64 = b64(ics);
+  const meet = booking.meet_link || "";
   const text =
     "Your meeting is booked.\n\n" +
     event.name + " with " + hostName + "\n" + when + "\n" +
     (event.location ? event.location + "\n" : "") +
+    (meet ? "Join: " + meet + "\n" : "") +
     "\nManage or cancel: " + manage + "\n";
   const html =
     "<h2>You're booked</h2><p><strong>" + esc(event.name) + "</strong> with " + esc(hostName) + "</p>" +
     "<p>" + esc(when) + "<br>" + (event.location ? esc(event.location) : "") + "</p>" +
+    (meet ? '<p><a href="' + esc(meet) + '">Join the video call</a></p>' : "") +
     '<p><a href="' + manage + '">Manage or cancel your booking</a></p>' +
     "<p>Added to your calendar? The invite is attached.</p>";
   const attachments = [{ filename: "meeting.ics", content: icsB64 }];
@@ -744,12 +753,19 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)"
     ).bind(id, event.id, name, email, notes, date, start, end, tz, createdAt, ip, answersJson, member.id).run();
 
-    // Fire-and-forget confirmation mail + webhook so neither blocks the response.
     const bookingRow = { id, event_id: event.id, name, email, notes, date, start_min: start, end_min: end, tz, created_at: createdAt, answers, host_id: member.id };
+    // Create the calendar event synchronously so a Meet link (if any) is ready
+    // for the confirmation + email. Fail-open: no link on error / when off.
+    let meetLink = "";
+    try { meetLink = await googleCreateEvent(env, settings, bookingRow, event); } catch (_) {}
+    if (meetLink) {
+      bookingRow.meet_link = meetLink;
+      try { await env.DB.prepare("UPDATE meetly_bookings SET meet_link = ? WHERE id = ?").bind(meetLink, id).run(); } catch (_) {}
+    }
+    // Fire-and-forget confirmation mail + webhook so neither blocks the response.
     const side = Promise.all([
       sendConfirmation(env, bookingRow, settings, event).catch(() => {}),
       sendWebhook(settings, "booking.created", bookingRow, event).catch(() => {}),
-      googleCreateEvent(env, settings, bookingRow, event).catch(() => {}),
     ]);
     if (ctx && ctx.waitUntil) ctx.waitUntil(side); else await side;
 
@@ -759,7 +775,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         id, event: event.id, eventName: event.name, duration: event.duration,
         location: event.location, name, email, notes, date, start, end,
         label: minutesLabel(start), tz, created_at: createdAt, answers,
-        host_id: member.id, hostName: member.name,
+        host_id: member.id, hostName: member.name, meetLink,
       },
     }, 201);
   }
@@ -903,6 +919,7 @@ function bookingOut(row, settings) {
     label: minutesLabel(row.start_min), tz: row.tz || "", created_at: row.created_at,
     canceled: !!row.canceled, answers: parseAnswers(row.answers),
     host_id: row.host_id || "", hostName: settings ? memberById(settings, row.host_id || "").name : undefined,
+    meetLink: row.meet_link || "",
   };
 }
 
