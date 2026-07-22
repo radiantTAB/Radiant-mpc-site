@@ -19,6 +19,7 @@
 //   /portal/api/*             -> Client portal API (own session auth)
 //   /admin/api/clients*       -> Client Setup API (behind Cloudflare Access)
 //   /admin/api/locations*     -> Client Setup API (behind Cloudflare Access)
+//   /admin/api/income*        -> Income Tracker API (behind admin login)
 //   /admin/api/*              -> License Manager API (behind Cloudflare Access)
 //
 // IMPORTANT: the Cloudflare Access policy that gates /admin/* must be
@@ -29,6 +30,7 @@
 import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
 import { handleClientsApi } from "./clients.js";
+import { handleIncomeApi } from "./income.js";
 import { handleMeetlyApi } from "./meetly.js";
 import { handlePortalApi, sessionClient, readCookie } from "./portal.js";
 import {
@@ -134,6 +136,9 @@ async function handle(request, env, url) {
           url.pathname.startsWith("/admin/api/locations")
         ) {
           return await handleClientsApi(request, env, url);
+        }
+        if (url.pathname.startsWith("/admin/api/income")) {
+          return await handleIncomeApi(request, env, url);
         }
         return await handleApi(request, env, url);
       } catch (err) {

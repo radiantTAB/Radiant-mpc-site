@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Income Tracker — Radiant Medical Physics Consulting</title>
+<meta name="description" content="Private income tracker — hours, income, running averages, and year-end projections per site.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/radiant-logo.png">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-elev:#fafafa;--bg-card:#f4f4f5;
+  --line:#e6e6e8;--line-hi:#cdcdd1;
+  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
+  --accent:#d00008;--accent-2:#a80006;--accent-bright:#f03020;--accent-warm:#f86058;
+  --charcoal:#303030;--ok:#1a7f37;--ok-bg:rgba(26,127,55,.08);
+  --neg:#b42318;
+  --font-display:'Montserrat',system-ui,sans-serif;
+  --font-body:'Montserrat',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --max-w:1320px;--pad-x:clamp(16px,4vw,48px);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:16px;font-weight:400;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none;transition:color .2s}
+a:hover{color:var(--accent-bright)}
+img{max-width:100%;display:block}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.svg-defs{position:absolute;width:0;height:0;overflow:hidden}
+
+/* Nav */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:16px var(--pad-x);background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;gap:10px}
+.brand-logo{height:64px;width:auto;display:block}
+.nav-links{display:flex;align-items:center;gap:26px;flex-wrap:wrap;justify-content:flex-end}
+.nav-links a{color:var(--text-mute);font-size:13px;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.nav-links a:hover{color:var(--text)}
+.nav-links a.active{color:var(--accent)}
+.nav-cta{padding:8px 16px;border:1px solid var(--line-hi);border-radius:999px;color:var(--text)!important;transition:all .2s;font:inherit;cursor:pointer;background:transparent}
+.nav-cta:hover{border-color:var(--accent);color:var(--accent)!important;background:rgba(208,0,8,.06)}
+
+/* Hero */
+.hero{background:var(--bg-elev);border-bottom:1px solid var(--line);padding:32px var(--pad-x) 28px}
+.hero-inner{max-width:var(--max-w);margin:0 auto}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-mute);margin-bottom:14px}
+.eyebrow-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px rgba(208,0,8,.4)}
+.hero h1{font-family:var(--font-display);font-weight:800;font-size:clamp(28px,4vw,42px);line-height:1.05;letter-spacing:-.02em}
+.hero p{color:var(--text-mute);margin-top:8px;max-width:640px;font-size:15px}
+
+/* Layout */
+.wrap{max-width:var(--max-w);margin:0 auto;padding:26px var(--pad-x) 80px}
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:26px}
+.toolbar .spacer{flex:1}
+label.fld{display:inline-flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);font-weight:600}
+select,input[type=text],input[type=number],input[type=date]{font:inherit;color:var(--text);background:#fff;border:1px solid var(--line-hi);border-radius:8px;padding:8px 10px}
+select:focus,input:focus{outline:none;border-color:var(--accent)}
+.btn{font:inherit;font-size:14px;font-weight:600;cursor:pointer;border-radius:8px;padding:9px 15px;border:1px solid var(--line-hi);background:#fff;color:var(--text);transition:all .18s;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+.btn-sm{padding:5px 10px;font-size:12.5px}
+.btn .ic{width:16px;height:16px}
+
+/* Cards */
+.section{margin-bottom:34px}
+.section-title{font-family:var(--font-display);font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-mute);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.section-title .ic{width:18px;height:18px;color:var(--accent)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.card{background:var(--bg-card);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:10px;padding:18px 20px}
+.card .k{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
+.card .v{font-family:var(--font-display);font-weight:800;font-size:27px;letter-spacing:-.02em;margin-top:6px}
+.card .sub{font-size:12.5px;color:var(--text-mute);margin-top:5px}
+.delta-up{color:var(--ok)}
+.delta-down{color:var(--neg)}
+
+/* Tables */
+.tbl-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);font-weight:500;background:var(--bg-elev);position:sticky;top:0;z-index:2}
+tbody tr:hover{background:var(--bg-elev)}
+tfoot td{font-weight:700;border-top:2px solid var(--line-hi);background:var(--bg-elev)}
+.num{font-family:var(--font-mono)}
+.muted{color:var(--text-dim)}
+
+/* Grid (weeks x sites) */
+.grid-scroll{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:10px;background:#fff}
+table.grid th,table.grid td{border-right:1px solid var(--line)}
+table.grid th.site-group{text-align:center;border-bottom:1px solid var(--line-hi);color:var(--text);font-family:var(--font-display);font-size:12px;font-weight:700;text-transform:none;letter-spacing:0}
+table.grid thead th{position:sticky;top:0}
+table.grid thead tr.groups th{top:0;z-index:4}
+table.grid thead tr.subs th{top:34px;z-index:3}
+table.grid td.wk,table.grid th.wk{position:sticky;left:0;background:var(--bg-elev);z-index:1;text-align:left;font-family:var(--font-mono);font-size:12.5px;border-right:1px solid var(--line-hi)}
+table.grid thead th.wk{z-index:5}
+table.grid input{width:80px;text-align:right;font-family:var(--font-mono);font-size:13px;border:1px solid transparent;background:transparent;padding:5px 6px;border-radius:5px}
+table.grid input:hover{border-color:var(--line)}
+table.grid input:focus{border-color:var(--accent);background:#fff}
+table.grid td.dollars input{width:92px}
+.wk-del{color:var(--text-dim);cursor:pointer;font-size:12px;padding:2px 6px;border:none;background:transparent}
+.wk-del:hover{color:var(--neg)}
+
+/* Sites manager */
+.site-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:9px;margin-bottom:10px;background:#fff}
+.site-row .name{font-weight:700;min-width:150px}
+.rate-chip{font-family:var(--font-mono);font-size:12px;background:var(--bg-card);border:1px solid var(--line-hi);border-radius:999px;padding:3px 9px;display:inline-flex;align-items:center;gap:6px}
+.rate-chip button{border:none;background:transparent;color:var(--text-dim);cursor:pointer;font-size:13px;line-height:1}
+.rate-chip button:hover{color:var(--neg)}
+.hint{font-size:12.5px;color:var(--text-dim)}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-mute);cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+
+/* Modal */
+.modal-back{position:fixed;inset:0;background:rgba(20,20,22,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-back.open{display:flex}
+.modal{background:#fff;border-radius:14px;max-width:460px;width:100%;padding:26px;border-top:4px solid var(--accent);box-shadow:0 24px 60px rgba(0,0,0,.25)}
+.modal h3{font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:16px}
+.modal .fld-block{margin-bottom:14px}
+.modal .fld-block label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);font-weight:600;margin-bottom:5px}
+.modal input,.modal textarea{width:100%;font:inherit;border:1px solid var(--line-hi);border-radius:8px;padding:9px 11px}
+.modal textarea{min-height:64px;resize:vertical}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.empty{text-align:center;color:var(--text-dim);padding:40px 20px;font-size:14.5px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--charcoal);color:#fff;padding:11px 20px;border-radius:999px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:200}
+.toast.show{opacity:1}
+.footer{padding:36px var(--pad-x);border-top:1px solid var(--line);background:var(--bg-elev);color:var(--text-dim);font-size:13px}
+.footer-inner{max-width:var(--max-w);margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
+@media(max-width:720px){
+  .nav-links a:not(.nav-cta){display:none}
+  .brand-logo{height:48px}
+}
+</style>
+</head>
+<body>
+
+<svg class="svg-defs" aria-hidden="true"><symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></symbol>
+<symbol id="i-sites" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></symbol>
+</svg>
+
+<nav class="nav">
+  <a href="/" class="brand" aria-label="Radiant Medical Physics Consulting LLC">
+    <img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo">
+  </a>
+  <div class="nav-links">
+    <a href="/">&larr; Launcher</a>
+    <a href="/admin/index.html">Admin Home</a>
+    <a href="/admin/clients.html">Client Manager</a>
+    <a href="/admin/license-manager.html">License Manager</a>
+    <a href="/admin/income.html" class="active">Income Tracker</a>
+    <button type="button" class="nav-cta" onclick="adminSignOut()">Sign Out</button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow"><span class="eyebrow-dot"></span><span>Private · Admin Only</span></div>
+    <h1>Income Tracker</h1>
+    <p>Hours and income per site per week, with a running weekly average carried out to a full-year projection and compared against prior years.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="toolbar">
+    <label class="fld">Year
+      <select id="yearSel"></select>
+    </label>
+    <button class="btn btn-sm" id="addYearBtn"><svg class="ic"><use href="#i-plus"/></svg>Year</button>
+    <div class="spacer"></div>
+    <button class="btn" id="addSiteBtn"><svg class="ic"><use href="#i-plus"/></svg>Add site</button>
+  </div>
+
+  <!-- Summary cards -->
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-chart"/></svg><span id="summaryTitle">Year summary</span></div>
+    <div class="cards" id="summaryCards"></div>
+  </section>
+
+  <!-- Per-site projection -->
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-trend"/></svg>Per-site projection</div>
+    <div class="tbl-scroll">
+      <table id="projTable"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+    </div>
+    <p class="hint" style="margin-top:8px">Projected annual = average per recorded week &times; <span id="wiyNote">52</span> weeks. &ldquo;Wks&rdquo; is how many weeks you&rsquo;ve recorded for this site this year (the basis for the average).</p>
+  </section>
+
+  <!-- Year over year -->
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-chart"/></svg>Year over year</div>
+    <div class="tbl-scroll">
+      <table id="yoyTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- Weekly grid -->
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-grid"/></svg>Weekly entry</div>
+    <div class="toolbar" style="margin-bottom:14px">
+      <label class="fld">Week ending
+        <input type="date" id="newWeekDate">
+      </label>
+      <button class="btn btn-sm" id="addWeekBtn"><svg class="ic"><use href="#i-plus"/></svg>Add week</button>
+      <button class="btn btn-sm" id="addNextWeekBtn">+7 days</button>
+      <div class="spacer"></div>
+      <label class="toggle"><input type="checkbox" id="autoFill"> Auto-fill $ from rate &times; hours</label>
+    </div>
+    <div class="grid-scroll">
+      <table class="grid" id="grid"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+    </div>
+    <p class="hint" style="margin-top:8px">Type hours and dollars for each site. Entries save automatically. Clear both to remove a week for a site.</p>
+  </section>
+
+  <!-- Sites & rates -->
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-sites"/></svg>Sites &amp; rates</div>
+    <div id="sitesManager"></div>
+  </section>
+
+</main>
+
+<!-- Site modal -->
+<div class="modal-back" id="siteModal">
+  <div class="modal">
+    <h3 id="siteModalTitle">Add site</h3>
+    <div class="fld-block"><label>Site name</label><input type="text" id="siteName" placeholder="e.g. Kettering"></div>
+    <div class="fld-block"><label>Notes (optional)</label><textarea id="siteNotes" placeholder="Anything worth remembering about this site"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSiteModal()">Cancel</button>
+      <button class="btn btn-primary" id="siteSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rate modal -->
+<div class="modal-back" id="rateModal">
+  <div class="modal">
+    <h3>Add rate</h3>
+    <p class="hint" id="rateModalSite" style="margin-bottom:14px"></p>
+    <div class="fld-block"><label>Hourly rate ($)</label><input type="number" id="rateVal" step="0.01" min="0" placeholder="e.g. 225"></div>
+    <div class="fld-block"><label>Effective from</label><input type="date" id="rateDate"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeRateModal()">Cancel</button>
+      <button class="btn btn-primary" id="rateSaveBtn">Add rate</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span>Radiant Medical Physics Consulting LLC · Private income tracker</span>
+    <span>© 2026 Radiant Medical Physics Consulting LLC</span>
+  </div>
+</footer>
+
+<script>
+function adminSignOut(){
+  fetch('/admin/api/logout',{method:'POST',credentials:'include'})
+    .then(function(){location.href='/admin/login.html';})
+    .catch(function(){location.href='/admin/login.html';});
+}
+
+// ---------- state ----------
+var S = { year:new Date().getFullYear(), years:[], weeksInYear:52, sites:[], weeks:[], yearTotals:{}, extraDates:[] };
+var API = '/admin/api/income';
+var usd = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+var usd2 = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+function nf(n,d){return (Number(n)||0).toLocaleString('en-US',{maximumFractionDigits:d===undefined?1:d});}
+
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show');},1600);}
+
+async function api(method,path,body){
+  var opt={method:method,credentials:'include',headers:{}};
+  if(body){opt.headers['content-type']='application/json';opt.body=JSON.stringify(body);}
+  var r=await fetch(API+path,opt);
+  if(r.status===401||r.status===302){location.href='/admin/login.html';throw new Error('auth');}
+  var d=await r.json().catch(function(){return {};});
+  if(!r.ok){toast(d.error||('Error '+r.status));throw new Error(d.error||('HTTP '+r.status));}
+  return d;
+}
+
+// ---------- helpers ----------
+function cellKey(siteId,date){return siteId+'|'+date;}
+function buildCellMap(){
+  var map={};
+  S.weeks.forEach(function(w){map[cellKey(w.site_id,w.week_ending)]=w;});
+  return map;
+}
+// All week-ending dates to show as rows: recorded + locally added, sorted.
+function weekDates(){
+  var set={};
+  S.weeks.forEach(function(w){set[w.week_ending]=1;});
+  S.extraDates.forEach(function(d){set[d]=1;});
+  return Object.keys(set).sort();
+}
+function activeSites(){return S.sites;}
+// Rate in effect on a given ISO date for a site (mirrors the server).
+function rateForDate(site,iso){
+  if(!site.rates||!site.rates.length)return null;
+  var sorted=site.rates.slice().sort(function(a,b){return a.effective_date<b.effective_date?-1:1;});
+  var appl=null;
+  sorted.forEach(function(r){if(r.effective_date<=iso)appl=r;});
+  return appl?appl.rate:sorted[0].rate;
+}
+// Run-rate projection for a site in the loaded year (mirrors income.js).
+function projectSite(siteId){
+  var rows=S.weeks.filter(function(w){return w.site_id===siteId;});
+  var n=rows.length,inc=0,hrs=0;
+  rows.forEach(function(w){inc+=Number(w.income)||0;hrs+=Number(w.hours)||0;});
+  var avgInc=n?inc/n:0, avgHrs=n?hrs/n:0;
+  return {weeks:n,ytdIncome:inc,ytdHours:hrs,avgIncome:avgInc,avgHours:avgHrs,
+          projIncome:avgInc*S.weeksInYear,projHours:avgHrs*S.weeksInYear,
+          remaining:Math.max(0,S.weeksInYear-n)};
+}
+function yearTotal(year){
+  var yt=S.yearTotals[String(year)]||{};
+  var inc=0,hrs=0,wk=0;
+  Object.keys(yt).forEach(function(sid){inc+=yt[sid].income;hrs+=yt[sid].hours;wk+=yt[sid].weeks;});
+  return {income:inc,hours:hrs,weeks:wk};
+}
+
+// ---------- load ----------
+async function load(year){
+  var d=await api('GET','/overview?year='+year);
+  S.year=d.year;S.years=d.years;S.weeksInYear=d.weeks_in_year;
+  S.sites=d.sites;S.weeks=d.weeks;S.yearTotals=d.year_totals;S.extraDates=[];
+  renderAll();
+}
+
+// ---------- render ----------
+function renderAll(){
+  renderYearSel();
+  document.getElementById('summaryTitle').textContent=S.year+' summary';
+  document.getElementById('wiyNote').textContent=S.weeksInYear;
+  renderSummary();renderProjection();renderYoY();renderGrid();renderSites();
+}
+function renderDerived(){renderSummary();renderProjection();renderYoY();renderGridFoot();}
+
+function renderYearSel(){
+  var sel=document.getElementById('yearSel');
+  sel.innerHTML=S.years.map(function(y){return '<option value="'+y+'"'+(y===S.year?' selected':'')+'>'+y+'</option>';}).join('');
+}
+
+function renderSummary(){
+  var totInc=0,totHrs=0,totProjInc=0,totProjHrs=0,wks=0;
+  activeSites().forEach(function(s){var p=projectSite(s.id);totInc+=p.ytdIncome;totHrs+=p.ytdHours;totProjInc+=p.projIncome;totProjHrs+=p.projHours;wks=Math.max(wks,p.weeks);});
+  var prior=yearTotal(S.year-1);
+  var deltaProj=totProjInc-prior.income;
+  var deltaHtml='';
+  if(prior.income>0){
+    var cls=deltaProj>=0?'delta-up':'delta-down';
+    var pct=prior.income?(deltaProj/prior.income*100):0;
+    deltaHtml='<div class="sub '+cls+'">'+(deltaProj>=0?'▲ ':'▼ ')+usd.format(Math.abs(deltaProj))+' ('+(deltaProj>=0?'+':'')+nf(pct,0)+'%) vs '+(S.year-1)+'</div>';
+  }else{
+    deltaHtml='<div class="sub muted">no '+(S.year-1)+' data</div>';
+  }
+  var cards=[
+    {k:'YTD income',v:usd.format(totInc),sub:wks+' week'+(wks===1?'':'s')+' recorded'},
+    {k:'Projected annual',v:usd.format(totProjInc),subHtml:deltaHtml},
+    {k:'YTD hours',v:nf(totHrs,1),sub:'projected '+nf(totProjHrs,0)+' hrs'},
+    {k:'Prior year ('+(S.year-1)+')',v:prior.income>0?usd.format(prior.income):'—',sub:prior.weeks?prior.weeks+' weeks · '+nf(prior.hours,0)+' hrs':'no data'}
+  ];
+  document.getElementById('summaryCards').innerHTML=cards.map(function(c){
+    return '<div class="card"><div class="k">'+c.k+'</div><div class="v">'+c.v+'</div>'+(c.subHtml||('<div class="sub">'+c.sub+'</div>'))+'</div>';
+  }).join('');
+}
+
+function renderProjection(){
+  var t=document.getElementById('projTable');
+  if(!activeSites().length){t.querySelector('thead').innerHTML='';t.querySelector('tbody').innerHTML='<tr><td class="empty">Add a site to get started.</td></tr>';t.querySelector('tfoot').innerHTML='';return;}
+  t.querySelector('thead').innerHTML='<tr><th>Site</th><th>Wks</th><th>YTD hours</th><th>YTD income</th><th>Avg $/wk</th><th>Current rate</th><th>Proj. hours</th><th>Proj. income</th><th>Prior yr</th><th>Δ proj.</th></tr>';
+  var prior=S.yearTotals[String(S.year-1)]||{};
+  var rows=activeSites().map(function(s){
+    var p=projectSite(s.id);
+    var pr=prior[s.id];var priorInc=pr?pr.income:0;
+    var delta=p.projIncome-priorInc;
+    var dcls=delta>=0?'delta-up':'delta-down';
+    var rate=s.current_rate!=null?usd.format(s.current_rate)+'/hr':'—';
+    return '<tr><td>'+esc(s.name)+'</td><td class="num">'+p.weeks+'</td>'+
+      '<td class="num">'+nf(p.ytdHours,1)+'</td>'+
+      '<td class="num">'+usd.format(p.ytdIncome)+'</td>'+
+      '<td class="num">'+usd.format(p.avgIncome)+'</td>'+
+      '<td class="num muted">'+rate+'</td>'+
+      '<td class="num">'+nf(p.projHours,0)+'</td>'+
+      '<td class="num"><strong>'+usd.format(p.projIncome)+'</strong></td>'+
+      '<td class="num muted">'+(priorInc?usd.format(priorInc):'—')+'</td>'+
+      '<td class="num '+(priorInc?dcls:'muted')+'">'+(priorInc?((delta>=0?'+':'')+usd.format(delta)):'—')+'</td></tr>';
+  }).join('');
+  t.querySelector('tbody').innerHTML=rows;
+  var tot={hrs:0,inc:0,avg:0,phrs:0,pinc:0,prior:0};
+  activeSites().forEach(function(s){var p=projectSite(s.id);tot.hrs+=p.ytdHours;tot.inc+=p.ytdIncome;tot.avg+=p.avgIncome;tot.phrs+=p.projHours;tot.pinc+=p.projIncome;var pr=prior[s.id];if(pr)tot.prior+=pr.income;});
+  var tdelta=tot.pinc-tot.prior;
+  t.querySelector('tfoot').innerHTML='<tr><td>Total</td><td></td><td class="num">'+nf(tot.hrs,1)+'</td><td class="num">'+usd.format(tot.inc)+'</td><td class="num">'+usd.format(tot.avg)+'</td><td></td><td class="num">'+nf(tot.phrs,0)+'</td><td class="num">'+usd.format(tot.pinc)+'</td><td class="num">'+(tot.prior?usd.format(tot.prior):'—')+'</td><td class="num '+(tot.prior?(tdelta>=0?'delta-up':'delta-down'):'muted')+'">'+(tot.prior?((tdelta>=0?'+':'')+usd.format(tdelta)):'—')+'</td></tr>';
+}
+
+function renderYoY(){
+  var t=document.getElementById('yoyTable');
+  t.querySelector('thead').innerHTML='<tr><th>Year</th><th>Weeks</th><th>Total hours</th><th>Total income</th><th>vs prior</th></tr>';
+  var years=S.years.slice().sort(function(a,b){return b-a;});
+  var rows=years.map(function(y){
+    var cur=yearTotal(y);var prev=yearTotal(y-1);
+    var isCur=(y===S.year);
+    // For the loaded year show projected annual; other years show recorded total.
+    var incLabel,delta,base=prev.income;
+    if(isCur){var pi=0;activeSites().forEach(function(s){pi+=projectSite(s.id).projIncome;});incLabel=usd.format(cur.income)+' <span class="muted">(→ '+usd.format(pi)+')</span>';delta=pi-base;}
+    else{incLabel=usd.format(cur.income);delta=cur.income-base;}
+    var dcls=delta>=0?'delta-up':'delta-down';
+    return '<tr><td>'+y+(isCur?' <span class="muted">(current)</span>':'')+'</td><td class="num">'+cur.weeks+'</td><td class="num">'+nf(cur.hours,0)+'</td><td class="num">'+incLabel+'</td><td class="num '+(base?dcls:'muted')+'">'+(base?((delta>=0?'+':'')+usd.format(delta)):'—')+'</td></tr>';
+  }).join('');
+  t.querySelector('tbody').innerHTML=rows||'<tr><td class="empty">No data yet.</td></tr>';
+}
+
+function renderGrid(){
+  var g=document.getElementById('grid');
+  var sites=activeSites();
+  if(!sites.length){g.querySelector('thead').innerHTML='';g.querySelector('tbody').innerHTML='<tr><td class="empty">Add a site to start entering weeks.</td></tr>';g.querySelector('tfoot').innerHTML='';return;}
+  // Header: two rows — site group, then Hrs/$ subheads.
+  var groups='<tr class="groups"><th class="wk" rowspan="2">Week ending</th>';
+  sites.forEach(function(s){groups+='<th class="site-group" colspan="2">'+esc(s.name)+'</th>';});
+  groups+='<th rowspan="2">Del</th></tr>';
+  var subs='<tr class="subs">';
+  sites.forEach(function(){subs+='<th>Hrs</th><th>$</th>';});
+  subs+='</tr>';
+  g.querySelector('thead').innerHTML=groups+subs;
+
+  var map=buildCellMap();
+  var dates=weekDates();
+  if(!dates.length){
+    g.querySelector('tbody').innerHTML='<tr><td class="wk">—</td><td colspan="'+(sites.length*2+1)+'" class="empty">No weeks yet. Add one above.</td></tr>';
+    g.querySelector('tfoot').innerHTML='';return;
+  }
+  var body=dates.map(function(d){
+    var tds='<td class="wk">'+d+'</td>';
+    sites.forEach(function(s){
+      var c=map[cellKey(s.id,d)];
+      var h=c&&c.hours?c.hours:'';
+      var i=c&&c.income?c.income:'';
+      tds+='<td><input type="number" step="0.25" min="0" data-site="'+s.id+'" data-date="'+d+'" data-f="hours" value="'+h+'"></td>';
+      tds+='<td class="dollars"><input type="number" step="1" min="0" data-site="'+s.id+'" data-date="'+d+'" data-f="income" value="'+i+'"></td>';
+    });
+    tds+='<td><button class="wk-del" title="Remove this week from every site" data-delweek="'+d+'">✕</button></td>';
+    return '<tr>'+tds+'</tr>';
+  }).join('');
+  g.querySelector('tbody').innerHTML=body;
+  renderGridFoot();
+  // Wire inputs.
+  g.querySelectorAll('tbody input').forEach(function(inp){inp.addEventListener('change',onCellChange);});
+  g.querySelectorAll('[data-delweek]').forEach(function(b){b.addEventListener('click',function(){delWeekRow(b.getAttribute('data-delweek'));});});
+}
+
+function renderGridFoot(){
+  var g=document.getElementById('grid');var sites=activeSites();
+  if(!sites.length){g.querySelector('tfoot').innerHTML='';return;}
+  var cells='<td class="wk">Total</td>';
+  sites.forEach(function(s){var p=projectSite(s.id);cells+='<td class="num">'+nf(p.ytdHours,1)+'</td><td class="num">'+usd.format(p.ytdIncome)+'</td>';});
+  cells+='<td></td>';
+  g.querySelector('tfoot').innerHTML='<tr>'+cells+'</tr>';
+}
+
+async function onCellChange(e){
+  var inp=e.target;var siteId=inp.getAttribute('data-site');var date=inp.getAttribute('data-date');var field=inp.getAttribute('data-f');
+  var row=inp.closest('tr');
+  var hoursInp=row.querySelector('input[data-site="'+siteId+'"][data-f="hours"]');
+  var incInp=row.querySelector('input[data-site="'+siteId+'"][data-f="income"]');
+  // Auto-fill dollars from rate x hours when enabled and hours was edited.
+  if(field==='hours'&&document.getElementById('autoFill').checked){
+    var site=S.sites.find(function(s){return s.id===siteId;});
+    var rate=site?rateForDate(site,date):null;
+    if(rate!=null&&hoursInp.value!==''){incInp.value=Math.round((Number(hoursInp.value)*rate)*100)/100;}
+  }
+  var hours=hoursInp.value===''?0:Number(hoursInp.value);
+  var income=incInp.value===''?0:Number(incInp.value);
+  try{
+    var res=await api('PUT','/weeks',{site_id:siteId,week_ending:date,hours:hours,income:income});
+    // Update local state.
+    var idx=S.weeks.findIndex(function(w){return w.site_id===siteId&&w.week_ending===date;});
+    if(res.deleted){if(idx>=0)S.weeks.splice(idx,1);}
+    else{
+      var wobj={id:res.id,site_id:siteId,week_ending:date,year:Number(date.slice(0,4)),hours:hours,income:income,notes:''};
+      if(idx>=0)S.weeks[idx]=wobj;else S.weeks.push(wobj);
+    }
+    // Keep the year_totals for the current year in sync so YoY updates live.
+    recalcCurrentYearTotals();
+    renderDerived();
+  }catch(err){/* toast already shown */}
+}
+
+function recalcCurrentYearTotals(){
+  var yt={};
+  S.weeks.forEach(function(w){var st=yt[w.site_id]=yt[w.site_id]||{income:0,hours:0,weeks:0};st.income+=Number(w.income)||0;st.hours+=Number(w.hours)||0;st.weeks+=1;});
+  S.yearTotals[String(S.year)]=yt;
+}
+
+async function delWeekRow(date){
+  var affected=S.weeks.filter(function(w){return w.week_ending===date;});
+  if(affected.length&&!confirm('Remove the week ending '+date+' from all sites? This deletes '+affected.length+' recorded entr'+(affected.length===1?'y':'ies')+'.'))return;
+  for(var i=0;i<affected.length;i++){try{await api('DELETE','/weeks/'+affected[i].id);}catch(e){}}
+  S.weeks=S.weeks.filter(function(w){return w.week_ending!==date;});
+  S.extraDates=S.extraDates.filter(function(d){return d!==date;});
+  recalcCurrentYearTotals();
+  renderGrid();renderDerived();
+  toast('Week removed');
+}
+
+function renderSites(){
+  var el=document.getElementById('sitesManager');
+  if(!S.sites.length){el.innerHTML='<p class="empty">No sites yet. Click &ldquo;Add site&rdquo; above.</p>';return;}
+  el.innerHTML=S.sites.map(function(s){
+    var rates=(s.rates||[]).slice().sort(function(a,b){return a.effective_date<b.effective_date?1:-1;});
+    var chips=rates.map(function(r){return '<span class="rate-chip">'+usd.format(r.rate)+'/hr from '+r.effective_date+' <button title="Delete rate" data-delrate="'+r.id+'">✕</button></span>';}).join(' ');
+    if(!chips)chips='<span class="hint">no rates set</span>';
+    return '<div class="site-row">'+
+      '<span class="name">'+esc(s.name)+'</span>'+
+      (s.notes?'<span class="hint">'+esc(s.notes)+'</span>':'')+
+      '<div style="flex:1;display:flex;gap:6px;flex-wrap:wrap">'+chips+'</div>'+
+      '<button class="btn btn-sm" data-addrate="'+s.id+'"><svg class="ic"><use href="#i-plus"/></svg>Rate</button>'+
+      '<button class="btn btn-sm" data-editsite="'+s.id+'">Edit</button>'+
+      '<button class="btn btn-sm" data-delsite="'+s.id+'">Delete</button>'+
+      '</div>';
+  }).join('');
+  el.querySelectorAll('[data-addrate]').forEach(function(b){b.addEventListener('click',function(){openRateModal(b.getAttribute('data-addrate'));});});
+  el.querySelectorAll('[data-editsite]').forEach(function(b){b.addEventListener('click',function(){openSiteModal(b.getAttribute('data-editsite'));});});
+  el.querySelectorAll('[data-delsite]').forEach(function(b){b.addEventListener('click',function(){delSite(b.getAttribute('data-delsite'));});});
+  el.querySelectorAll('[data-delrate]').forEach(function(b){b.addEventListener('click',function(){delRate(b.getAttribute('data-delrate'));});});
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+// ---------- site modal ----------
+var editingSiteId=null;
+function openSiteModal(id){
+  editingSiteId=id||null;
+  var s=id?S.sites.find(function(x){return x.id===id;}):null;
+  document.getElementById('siteModalTitle').textContent=id?'Edit site':'Add site';
+  document.getElementById('siteName').value=s?s.name:'';
+  document.getElementById('siteNotes').value=s?s.notes:'';
+  document.getElementById('siteModal').classList.add('open');
+  setTimeout(function(){document.getElementById('siteName').focus();},50);
+}
+function closeSiteModal(){document.getElementById('siteModal').classList.remove('open');}
+document.getElementById('siteSaveBtn').addEventListener('click',async function(){
+  var name=document.getElementById('siteName').value.trim();
+  var notes=document.getElementById('siteNotes').value.trim();
+  if(!name){toast('Enter a site name');return;}
+  try{
+    if(editingSiteId){await api('PUT','/sites/'+editingSiteId,{name:name,notes:notes,active:true});}
+    else{await api('POST','/sites',{name:name,notes:notes});}
+    closeSiteModal();await load(S.year);toast('Saved');
+  }catch(e){}
+});
+async function delSite(id){
+  var s=S.sites.find(function(x){return x.id===id;});
+  if(!confirm('Delete "'+(s?s.name:'this site')+'" and ALL of its recorded weeks and rates? This cannot be undone.'))return;
+  try{await api('DELETE','/sites/'+id);await load(S.year);toast('Site deleted');}catch(e){}
+}
+
+// ---------- rate modal ----------
+var rateSiteId=null;
+function openRateModal(id){
+  rateSiteId=id;var s=S.sites.find(function(x){return x.id===id;});
+  document.getElementById('rateModalSite').textContent=s?s.name:'';
+  document.getElementById('rateVal').value='';
+  document.getElementById('rateDate').value=new Date().toISOString().slice(0,10);
+  document.getElementById('rateModal').classList.add('open');
+  setTimeout(function(){document.getElementById('rateVal').focus();},50);
+}
+function closeRateModal(){document.getElementById('rateModal').classList.remove('open');}
+document.getElementById('rateSaveBtn').addEventListener('click',async function(){
+  var rate=document.getElementById('rateVal').value;
+  var date=document.getElementById('rateDate').value;
+  if(rate===''||Number(rate)<0){toast('Enter a valid rate');return;}
+  if(!date){toast('Pick an effective date');return;}
+  try{await api('POST','/sites/'+rateSiteId+'/rates',{rate:Number(rate),effective_date:date});closeRateModal();await load(S.year);toast('Rate added');}catch(e){}
+});
+async function delRate(id){
+  if(!confirm('Delete this rate?'))return;
+  try{await api('DELETE','/rates/'+id);await load(S.year);}catch(e){}
+}
+
+// ---------- toolbar ----------
+document.getElementById('yearSel').addEventListener('change',function(e){load(Number(e.target.value));});
+document.getElementById('addSiteBtn').addEventListener('click',function(){openSiteModal(null);});
+document.getElementById('addYearBtn').addEventListener('click',function(){
+  var y=prompt('View / start which year?',String(new Date().getFullYear()));
+  if(!y)return;y=parseInt(y,10);if(!y||y<2000||y>2100){toast('Enter a valid year');return;}
+  load(y);
+});
+document.getElementById('addWeekBtn').addEventListener('click',function(){
+  var d=document.getElementById('newWeekDate').value;
+  if(!d){toast('Pick a week-ending date');return;}
+  if(Number(d.slice(0,4))!==S.year){toast('That date is in '+d.slice(0,4)+', not '+S.year);return;}
+  if(S.extraDates.indexOf(d)<0&&!S.weeks.some(function(w){return w.week_ending===d;}))S.extraDates.push(d);
+  renderGrid();
+  toast('Week added — enter values to save');
+});
+document.getElementById('addNextWeekBtn').addEventListener('click',function(){
+  var dates=weekDates();var base;
+  if(dates.length){base=new Date(dates[dates.length-1]+'T00:00:00');base.setDate(base.getDate()+7);}
+  else{base=new Date(S.year+'-01-01T00:00:00');
+    // First Saturday-ish week-ending; just use Jan 7 as a sensible default.
+    base=new Date(S.year+'-01-07T00:00:00');}
+  var d=base.toISOString().slice(0,10);
+  if(Number(d.slice(0,4))!==S.year){toast('Next week falls in '+d.slice(0,4)+'; add it from that year.');return;}
+  if(S.extraDates.indexOf(d)<0&&!S.weeks.some(function(w){return w.week_ending===d;}))S.extraDates.push(d);
+  document.getElementById('newWeekDate').value=d;
+  renderGrid();toast('Added week ending '+d);
+});
+[document.getElementById('siteModal'),document.getElementById('rateModal')].forEach(function(m){
+  m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');});
+});
+
+// ---------- go ----------
+load(S.year).catch(function(){});
+</script>
+<script src="/session-guard.js" defer></script>
+</body>
+</html>
