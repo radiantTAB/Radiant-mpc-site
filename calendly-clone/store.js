@@ -30,13 +30,14 @@
     dailyCap: 0,
     webhookUrl: "",
     webhookSecret: "",
+    team: [],
     overrides: {},
     hours: { 0: [], 1: [[9, 12], [13, 17]], 2: [[9, 12], [13, 17]], 3: [[9, 12], [13, 17]], 4: [[9, 12], [13, 17]], 5: [[9, 12], [13, 16]], 6: [] }
   };
   var DEFAULT_EVENTS = [
-    { id: "intro-15", name: "15 Minute Intro Call", duration: 15, description: "A quick introduction to see if we're a good fit.", location: "Google Meet (link sent after booking)", sort: 0, active: 1, questions: [] },
-    { id: "meeting-30", name: "30 Minute Meeting", duration: 30, description: "A focused conversation about your project or question.", location: "Zoom (link sent after booking)", sort: 1, active: 1, questions: [] },
-    { id: "deep-60", name: "60 Minute Deep Dive", duration: 60, description: "An in-depth working session. Bring your questions.", location: "Phone call", sort: 2, active: 1, questions: [] }
+    { id: "intro-15", name: "15 Minute Intro Call", duration: 15, description: "A quick introduction to see if we're a good fit.", location: "Google Meet (link sent after booking)", sort: 0, active: 1, questions: [], hosts: [] },
+    { id: "meeting-30", name: "30 Minute Meeting", duration: 30, description: "A focused conversation about your project or question.", location: "Zoom (link sent after booking)", sort: 1, active: 1, questions: [], hosts: [] },
+    { id: "deep-60", name: "60 Minute Deep Dive", duration: 60, description: "An in-depth working session. Bring your questions.", location: "Phone call", sort: 2, active: 1, questions: [], hosts: [] }
   ];
 
   // ---------- shared helpers ----------
@@ -56,25 +57,51 @@
     }
     return (settings.hours && settings.hours[weekdayOf(dateStr)]) || [];
   }
+  function eventMembers(settings, event) {
+    var team = settings.team || [];
+    var ids = event.hosts || [];
+    var members = ids.map(function (id) { return team.find(function (m) { return m.id === id; }); }).filter(Boolean);
+    if (members.length) return members;
+    return [{ id: "", name: settings.host.name, initials: settings.host.initials, email: settings.host.email || "" }];
+  }
+  function memberById(settings, id) {
+    if (!id) return { id: "", name: settings.host.name, initials: settings.host.initials, email: settings.host.email || "" };
+    return (settings.team || []).find(function (m) { return m.id === id; }) || { id: "", name: settings.host.name, initials: settings.host.initials };
+  }
   function computeSlots(settings, event, dateStr, bookings) {
     var windows = windowsFor(settings, dateStr);
     var step = settings.slotStep || 30, buffer = settings.buffer || 0, dur = event.duration;
     var minNotice = settings.minNotice || 0;
     var tz = (settings.host && settings.host.timezone) || "America/New_York";
     var now = Date.now();
+    var members = eventMembers(settings, event);
     var taken = (bookings || []).filter(function (b) { return !b.canceled; });
     var out = [];
     windows.forEach(function (w) {
       var startMin = w[0] * 60, endMin = w[1] * 60;
       for (var m = startMin; m + dur <= endMin; m += step) {
         var s = m, e = m + dur;
-        var clash = taken.some(function (b) { return s < b.end_min + buffer && b.start_min - buffer < e; });
-        if (clash) continue;
+        var anyFree = members.some(function (mem) {
+          return !taken.some(function (b) { return (b.host_id || "") === mem.id && s < b.end_min + buffer && b.start_min - buffer < e; });
+        });
+        if (!anyFree) continue;
         if (minNotice > 0 && (hostInstant(dateStr, s, tz) - now) < minNotice * 60000) continue;
         out.push({ start: s, end: e, label: minutesLabel(s) });
       }
     });
     return out;
+  }
+  function assignMember(settings, event, start, end, dayBookings) {
+    var buffer = settings.buffer || 0;
+    var members = eventMembers(settings, event);
+    var taken = (dayBookings || []).filter(function (b) { return !b.canceled; });
+    var free = members.filter(function (mem) {
+      return !taken.some(function (b) { return (b.host_id || "") === mem.id && start < b.end_min + buffer && b.start_min - buffer < end; });
+    });
+    if (!free.length) return null;
+    function loadOf(mem) { return taken.filter(function (b) { return (b.host_id || "") === mem.id; }).length; }
+    free.sort(function (a, b) { return loadOf(a) - loadOf(b); });
+    return free[0];
   }
 
   // host wall-clock -> real UTC instant (mirrors app.js / worker)
@@ -135,7 +162,8 @@
     var events = this._events().filter(function (e) { return e.active !== 0; })
       .sort(function (a, b) { return (a.sort - b.sort) || a.name.localeCompare(b.name); });
     var host = { name: s.host.name, initials: s.host.initials, title: s.host.title, timezone: s.host.timezone };
-    return Promise.resolve({ host: host, slotStep: s.slotStep, buffer: s.buffer, minNotice: s.minNotice, horizonDays: s.horizonDays, overrides: s.overrides || {}, hours: s.hours, events: events });
+    var team = (s.team || []).map(function (m) { return { id: m.id, name: m.name, initials: m.initials }; });
+    return Promise.resolve({ host: host, team: team, slotStep: s.slotStep, buffer: s.buffer, minNotice: s.minNotice, horizonDays: s.horizonDays, overrides: s.overrides || {}, hours: s.hours, events: events });
   };
   LocalStore.prototype.getSlots = function (eventId, date) {
     var s = this._settings();
@@ -156,10 +184,9 @@
     var bookings = this._bookings();
     var todays = bookings.filter(function (b) { return b.date === data.date && !b.canceled; });
     if (s.dailyCap > 0 && todays.length >= s.dailyCap) return Promise.reject(new Error("No more bookings are available on that day."));
-    var free = computeSlots(s, event, data.date, todays);
-    if (!free.some(function (x) { return x.start === data.start; })) {
-      return Promise.reject(new Error("That time was just taken. Please pick another."));
-    }
+    var end = data.start + event.duration;
+    var member = assignMember(s, event, data.start, end, todays);
+    if (!member) return Promise.reject(new Error("That time is no longer available. Please pick another."));
     // Custom questions: validate required, collect answers.
     var answersIn = data.answers && typeof data.answers === "object" ? data.answers : {};
     var answers = {};
@@ -171,19 +198,19 @@
     }
     var b = {
       id: makeId("ml_"), event_id: event.id, name: data.name, email: data.email,
-      notes: data.notes || "", date: data.date, start_min: data.start, end_min: data.start + event.duration,
-      tz: data.tz || "", created_at: new Date().toISOString(), canceled: 0, answers: answers
+      notes: data.notes || "", date: data.date, start_min: data.start, end_min: end,
+      tz: data.tz || "", created_at: new Date().toISOString(), canceled: 0, answers: answers, host_id: member.id
     };
     bookings.push(b);
     writeJSON(LS_BOOKINGS, bookings);
     var mine = readJSON(LS_MINE, []); mine.push(b.id); writeJSON(LS_MINE, mine);
-    return Promise.resolve(shape(b, event));
+    return Promise.resolve(shape(b, event, s));
   };
   LocalStore.prototype.getBooking = function (id) {
     var b = this._bookings().find(function (x) { return x.id === id; });
     if (!b) return Promise.reject(new Error("No booking found with that code."));
     var event = this._events().find(function (e) { return e.id === b.event_id; }) || { name: b.event_id, duration: b.end_min - b.start_min, location: "" };
-    return Promise.resolve(shape(b, event));
+    return Promise.resolve(shape(b, event, this._settings()));
   };
   LocalStore.prototype.cancelBooking = function (id) {
     var bookings = this._bookings();
@@ -210,9 +237,10 @@
     return Promise.resolve({ ok: true, events: clean });
   };
   LocalStore.prototype.adminBookings = function (all) {
+    var s = this._settings();
     var list = this._bookings().filter(function (b) { return all ? true : !b.canceled; });
     list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : b.start_min - a.start_min; });
-    return Promise.resolve(list.map(function (b) { return shape(b, { name: b.event_id, duration: b.end_min - b.start_min, location: "" }); }));
+    return Promise.resolve(list.map(function (b) { return shape(b, { name: b.event_id, duration: b.end_min - b.start_min, location: "" }, s); }));
   };
 
   // ============================ ApiStore ============================
@@ -253,12 +281,13 @@
   };
 
   // ---------- normalizers so both stores return the same booking shape ----------
-  function shape(b, event) {
+  function shape(b, event, settings) {
     return {
       id: b.id, event: b.event_id, eventName: event.name, duration: event.duration, location: event.location,
       name: b.name, email: b.email, notes: b.notes || "", date: b.date,
       start: b.start_min, end: b.end_min, label: minutesLabel(b.start_min), tz: b.tz || "",
-      created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {}
+      created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {},
+      host_id: b.host_id || "", hostName: settings ? memberById(settings, b.host_id || "").name : undefined
     };
   }
   function normalizeApiBooking(b) {
@@ -266,7 +295,8 @@
       id: b.id, event: b.event, eventName: b.eventName || b.event, duration: b.duration || (b.end - b.start),
       location: b.location || "", name: b.name, email: b.email, notes: b.notes || "", date: b.date,
       start: b.start, end: b.end, label: b.label || minutesLabel(b.start), tz: b.tz || "",
-      created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {}
+      created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {},
+      host_id: b.host_id || "", hostName: b.hostName
     };
   }
 
@@ -295,9 +325,30 @@
       dailyCap: clampInt(body.dailyCap, 0, 100, current.dailyCap),
       webhookUrl: sanitizeUrl(body.webhookUrl, current.webhookUrl),
       webhookSecret: String(body.webhookSecret != null ? body.webhookSecret : current.webhookSecret || "").trim().slice(0, 200),
+      team: sanitizeTeam(body.team, current.team),
       overrides: sanitizeOverrides(body.overrides, current.overrides),
       hours: hours
     };
+  }
+  function sanitizeTeam(team, fallback) {
+    if (!Array.isArray(team)) return fallback || [];
+    var out = [];
+    for (var i = 0; i < team.length && out.length < 25; i++) {
+      var m = team[i] || {};
+      var name = String(m.name || "").trim().slice(0, 80);
+      if (!name) continue;
+      var initials = String(m.initials || "").trim().slice(0, 3).toUpperCase();
+      if (!initials) initials = name.split(/\s+/).map(function (w) { return w[0]; }).join("").slice(0, 2).toUpperCase();
+      var emailRaw = String(m.email || "").trim().slice(0, 160);
+      out.push({ id: String(m.id || "").trim() || makeId("mem_"), name: name, initials: initials, email: emailRaw && isEmail(emailRaw) ? emailRaw : "" });
+    }
+    return out;
+  }
+  function sanitizeHosts(hosts) {
+    if (!Array.isArray(hosts)) return [];
+    var out = [];
+    hosts.forEach(function (h) { var id = String(h || "").trim(); if (id && out.indexOf(id) === -1) out.push(id); });
+    return out;
   }
   function sanitizeUrl(v, fallback) {
     var s = String(v != null ? v : "").trim().slice(0, 500);
@@ -327,7 +378,8 @@
         description: String(e.description || "").trim(),
         location: String(e.location || "").trim(),
         sort: i, active: e.active === false || e.active === 0 ? 0 : 1,
-        questions: sanitizeQuestions(e.questions)
+        questions: sanitizeQuestions(e.questions),
+        hosts: sanitizeHosts(e.hosts)
       });
     }
     return out;

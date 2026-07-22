@@ -513,6 +513,14 @@ img { max-width: 100%; display: block; }
 .eer-grid input[type="text"], .eer-grid input:not([type]), .ee-name, .ee-duration, .ee-location, .ee-desc { padding: 9px 10px; border: 1.5px solid var(--line); border-radius: 8px; font: inherit; background: var(--surface); color: var(--ink); min-width: 0; }
 .ee-active { display: flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); white-space: nowrap; }
 
+.team-list { display: grid; gap: 10px; margin-bottom: 12px; }
+.member-row { display: grid; grid-template-columns: 1.6fr 70px 1.6fr auto; gap: 8px; align-items: center; }
+.member-row input { padding: 9px 10px; border: 1.5px solid var(--line); border-radius: 8px; font: inherit; background: var(--surface); color: var(--ink); min-width: 0; }
+
+.ee-hosts { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.host-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.host-check { display: flex; align-items: center; gap: 6px; font-size: .9rem; }
+
 .ee-questions { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .eeq-head { font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
 .eeq-list { display: grid; gap: 8px; margin-bottom: 8px; }

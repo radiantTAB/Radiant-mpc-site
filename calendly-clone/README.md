@@ -63,6 +63,16 @@ token is passed in the URL (calendar clients can't send auth headers), so treat
 the whole URL as a secret. The admin console shows the ready-made URL with a
 copy button when running against the deployed backend.
 
+### Team & round-robin
+
+Add **team members** in the admin Team card, then assign them to an event type
+(the Hosts checkboxes on each event). A slot for that event is offered while
+**any** assigned member is free, and each booking is auto-assigned to a free
+member, load-balanced (fewest bookings that day). So two members double the
+per-slot capacity, and the booker/host both see who they're meeting. Events
+with no assignment fall back to the single primary host. Availability and
+timezone are shared across the team.
+
 ### Webhooks
 
 Set a **webhook URL** in the admin Integrations card and Meetly will POST a JSON
