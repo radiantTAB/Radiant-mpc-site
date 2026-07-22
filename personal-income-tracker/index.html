@@ -261,6 +261,7 @@ table.kt input.wide{width:56px}
         <label class="fld">Pay period <select id="ppSel"></select></label>
         <button class="btn btn-sm" id="addPPBtn"><svg class="ic"><use href="#i-plus"/></svg>New pay period</button>
         <button class="btn btn-sm" id="delPPBtn">Delete period</button>
+        <button class="btn btn-sm btn-primary" id="ktSyncBtn">Push GK/RO hrs → Income grid</button>
         <div class="spacer"></div>
         <button class="btn btn-sm" id="addEntryBtn"><svg class="ic"><use href="#i-plus"/></svg>Add entry</button>
       </div>
@@ -354,6 +355,7 @@ table.kt input.wide{width:56px}
 // =====================================================================
 var STORE_KEY='incomeTrackerDB_v2';
 var WEEKS_IN_YEAR=52;
+var NOW_YEAR=new Date().getFullYear();
 var persistOK=true;
 var DB=loadDB();
 var S={year:2026,extraDates:[],sites:[],weeks:[],years:[]};
@@ -365,8 +367,8 @@ function seedDB(){
     mk('OPEN / OTHER','income_actual',[]),
     mk('DP - Remote','runrate',[r(125.87,'2026-01-01',52)]),
     mk('DP - Onsite','manual',[r(175.95,'2026-01-01',52)],{manual_hours:112.5}),
-    mk('Kettering - Gamma Knife','runrate',[r(119.55,'2026-01-01',27),r(134.64,'2026-07-01',52)]),
-    mk('Kettering Health - RadOnc','runrate',[r(119.55,'2026-01-01',27),r(134.64,'2026-07-01',52)]),
+    mk('Kettering - Gamma Knife','runrate',[r(119.55,'2026-01-01',27),r(134.64,'2026-07-01',52)],{kt_cc:'GK'}),
+    mk('Kettering Health - RadOnc','runrate',[r(119.55,'2026-01-01',27),r(134.64,'2026-07-01',52)],{kt_cc:'RO'}),
     mk('OMPC - On-Site','actual',[r(220,'2026-01-01',52)]),
     mk('OMPC - Remote','actual',[r(120,'2026-01-01',52)])
   ];
@@ -417,6 +419,9 @@ function projectSite(s){
   var avgH=n?ytdH/n:0, avgI=n?ytdI/n:0;
   var rate=currentRate(s);
   var out={weeks:n,ytdHours:ytdH,ytdIncome:ytdI,avgHours:avgH,avgIncome:avgI,rate:rate,projHours:0,projIncome:0,segments:[]};
+  // A completed (past) year is shown at its actual recorded total, not a
+  // run-rate projection built from the current-year config.
+  if(S.year<NOW_YEAR){out.projHours=ytdH;out.projIncome=ytdI;out.pastActual=true;return out;}
   var method=s.method||'runrate';
   if(method==='income_actual'){out.projIncome=ytdI;out.projHours=ytdH;return out;}
   if(method==='income_runrate'){out.projIncome=avgI*WEEKS_IN_YEAR;out.projHours=avgH*WEEKS_IN_YEAR;return out;}
@@ -514,16 +519,17 @@ function renderYoY(){
 
 function renderProjYear(){
   var t=document.getElementById('projYearTable');
-  var liveTotal=totalProjection();
-  DB.projYear[String(S.year)]=Math.round(liveTotal*100)/100; // current year auto
-  var years={};Object.keys(DB.projYear).forEach(function(y){years[y]=1;});years[String(S.year)]=1;
+  // Only the actual current calendar year auto-fills from the live projection;
+  // past years keep their stored totals (and stay editable).
+  if(S.year===NOW_YEAR){DB.projYear[String(NOW_YEAR)]=Math.round(totalProjection()*100)/100;}
+  var years={};Object.keys(DB.projYear).forEach(function(y){years[y]=1;});years[String(NOW_YEAR)]=1;
   var ylist=Object.keys(years).map(Number).sort(function(a,b){return a-b;});
   t.querySelector('thead').innerHTML='<tr><th>Year</th><th>Total projection</th><th>vs prior</th></tr>';
   var cum=0;
   t.querySelector('tbody').innerHTML=ylist.map(function(y){
     var v=Number(DB.projYear[String(y)])||0;cum+=v;
     var prev=Number(DB.projYear[String(y-1)])||0;var d=v-prev;var dcls=d>=0?'delta-up':'delta-down';
-    var isCur=(y===S.year);
+    var isCur=(y===NOW_YEAR);
     var valCell=isCur?('<strong class="num">'+usd.format(v)+'</strong> <span class="muted">(live)</span>')
       :('<input type="number" step="0.01" data-projyear="'+y+'" value="'+(DB.projYear[String(y)]==null?'':DB.projYear[String(y)])+'">');
     return '<tr><td>'+y+(isCur?' <span class="muted">(current)</span>':'')+'</td><td class="num">'+valCell+'</td><td class="num '+(prev?dcls:'muted')+'">'+(prev?((d>=0?'+':'')+usd.format(d)):'—')+'</td></tr>';
@@ -781,7 +787,46 @@ function renderKtWeeks(){
   t.querySelectorAll('[data-w]').forEach(function(inp){inp.addEventListener('change',function(){ktUpdWeek(inp.getAttribute('data-w'),inp.getAttribute('data-f'),inp.value===''?0:num(inp.value));renderKtWeeks();});});
   t.querySelectorAll('[data-delw]').forEach(function(b){b.addEventListener('click',function(){ktDelWeek(b.getAttribute('data-delw'));renderKtWeeks();});});
 }
+// ---- link timeclock hours -> Income grid ----
+// GK hours feed "Kettering - Gamma Knife"; RO hours feed "Kettering Health
+// - RadOnc". Sites are matched by their kt_cc tag, falling back to name so
+// migrated saves (no tag) still link. Entries are grouped into Monday-keyed
+// weeks (matching the Income grid) across all pay periods; dollars are set
+// at the Kettering rate in effect that week.
+function findKetteringSite(cc){
+  var byTag=DB.sites.filter(function(s){return s.kt_cc===cc;})[0];
+  if(byTag)return byTag;
+  var re=cc==='GK'?/gamma\s*knife/i:/rad\s*onc|radonc/i;
+  return DB.sites.filter(function(s){return re.test(s.name);})[0]||null;
+}
+function syncTimeclockToIncome(){
+  ktEnsure();
+  var gk=findKetteringSite('GK'),ro=findKetteringSite('RO');
+  if(!gk||!ro){toast('Could not find both Kettering sites in the Income tab.');return;}
+  var agg={};
+  DB.kettering.payPeriods.forEach(function(pp){(pp.entries||[]).forEach(function(e){
+    if(!e.date)return;var h=clockHours(e.start,e.stop);if(!h)return;
+    var wk=mondayOf(e.date);var a=agg[wk]=agg[wk]||{GK:0,RO:0};
+    a[e.cc==='RO'?'RO':'GK']+=h;
+  });});
+  var weeks=Object.keys(agg).sort();
+  if(!weeks.length){toast('No timeclock hours to push yet.');return;}
+  if(!confirm('Push GK/RO hours from the timeclock into the Income grid for '+weeks.length+' week(s)?\n\nThis sets each of those weeks’ Kettering GK and RadOnc hours (and $ at the rate in effect that week) from your clock entries, overwriting whatever those two sites held for those weeks.'))return;
+  weeks.forEach(function(wk){
+    [['GK',gk],['RO',ro]].forEach(function(p){
+      var site=p[1];var h=Math.round(agg[wk][p[0]]*100)/100;
+      var rate=rateForDate(site,wk);var inc=rate!=null?Math.round(h*rate*100)/100:0;
+      upsertWeek(site.id,wk,h,inc);
+    });
+  });
+  // Jump the Income tab to the year those weeks belong to, so the result is visible.
+  var yr=parseInt(weeks[weeks.length-1].slice(0,4),10);if(yr)S.year=yr;
+  refresh();renderAll();
+  toast('Pushed '+weeks.length+' week(s) into the Income grid');
+}
+
 // ---- kettering toolbar ----
+document.getElementById('ktSyncBtn').addEventListener('click',syncTimeclockToIncome);
 document.getElementById('ppSel').addEventListener('change',function(e){S.ktPP=e.target.value;renderPPTable();renderPPSummary();});
 document.getElementById('addPPBtn').addEventListener('click',function(){var d=prompt('Pay-period start date (YYYY-MM-DD, first Monday):',todayISO());if(!d)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('Use YYYY-MM-DD');return;}S.ktPP=ktAddPP(d);renderKettering();toast('Pay period added');});
 document.getElementById('delPPBtn').addEventListener('click',function(){var pp=ktActivePP();if(!pp){return;}if(!confirm('Delete this pay period and its '+(pp.entries||[]).length+' entries?'))return;ktDelPP(pp.id);S.ktPP=null;renderKettering();toast('Pay period deleted');});
