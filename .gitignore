@@ -1,3 +1,4 @@
 # Never commit real income data — ship it via the app's Backup/Restore.
 *.json
 *.xlsx
+__pycache__/

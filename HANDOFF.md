@@ -50,10 +50,32 @@ The migrated financial data was delivered as **`.json` backups in the chat**, no
 **To load data:** open `index.html` → **Restore** → pick the ALLYEARS `.json`.
 **Restore replaces everything in the file**, so **Backup first** if you've already entered timeclock/DP data.
 
-The source spreadsheet the data came from: `2024_Income_Statement.xlsx`
-(sheets `2021`–`2026`, `KMC Calc`, `Predictor`). Keep it if you want to
-re-migrate; the migration was a Python/openpyxl script (not committed — ask
-Claude Code to recreate it from the xlsx if needed).
+**To regenerate the data from scratch** (no chat, no backup file needed):
+
+```powershell
+cd C:\Users\toddb\income-tracker
+python migrate_from_xlsx.py "C:\Users\toddb\OneDrive\2024 Income Statement.xlsx"
+```
+
+That writes `income-tracker-ALLYEARS-migrated.json` here; Restore it. The
+script self-checks every site's yearly hours and income against that sheet's
+own Totals row and refuses to claim success if any disagree. Run
+`python migrate_from_xlsx.py --demo` for its unit check. Close the workbook in
+Excel first — an open file gives `PermissionError`.
+
+Source spreadsheet: `C:\Users\toddb\OneDrive\2024 Income Statement.xlsx`
+(sheets `2021`–`2026`, `KMC Calc`, `Predictor`). `KMC Calc` is a scratch pad
+for the current pay period and `Predictor` is planning scratch — neither is
+migrated, and 2021 is deliberately skipped.
+
+**Known residual:** the regenerated 2026 projection totals **$575,563.03**
+vs the validated **$574,165.25** — 0.24% high, entirely in the two Kettering
+sites (GK +$777, RadOnc +$621). Every other site matches to the cent. Cause:
+each Kettering site has two rate segments (27 wk @ $119.55 + 52 wk @ $134.64)
+and the original used a *different* frozen average per segment; the script
+writes the sheet's single row-1 average to both. To match exactly, edit the
+second segment's avg in *Sites & rates*. Not reverse-fitted on purpose — the
+numbers the script writes all come from the sheet.
 
 ---
 
