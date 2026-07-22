@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Income Tracker</title>
+<!--
+  Personal Income Tracker — a single, self-contained file.
+
+  • No install, no server, no internet required. Double-click to open in
+    any browser. Everything (the app AND your data) lives on your machine.
+  • Data saves automatically in this browser's local storage. Use Backup
+    often to save a .json copy you control; Restore loads it back.
+  • Projection matches the spreadsheet model: per site, average weekly
+    hours × weeks × rate, summed. Sites with a mid-year rate change split
+    into weeks at the old rate + weeks at the new rate.
+  • Styling reuses the Radiant look but this tool is standalone.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-elev:#fafafa;--bg-card:#f4f4f5;
+  --line:#e6e6e8;--line-hi:#cdcdd1;
+  --text:#1a1a1a;--text-mute:#5a5a5a;--text-dim:#8a8a8a;
+  --accent:#d00008;--accent-2:#a80006;--accent-bright:#f03020;--accent-warm:#f86058;
+  --charcoal:#303030;--ok:#1a7f37;--ok-bg:rgba(26,127,55,.08);--neg:#b42318;
+  --font-display:'Montserrat',system-ui,sans-serif;
+  --font-body:'Montserrat',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --max-w:1360px;--pad-x:clamp(14px,3.5vw,44px);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 1px 1px,rgba(208,0,8,.03) 1px,transparent 0);background-size:32px 32px;pointer-events:none;z-index:0}
+a{color:var(--accent);text-decoration:none}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.svg-defs{position:absolute;width:0;height:0;overflow:hidden}
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px var(--pad-x);background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{display:inline-flex;align-items:center;gap:11px}
+.brand-dot{width:16px;height:16px;border-radius:50%;background:conic-gradient(var(--accent) 0 50%,transparent 50% 100%);border:2px solid var(--accent);box-shadow:0 0 12px rgba(208,0,8,.35)}
+.brand-name{font-family:var(--font-display);font-weight:800;font-size:18px;letter-spacing:-.01em}
+.brand-name span{color:var(--accent)}
+.nav-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hero{background:var(--bg-elev);border-bottom:1px solid var(--line);padding:24px var(--pad-x) 20px;position:relative;z-index:2}
+.hero-inner{max-width:var(--max-w);margin:0 auto}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-mute);margin-bottom:12px}
+.eyebrow-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px rgba(208,0,8,.4)}
+.hero h1{font-family:var(--font-display);font-weight:800;font-size:clamp(24px,3.6vw,36px);line-height:1.05;letter-spacing:-.02em}
+.hero p{color:var(--text-mute);margin-top:7px;max-width:680px;font-size:14px}
+.wrap{max-width:var(--max-w);margin:0 auto;padding:22px var(--pad-x) 90px;position:relative;z-index:2}
+.banner{border:1px solid rgba(240,196,116,.5);background:rgba(240,196,116,.14);color:#7a5b17;border-radius:10px;padding:12px 16px;font-size:13.5px;margin-bottom:22px;display:none}
+.banner.show{display:block}
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.toolbar .spacer{flex:1}
+label.fld{display:inline-flex;flex-direction:column;gap:4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);font-weight:600}
+select,input[type=text],input[type=number],input[type=date]{font:inherit;color:var(--text);background:#fff;border:1px solid var(--line-hi);border-radius:8px;padding:8px 10px}
+select:focus,input:focus{outline:none;border-color:var(--accent)}
+.btn{font:inherit;font-size:14px;font-weight:600;cursor:pointer;border-radius:8px;padding:9px 15px;border:1px solid var(--line-hi);background:#fff;color:var(--text);transition:all .18s;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+.btn-sm{padding:6px 11px;font-size:12.5px}
+.btn .ic{width:16px;height:16px}
+.section{margin-bottom:34px}
+.section-title{font-family:var(--font-display);font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-mute);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.section-title .ic{width:18px;height:18px;color:var(--accent)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+.card{background:var(--bg-card);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:10px;padding:18px 20px}
+.card .k{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim)}
+.card .v{font-family:var(--font-display);font-weight:800;font-size:26px;letter-spacing:-.02em;margin-top:6px}
+.card .sub{font-size:12.5px;color:var(--text-mute);margin-top:5px}
+.delta-up{color:var(--ok)}.delta-down{color:var(--neg)}
+.tbl-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+thead th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);font-weight:500;background:var(--bg-elev);position:sticky;top:0;z-index:2}
+tbody tr:hover{background:var(--bg-elev)}
+tfoot td{font-weight:700;border-top:2px solid var(--line-hi);background:var(--bg-elev)}
+.num{font-family:var(--font-mono)}.muted{color:var(--text-dim)}
+.grid-scroll{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:10px;background:#fff}
+table.grid th,table.grid td{border-right:1px solid var(--line)}
+table.grid th.site-group{text-align:center;border-bottom:1px solid var(--line-hi);color:var(--text);font-family:var(--font-display);font-size:12px;font-weight:700;text-transform:none;letter-spacing:0}
+table.grid thead th{position:sticky;top:0}
+table.grid thead tr.groups th{top:0;z-index:4}
+table.grid thead tr.subs th{top:34px;z-index:3}
+table.grid td.wk,table.grid th.wk{position:sticky;left:0;background:var(--bg-elev);z-index:1;text-align:left;font-family:var(--font-mono);font-size:12.5px;border-right:1px solid var(--line-hi)}
+table.grid thead th.wk{z-index:5}
+table.grid input{width:64px;text-align:right;font-family:var(--font-mono);font-size:13px;border:1px solid transparent;background:transparent;padding:5px 5px;border-radius:5px}
+table.grid input:hover{border-color:var(--line)}
+table.grid input:focus{border-color:var(--accent);background:#fff}
+table.grid td.dollars input{width:82px}
+table.grid td.runtot{font-family:var(--font-mono);color:var(--text-mute);background:var(--bg-elev)}
+.wk-del{color:var(--text-dim);cursor:pointer;font-size:12px;padding:2px 6px;border:none;background:transparent}
+.wk-del:hover{color:var(--neg)}
+.site-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:9px;margin-bottom:10px;background:#fff}
+.site-row .name{font-weight:700;min-width:150px}
+.rate-chip{font-family:var(--font-mono);font-size:12px;background:var(--bg-card);border:1px solid var(--line-hi);border-radius:999px;padding:3px 9px;display:inline-flex;align-items:center;gap:6px}
+.rate-chip input{width:42px;padding:1px 4px;font-size:11.5px;text-align:right;border:1px solid var(--line-hi);border-radius:5px}
+.rate-chip button{border:none;background:transparent;color:var(--text-dim);cursor:pointer;font-size:13px;line-height:1}
+.rate-chip button:hover{color:var(--neg)}
+.hint{font-size:12.5px;color:var(--text-dim)}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-mute);cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:16px;height:16px}
+.method-sel{font-size:12px;padding:5px 7px}
+.seg-note{font-size:11.5px;color:var(--text-dim);font-family:var(--font-mono)}
+.modal-back{position:fixed;inset:0;background:rgba(20,20,22,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-back.open{display:flex}
+.modal{background:#fff;border-radius:14px;max-width:480px;width:100%;padding:26px;border-top:4px solid var(--accent);box-shadow:0 24px 60px rgba(0,0,0,.25)}
+.modal h3{font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:16px}
+.modal .fld-block{margin-bottom:14px}
+.modal .fld-block label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);font-weight:600;margin-bottom:5px}
+.modal input,.modal textarea,.modal select{width:100%;font:inherit;border:1px solid var(--line-hi);border-radius:8px;padding:9px 11px}
+.modal textarea{min-height:60px;resize:vertical}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.empty{text-align:center;color:var(--text-dim);padding:40px 20px;font-size:14.5px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--charcoal);color:#fff;padding:11px 20px;border-radius:999px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:200}
+.toast.show{opacity:1}
+table.edit input{width:88px;text-align:right;font-family:var(--font-mono);font-size:13px;border:1px solid transparent;background:transparent;padding:4px 6px;border-radius:5px}
+table.edit input:hover{border-color:var(--line)}
+table.edit input:focus{border-color:var(--accent);background:#fff}
+/* Tabs */
+.tabbar{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:24px;flex-wrap:wrap}
+.tabbtn{font:inherit;font-weight:700;font-size:14px;cursor:pointer;background:transparent;border:none;padding:11px 18px;color:var(--text-mute);border-bottom:3px solid transparent;margin-bottom:-2px;display:inline-flex;align-items:center;gap:8px}
+.tabbtn:hover{color:var(--text)}
+.tabbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tabbtn .ic{width:17px;height:17px}
+.tabpane[hidden]{display:none}
+.subhead{font-family:var(--font-display);font-weight:700;font-size:17px;margin:6px 0 12px}
+.pp-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:14px 0}
+.pp-cell{background:var(--bg-card);border:1px solid var(--line);border-radius:9px;padding:12px 14px;text-align:center}
+.pp-cell .k{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim)}
+.pp-cell .v{font-family:var(--font-display);font-weight:800;font-size:20px;margin-top:3px}
+.pp-cell.grand{border-top:3px solid var(--accent)}
+table.kt input,table.kt select{width:100%;font:inherit;font-size:13px;border:1px solid transparent;background:transparent;padding:5px 6px;border-radius:5px;font-family:var(--font-mono)}
+table.kt input:hover,table.kt select:hover{border-color:var(--line)}
+table.kt input:focus,table.kt select:focus{border-color:var(--accent);background:#fff;outline:none}
+table.kt td,table.kt th{text-align:center}
+table.kt th:first-child,table.kt td:first-child{text-align:left}
+.cc-gk{color:var(--accent);font-weight:600}.cc-ro{color:#1666c4;font-weight:600}
+.plan-card{background:var(--bg-card);border:1px solid var(--line);border-left:3px solid var(--accent-warm);border-radius:10px;padding:20px 24px;margin-bottom:16px}
+.plan-card h4{font-family:var(--font-display);font-size:15px;margin-bottom:8px}
+.plan-card ul{margin:8px 0 0 20px;font-size:14px;color:var(--text-mute);line-height:1.7}
+.tog{display:inline-flex;border:1px solid var(--line-hi);border-radius:8px;overflow:hidden}
+.tog button{font:inherit;font-size:13px;font-weight:700;padding:8px 16px;border:none;background:#fff;color:var(--text-mute);cursor:pointer}
+.tog button.active{background:var(--accent);color:#fff}
+.dp-notes{display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));gap:8px;margin:8px 0 4px;overflow-x:auto}
+.dp-notes .dn{display:flex;flex-direction:column;gap:4px}
+.dp-notes label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);font-family:var(--font-mono)}
+.dp-notes textarea{font:inherit;font-size:12.5px;min-height:66px;border:1px solid var(--line-hi);border-radius:7px;padding:6px 8px;resize:vertical;width:100%}
+.dp-notes textarea:focus{outline:none;border-color:var(--accent)}
+table.kt td.rowlabel,table.kt th.rowlabel{text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:var(--bg-elev);z-index:1}
+table.kt input.wide{width:56px}
+.dp-total-line{display:flex;gap:24px;flex-wrap:wrap;margin:12px 0;font-family:var(--font-mono);font-size:14px}
+.dp-total-line strong{font-family:var(--font-display)}
+.footer{padding:30px var(--pad-x);border-top:1px solid var(--line);background:var(--bg-elev);color:var(--text-dim);font-size:13px;position:relative;z-index:2}
+.footer-inner{max-width:var(--max-w);margin:0 auto;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
+@media(max-width:720px){.brand-name{font-size:16px}}
+</style>
+</head>
+<body>
+
+<svg class="svg-defs" aria-hidden="true"><symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></symbol>
+<symbol id="i-sites" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M12 3v13M7 8l5-5 5 5"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><path d="M3 5v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+</svg>
+
+<nav class="nav">
+  <div class="brand"><span class="brand-dot"></span><span class="brand-name">Income&nbsp;<span>Tracker</span></span></div>
+  <div class="nav-actions">
+    <button class="btn btn-sm" id="backupBtn"><svg class="ic"><use href="#i-save"/></svg>Backup</button>
+    <button class="btn btn-sm" id="restoreBtn"><svg class="ic"><use href="#i-up"/></svg>Restore</button>
+    <button class="btn btn-sm" id="csvBtn">Export CSV</button>
+    <input type="file" id="restoreFile" accept="application/json,.json" style="display:none">
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow"><span class="eyebrow-dot"></span><span>Standalone · Runs offline · Your data stays on this device</span></div>
+    <h1>Income Tracker</h1>
+    <p>Hours and income per site per week. Each site's average weekly hours are carried out to a full-year projection at its rate — including mid-year rate changes — and compared against prior years.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="storageWarn"></div>
+
+  <div class="tabbar" id="tabbar">
+    <button class="tabbtn active" data-tab="income"><svg class="ic"><use href="#i-chart"/></svg>Income</button>
+    <button class="tabbtn" data-tab="kettering"><svg class="ic"><use href="#i-cal"/></svg>Kettering detail</button>
+    <button class="tabbtn" data-tab="dp"><svg class="ic"><use href="#i-grid"/></svg>DP PRN Log</button>
+  </div>
+
+  <div id="tab-income" class="tabpane">
+  <div class="toolbar">
+    <label class="fld">Year <select id="yearSel"></select></label>
+    <button class="btn btn-sm" id="addYearBtn"><svg class="ic"><use href="#i-plus"/></svg>Year</button>
+    <div class="spacer"></div>
+    <button class="btn" id="addSiteBtn"><svg class="ic"><use href="#i-plus"/></svg>Add site</button>
+  </div>
+
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-chart"/></svg><span id="summaryTitle">Year summary</span></div>
+    <div class="cards" id="summaryCards"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-trend"/></svg>Per-site projection</div>
+    <div class="tbl-scroll">
+      <table id="projTable"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+    </div>
+    <p class="hint" style="margin-top:8px">Run-rate sites: avg weekly hours &times; weeks &times; rate (a mid-year rate change adds a second segment, e.g. 27 wk @ old + 52 wk @ new). Actual-hours sites: hours recorded so far &times; rate. Manual sites: a fixed hours figure &times; rate. Set each site's method in <em>Sites &amp; rates</em> below.</p>
+  </section>
+
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-chart"/></svg>Year over year — average weekly hours</div>
+    <div class="tbl-scroll"><table class="edit" id="yoyTable"><thead></thead><tbody></tbody></table></div>
+    <p class="hint" style="margin-top:8px">Editable history — your recorded per-site figures by year. Click a cell to change it.</p>
+  </section>
+
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-chart"/></svg>Total projection by year</div>
+    <div class="tbl-scroll"><table class="edit" id="projYearTable"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    <p class="hint" style="margin-top:8px">Prior years are editable; the current year auto-fills from the projection above.</p>
+  </section>
+
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-grid"/></svg>Weekly entry</div>
+    <div class="toolbar" style="margin-bottom:14px">
+      <label class="fld">Week ending <input type="date" id="newWeekDate"></label>
+      <button class="btn btn-sm" id="addWeekBtn"><svg class="ic"><use href="#i-plus"/></svg>Add week</button>
+      <button class="btn btn-sm" id="addNextWeekBtn">+7 days</button>
+      <div class="spacer"></div>
+      <label class="toggle"><input type="checkbox" id="autoFill" checked> Auto-fill $ from rate &times; hours</label>
+    </div>
+    <div class="grid-scroll"><table class="grid" id="grid"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+    <p class="hint" style="margin-top:8px">Type hours for each site — dollars auto-fill from the current rate (editable). Entries save automatically. Clear both to remove a week for a site.</p>
+  </section>
+
+  <section class="section">
+    <div class="section-title"><svg class="ic"><use href="#i-sites"/></svg>Sites &amp; rates</div>
+    <div id="sitesManager"></div>
+  </section>
+  </div><!-- /tab-income -->
+
+  <!-- ===== KETTERING DETAIL ===== -->
+  <div id="tab-kettering" class="tabpane" hidden>
+
+    <section class="section">
+      <div class="section-title"><svg class="ic"><use href="#i-cal"/></svg>Timeclock &amp; pay periods</div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <label class="fld">Pay period <select id="ppSel"></select></label>
+        <button class="btn btn-sm" id="addPPBtn"><svg class="ic"><use href="#i-plus"/></svg>New pay period</button>
+        <button class="btn btn-sm" id="delPPBtn">Delete period</button>
+        <button class="btn btn-sm btn-primary" id="ktSyncBtn">Push GK/RO hrs → Income grid</button>
+        <div class="spacer"></div>
+        <button class="btn btn-sm" id="addEntryBtn"><svg class="ic"><use href="#i-plus"/></svg>Add entry</button>
+      </div>
+      <div class="tbl-scroll"><table class="kt" id="ppTable"><thead></thead><tbody></tbody></table></div>
+      <div class="pp-summary" id="ppSummary"></div>
+      <p class="hint">Each entry: date, clock in/out (hours auto-calc), and cost center GK or RO. Week 1 = the pay-period start week; week 2 = the following week. Totals split GK/RO per week, matching the KMC pay-period sheet.</p>
+    </section>
+
+    <section class="section">
+      <div class="section-title"><svg class="ic"><use href="#i-chart"/></svg>RadOnc charts by day &amp; Gamma Knife Co-Reg</div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <label class="fld">Week ending <input type="date" id="ktNewWeek"></label>
+        <button class="btn btn-sm" id="ktAddWeekBtn"><svg class="ic"><use href="#i-plus"/></svg>Add week</button>
+        <button class="btn btn-sm" id="ktNextWeekBtn">+7 days</button>
+      </div>
+      <div class="tbl-scroll"><table class="kt" id="ktWeekTable"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+      <p class="hint">RO charts are bucketed Sun/Mon · Tue · Wed · Thu · Fri/Sat (weekly total auto-sums). The footer shows season totals and per-day averages across the weeks recorded — like the "Kettering Charts" block on your sheet.</p>
+    </section>
+
+  </div><!-- /tab-kettering -->
+
+  <!-- ===== DP PRN LOG ===== -->
+  <div id="tab-dp" class="tabpane" hidden>
+    <section class="section">
+      <div class="toolbar" style="margin-bottom:14px">
+        <label class="fld">Log
+          <span class="tog" id="dpLogTog">
+            <button type="button" data-dplog="onsite">OnSite · Dayton Physicians</button>
+            <button type="button" data-dplog="remote">Remote</button>
+          </span>
+        </label>
+        <label class="fld">Week (Mon) <select id="dpWeekSel"></select></label>
+        <button class="btn btn-sm" id="dpNewWeekBtn"><svg class="ic"><use href="#i-plus"/></svg>New week</button>
+        <button class="btn btn-sm" id="dpNextWeekBtn">+7 days</button>
+        <button class="btn btn-sm" id="dpDelWeekBtn">Delete week</button>
+        <div class="spacer"></div>
+        <button class="btn btn-sm" id="dpCsvBtn">Export CSV</button>
+      </div>
+      <div class="subhead" id="dpTitle">Weekly PRN Hours</div>
+      <div class="tbl-scroll"><table class="kt" id="dpTaskTable"><thead></thead><tbody></tbody></table></div>
+      <p class="hint" style="margin:10px 0 4px">Free text — what you did each day that isn't in the table above:</p>
+      <div class="dp-notes" id="dpNotes"></div>
+      <div class="subhead" style="margin-top:24px">Totals by location — hours</div>
+      <div class="tbl-scroll"><table class="kt" id="dpLocTable"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+      <div class="dp-total-line" id="dpTotals"></div>
+      <p class="hint">Each week is saved automatically and included in Backup/Restore. WCC has been removed from the location list.</p>
+    </section>
+  </div><!-- /tab-dp -->
+</main>
+
+<!-- Site modal -->
+<div class="modal-back" id="siteModal"><div class="modal">
+  <h3 id="siteModalTitle">Add site</h3>
+  <div class="fld-block"><label>Site name</label><input type="text" id="siteName" placeholder="e.g. Kettering Health - RadOnc"></div>
+  <div class="fld-block"><label>Projection method</label>
+    <select id="siteMethod">
+      <option value="runrate">Run-rate — avg weekly hours × weeks × rate</option>
+      <option value="actual">Actual hours to date × rate</option>
+      <option value="manual">Manual — fixed annual hours × rate</option>
+      <option value="income_runrate">No rate — avg weekly $ × 52</option>
+      <option value="income_actual">No rate — dollars entered (actual total)</option>
+    </select>
+  </div>
+  <div class="fld-block" id="manualHoursBlock" style="display:none"><label>Manual annual hours</label><input type="number" id="siteManualHours" step="0.01" min="0" placeholder="e.g. 112.5"></div>
+  <div class="fld-block"><label>Notes (optional)</label><textarea id="siteNotes"></textarea></div>
+  <div class="modal-actions"><button class="btn" data-close="siteModal">Cancel</button><button class="btn btn-primary" id="siteSaveBtn">Save</button></div>
+</div></div>
+
+<!-- Rate modal -->
+<div class="modal-back" id="rateModal"><div class="modal">
+  <h3>Add rate</h3>
+  <p class="hint" id="rateModalSite" style="margin-bottom:14px"></p>
+  <div class="fld-block"><label>Hourly rate ($)</label><input type="number" id="rateVal" step="0.01" min="0" placeholder="e.g. 134.64"></div>
+  <div class="fld-block"><label>Effective from</label><input type="date" id="rateDate"></div>
+  <div class="fld-block"><label>Projection weeks at this rate</label><input type="number" id="rateWeeks" step="1" min="0" value="52"><p class="hint" style="margin-top:4px">How many weeks of the year to project at this rate (e.g. 27 for a base period, 52 for the new full-year rate).</p></div>
+  <div class="modal-actions"><button class="btn" data-close="rateModal">Cancel</button><button class="btn btn-primary" id="rateSaveBtn">Add rate</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<footer class="footer"><div class="footer-inner"><span>Personal Income Tracker · standalone · v2</span><span id="footStats"></span></div></footer>
+
+<script>
+"use strict";
+// =====================================================================
+//  Data model (localStorage). Shape:
+//  { version, sites:[{id,name,notes,sort_order,method,manual_hours,
+//        rates:[{id,rate,effective_date,proj_weeks}]}],
+//    weeks:[{id,site_id,week_ending,hours,income,notes}],
+//    yoy:{cols:[...], rows:{year:{col:val}}},
+//    projYear:{year:val} }  // manual prior-year total projections
+// =====================================================================
+var STORE_KEY='incomeTrackerDB_v2';
+var WEEKS_IN_YEAR=52;
+var NOW_YEAR=new Date().getFullYear();
+var persistOK=true;
+var DB=loadDB();
+var S={year:2026,extraDates:[],sites:[],weeks:[],years:[]};
+
+function seedDB(){
+  function r(rate,date,weeks){return {id:newId(),rate:rate,effective_date:date,proj_weeks:weeks};}
+  function mk(name,method,rates,extra){return Object.assign({id:newId(),name:name,notes:'',sort_order:0,method:method,manual_hours:null,rates:rates||[]},extra||{});}
+  var sites=[
+    mk('OPEN / OTHER','income_actual',[]),
+    mk('DP - Remote','runrate',[r(125.87,'2026-01-01',52)]),
+    mk('DP - Onsite','manual',[r(175.95,'2026-01-01',52)],{manual_hours:112.5}),
+    mk('Kettering - Gamma Knife','runrate',[r(119.55,'2026-01-01',27),r(134.64,'2026-07-01',52)],{kt_cc:'GK'}),
+    mk('Kettering Health - RadOnc','runrate',[r(119.55,'2026-01-01',27),r(134.64,'2026-07-01',52)],{kt_cc:'RO'}),
+    mk('OMPC - On-Site','actual',[r(220,'2026-01-01',52)]),
+    mk('OMPC - Remote','actual',[r(120,'2026-01-01',52)])
+  ];
+  sites.forEach(function(s,i){s.sort_order=i;});
+  var yoy={cols:['DP-R','DP-OS','K-GK','K-RO','OMPC-OS','OMPC-R'],rows:{
+    '2023':{'DP-R':31.4,'DP-OS':111.15,'K-GK':5.99,'K-RO':5.99,'OMPC-OS':24,'OMPC-R':892.25},
+    '2024':{'DP-R':19.22,'DP-OS':265.25,'K-GK':5.37,'K-RO':8.25,'OMPC-OS':0,'OMPC-R':513.75},
+    '2025':{'DP-R':30.35,'DP-OS':263.75,'K-GK':6.74,'K-RO':12.83,'OMPC-OS':347.01,'OMPC-R':470.5},
+    '2026':{'DP-R':35.83,'DP-OS':112.5,'K-GK':7.22,'K-RO':9.37,'OMPC-OS':474.72,'OMPC-R':392.5}
+  }};
+  var projYear={'2022':446079.96,'2023':655226,'2024':577119.01,'2025':616608.03};
+  return {version:2,sites:sites,weeks:[],yoy:yoy,projYear:projYear,kettering:{payPeriods:[],weeks:[]},dp:{onsite:{weeks:[]},remote:{weeks:[]}}};
+}
+function loadDB(){
+  try{var raw=localStorage.getItem(STORE_KEY);if(raw){var d=JSON.parse(raw);if(d&&Array.isArray(d.sites)&&Array.isArray(d.weeks)){d.yoy=d.yoy||{cols:[],rows:{}};d.projYear=d.projYear||{};d.kettering=d.kettering||{payPeriods:[],weeks:[]};d.dp=d.dp||{onsite:{weeks:[]},remote:{weeks:[]}};return d;}}}catch(e){}
+  return seedDB();
+}
+function saveDB(){try{localStorage.setItem(STORE_KEY,JSON.stringify(DB));persistOK=true;}catch(e){persistOK=false;}updateStorageWarn();}
+function updateStorageWarn(){var b=document.getElementById('storageWarn');if(!persistOK){b.innerHTML='⚠ This browser is not saving automatically (private mode or file restrictions). Use <strong>Backup</strong> before closing and <strong>Restore</strong> next time.';b.classList.add('show');}else{b.classList.remove('show');}}
+function newId(){if(window.crypto&&crypto.randomUUID)return crypto.randomUUID().replace(/-/g,'').slice(0,12);return 'x'+Math.abs((Date.now()^(Math.random()*1e9))|0).toString(16)+(Math.random()*1e6|0).toString(16);}
+function todayISO(){return new Date().toISOString().slice(0,10);}
+function yearOf(w){return parseInt(w.week_ending.slice(0,4),10);}
+function num(v){var n=Number(v);return Number.isFinite(n)&&n>=0?n:0;}
+
+// ---- mutations ----
+function addSite(name,method,notes,manualHours){var maxS=DB.sites.reduce(function(m,s){return Math.max(m,s.sort_order||0);},0);var s={id:newId(),name:name,notes:notes||'',sort_order:maxS+1,method:method||'runrate',manual_hours:manualHours!=null?manualHours:null,rates:[]};DB.sites.push(s);saveDB();return s.id;}
+function updateSite(id,fields){var s=DB.sites.find(function(x){return x.id===id;});if(s){Object.assign(s,fields);saveDB();}}
+function deleteSite(id){DB.sites=DB.sites.filter(function(s){return s.id!==id;});DB.weeks=DB.weeks.filter(function(w){return w.site_id!==id;});saveDB();}
+function addRate(siteId,rate,eff,weeks){var s=DB.sites.find(function(x){return x.id===siteId;});if(!s)return;s.rates=s.rates||[];s.rates.push({id:newId(),rate:Number(rate),effective_date:eff,proj_weeks:Number(weeks)});saveDB();}
+function updateRateWeeks(rateId,weeks){DB.sites.forEach(function(s){(s.rates||[]).forEach(function(r){if(r.id===rateId)r.proj_weeks=Number(weeks);});});saveDB();}
+function updateRateAvg(rateId,val){DB.sites.forEach(function(s){(s.rates||[]).forEach(function(r){if(r.id===rateId)r.avg_hours=(val===''?null:Number(val));});});saveDB();}
+function deleteRate(rateId){DB.sites.forEach(function(s){s.rates=(s.rates||[]).filter(function(r){return r.id!==rateId;});});saveDB();}
+function upsertWeek(siteId,date,hours,income){var idx=DB.weeks.findIndex(function(w){return w.site_id===siteId&&w.week_ending===date;});if(hours===0&&income===0){if(idx>=0){DB.weeks.splice(idx,1);saveDB();}return {deleted:true};}if(idx>=0){DB.weeks[idx].hours=hours;DB.weeks[idx].income=income;}else{DB.weeks.push({id:newId(),site_id:siteId,week_ending:date,hours:hours,income:income,notes:''});}saveDB();return {deleted:false};}
+function deleteWeekRow(date){DB.weeks=DB.weeks.filter(function(w){return w.week_ending!==date;});saveDB();}
+
+// ---- derived ----
+function sitesSorted(){return DB.sites.slice().sort(function(a,b){return (a.sort_order-b.sort_order)||a.name.localeCompare(b.name);});}
+function rateForDate(site,iso){var rates=site.rates||[];if(!rates.length)return null;var sorted=rates.slice().sort(function(a,b){return a.effective_date<b.effective_date?-1:1;});var appl=null;sorted.forEach(function(r){if(r.effective_date<=iso)appl=r;});return appl?appl.rate:sorted[0].rate;}
+function currentRate(site){return rateForDate(site,todayISO());}
+function weeksForSiteYear(siteId){return S.weeks.filter(function(w){return w.site_id===siteId;});}
+function allYears(){var set={};DB.weeks.forEach(function(w){set[yearOf(w)]=1;});Object.keys((DB.yoy&&DB.yoy.rows)||{}).forEach(function(y){set[y]=1;});Object.keys(DB.projYear||{}).forEach(function(y){set[y]=1;});set[S.year]=1;return Object.keys(set).map(Number).sort(function(a,b){return b-a;});}
+function refresh(){S.years=allYears();S.sites=sitesSorted();S.weeks=DB.weeks.filter(function(w){return yearOf(w)===S.year;});}
+
+// Core projection for a site in the loaded year.
+function projectSite(s){
+  var rows=weeksForSiteYear(s.id);var n=rows.length,ytdH=0,ytdI=0;
+  rows.forEach(function(w){ytdH+=num(w.hours);ytdI+=num(w.income);});
+  var avgH=n?ytdH/n:0, avgI=n?ytdI/n:0;
+  var rate=currentRate(s);
+  var out={weeks:n,ytdHours:ytdH,ytdIncome:ytdI,avgHours:avgH,avgIncome:avgI,rate:rate,projHours:0,projIncome:0,segments:[]};
+  // A completed (past) year is shown at its actual recorded total, not a
+  // run-rate projection built from the current-year config.
+  if(S.year<NOW_YEAR){out.projHours=ytdH;out.projIncome=ytdI;out.pastActual=true;return out;}
+  var method=s.method||'runrate';
+  if(method==='income_actual'){out.projIncome=ytdI;out.projHours=ytdH;return out;}
+  if(method==='income_runrate'){out.projIncome=avgI*WEEKS_IN_YEAR;out.projHours=avgH*WEEKS_IN_YEAR;return out;}
+  if(method==='actual'){out.projHours=ytdH;out.projIncome=ytdH*(rate||0);out.segments=[{weeks:null,rate:rate,hours:ytdH,income:out.projIncome,label:'actual'}];return out;}
+  if(method==='manual'){var mh=num(s.manual_hours);out.projHours=mh;out.projIncome=mh*(rate||0);out.segments=[{weeks:null,rate:rate,hours:mh,income:out.projIncome,label:'manual'}];return out;}
+  // runrate: sum over rate segments. Each segment projects at its own
+  // rate for its own number of weeks, using either an explicit per-segment
+  // average (avg_hours override, e.g. the base period averaged over all
+  // weeks vs the new period averaged from week 2) or, when unset, the
+  // site's live average weekly hours from recorded weeks.
+  var rates=(s.rates||[]).slice().sort(function(a,b){return a.effective_date<b.effective_date?-1:1;});
+  if(!rates.length){out.projHours=avgH*WEEKS_IN_YEAR;out.projIncome=avgH*WEEKS_IN_YEAR*0;return out;}
+  rates.forEach(function(r){
+    var a=(r.avg_hours!=null&&r.avg_hours!=='')?Number(r.avg_hours):avgH;
+    var w=r.proj_weeks!=null?Number(r.proj_weeks):WEEKS_IN_YEAR;
+    var h=a*w;var inc=h*r.rate;
+    out.projHours+=h;out.projIncome+=inc;
+    out.segments.push({weeks:w,rate:r.rate,hours:h,income:inc,eff:r.effective_date,avg:a,avgSet:(r.avg_hours!=null&&r.avg_hours!=='')});
+  });
+  return out;
+}
+function totalProjection(){var t=0;S.sites.forEach(function(s){t+=projectSite(s).projIncome;});return t;}
+
+// =====================================================================
+//  Rendering
+// =====================================================================
+var usd=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+var usd2=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:2});
+function nf(n,d){return (Number(n)||0).toLocaleString('en-US',{maximumFractionDigits:d===undefined?1:d});}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show');},1600);}
+function cellKey(a,b){return a+'|'+b;}
+function buildCellMap(){var map={};S.weeks.forEach(function(w){map[cellKey(w.site_id,w.week_ending)]=w;});return map;}
+function weekDates(){var set={};S.weeks.forEach(function(w){set[w.week_ending]=1;});S.extraDates.forEach(function(d){set[d]=1;});return Object.keys(set).sort();}
+
+function renderAll(){refresh();renderYearSel();document.getElementById('summaryTitle').textContent=S.year+' summary';renderSummary();renderProjection();renderYoY();renderProjYear();renderGrid();renderSites();renderFootStats();}
+function renderDerived(){renderSummary();renderProjection();renderProjYear();renderGridFoot();renderFootStats();}
+function renderFootStats(){document.getElementById('footStats').textContent=DB.sites.length+' sites · '+DB.weeks.length+' week entries stored';}
+function renderYearSel(){document.getElementById('yearSel').innerHTML=S.years.map(function(y){return '<option value="'+y+'"'+(y===S.year?' selected':'')+'>'+y+'</option>';}).join('');}
+
+function renderSummary(){
+  var totInc=0,totHrs=0,totProjInc=0,totProjHrs=0,wks=0;
+  S.sites.forEach(function(s){var p=projectSite(s);totInc+=p.ytdIncome;totHrs+=p.ytdHours;totProjInc+=p.projIncome;totProjHrs+=p.projHours;wks=Math.max(wks,p.weeks);});
+  var prior=Number(DB.projYear[String(S.year-1)])||0;
+  var deltaHtml;
+  if(prior>0){var d=totProjInc-prior;var cls=d>=0?'delta-up':'delta-down';deltaHtml='<div class="sub '+cls+'">'+(d>=0?'▲ ':'▼ ')+usd.format(Math.abs(d))+' ('+(d>=0?'+':'')+nf(prior?d/prior*100:0,0)+'%) vs '+(S.year-1)+'</div>';}
+  else deltaHtml='<div class="sub muted">set '+(S.year-1)+' below</div>';
+  var cards=[
+    {k:'YTD income',v:usd.format(totInc),sub:wks+' week'+(wks===1?'':'s')+' recorded'},
+    {k:'Projected annual',v:usd.format(totProjInc),subHtml:deltaHtml},
+    {k:'YTD hours',v:nf(totHrs,1),sub:'projected '+nf(totProjHrs,0)+' hrs'},
+    {k:'Prior year ('+(S.year-1)+')',v:prior>0?usd.format(prior):'—',sub:prior>0?'from projection table':'no data'}
+  ];
+  document.getElementById('summaryCards').innerHTML=cards.map(function(c){return '<div class="card"><div class="k">'+c.k+'</div><div class="v">'+c.v+'</div>'+(c.subHtml||('<div class="sub">'+c.sub+'</div>'))+'</div>';}).join('');
+}
+
+function methodLabel(m){return {runrate:'run-rate',actual:'actual hrs',manual:'manual',income_runrate:'$ run-rate',income_actual:'$ actual'}[m]||m;}
+function renderProjection(){
+  var t=document.getElementById('projTable');
+  if(!S.sites.length){t.querySelector('thead').innerHTML='';t.querySelector('tbody').innerHTML='<tr><td class="empty">Add a site to get started.</td></tr>';t.querySelector('tfoot').innerHTML='';return;}
+  t.querySelector('thead').innerHTML='<tr><th>Site</th><th>Method</th><th>Wks</th><th>Avg hrs/wk</th><th>YTD hours</th><th>YTD income</th><th>Proj. hours</th><th>Rate(s)</th><th>Proj. income</th></tr>';
+  var rows=S.sites.map(function(s){
+    var p=projectSite(s);
+    var rateTxt;
+    if(s.method==='income_runrate'||s.method==='income_actual')rateTxt='<span class="muted">— $ direct —</span>';
+    else if(p.segments.length&&s.method==='runrate')rateTxt=p.segments.map(function(g){return usd2.format(g.rate)+'×'+nf(g.weeks,0)+'w@'+nf(g.avg,2)+'h';}).join(' + ');
+    else rateTxt=p.rate!=null?usd2.format(p.rate)+'/hr':'—';
+    return '<tr><td>'+esc(s.name)+'</td><td class="muted" style="font-size:12px">'+methodLabel(s.method)+'</td>'+
+      '<td class="num">'+p.weeks+'</td><td class="num">'+nf(p.avgHours,2)+'</td>'+
+      '<td class="num">'+nf(p.ytdHours,1)+'</td><td class="num">'+usd.format(p.ytdIncome)+'</td>'+
+      '<td class="num">'+nf(p.projHours,0)+'</td><td class="num seg-note">'+rateTxt+'</td>'+
+      '<td class="num"><strong>'+usd.format(p.projIncome)+'</strong></td></tr>';
+  }).join('');
+  t.querySelector('tbody').innerHTML=rows;
+  var tH=0,tI=0,tPH=0,tPI=0;S.sites.forEach(function(s){var p=projectSite(s);tH+=p.ytdHours;tI+=p.ytdIncome;tPH+=p.projHours;tPI+=p.projIncome;});
+  t.querySelector('tfoot').innerHTML='<tr><td>Total</td><td></td><td></td><td></td><td class="num">'+nf(tH,1)+'</td><td class="num">'+usd.format(tI)+'</td><td class="num">'+nf(tPH,0)+'</td><td></td><td class="num">'+usd.format(tPI)+'</td></tr>';
+}
+
+function renderYoY(){
+  var t=document.getElementById('yoyTable');var cols=(DB.yoy&&DB.yoy.cols)||[];
+  if(!cols.length){t.querySelector('thead').innerHTML='';t.querySelector('tbody').innerHTML='<tr><td class="empty">No year-over-year columns.</td></tr>';return;}
+  t.querySelector('thead').innerHTML='<tr><th>Year</th>'+cols.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>';
+  var years=Object.keys(DB.yoy.rows).map(Number).sort(function(a,b){return a-b;});
+  t.querySelector('tbody').innerHTML=years.map(function(y){
+    var row=DB.yoy.rows[String(y)]||{};
+    var prev=DB.yoy.rows[String(y-1)]||null;
+    var cells=cols.map(function(c){
+      var v=row[c];
+      return '<td><input type="number" step="0.01" data-yoy-year="'+y+'" data-yoy-col="'+esc(c)+'" value="'+(v==null?'':v)+'"></td>';
+    }).join('');
+    return '<tr><td>'+y+'</td>'+cells+'</tr>';
+  }).join('');
+  t.querySelectorAll('input[data-yoy-year]').forEach(function(inp){inp.addEventListener('change',function(){var y=inp.getAttribute('data-yoy-year');var c=inp.getAttribute('data-yoy-col');DB.yoy.rows[y]=DB.yoy.rows[y]||{};DB.yoy.rows[y][c]=inp.value===''?null:Number(inp.value);saveDB();});});
+}
+
+function renderProjYear(){
+  var t=document.getElementById('projYearTable');
+  // Only the actual current calendar year auto-fills from the live projection;
+  // past years keep their stored totals (and stay editable).
+  if(S.year===NOW_YEAR){DB.projYear[String(NOW_YEAR)]=Math.round(totalProjection()*100)/100;}
+  var years={};Object.keys(DB.projYear).forEach(function(y){years[y]=1;});years[String(NOW_YEAR)]=1;
+  var ylist=Object.keys(years).map(Number).sort(function(a,b){return a-b;});
+  t.querySelector('thead').innerHTML='<tr><th>Year</th><th>Total projection</th><th>vs prior</th></tr>';
+  var cum=0;
+  t.querySelector('tbody').innerHTML=ylist.map(function(y){
+    var v=Number(DB.projYear[String(y)])||0;cum+=v;
+    var prev=Number(DB.projYear[String(y-1)])||0;var d=v-prev;var dcls=d>=0?'delta-up':'delta-down';
+    var isCur=(y===NOW_YEAR);
+    var valCell=isCur?('<strong class="num">'+usd.format(v)+'</strong> <span class="muted">(live)</span>')
+      :('<input type="number" step="0.01" data-projyear="'+y+'" value="'+(DB.projYear[String(y)]==null?'':DB.projYear[String(y)])+'">');
+    return '<tr><td>'+y+(isCur?' <span class="muted">(current)</span>':'')+'</td><td class="num">'+valCell+'</td><td class="num '+(prev?dcls:'muted')+'">'+(prev?((d>=0?'+':'')+usd.format(d)):'—')+'</td></tr>';
+  }).join('');
+  t.querySelector('tfoot').innerHTML='<tr><td>Cumulative</td><td class="num">'+usd.format(cum)+'</td><td></td></tr>';
+  t.querySelectorAll('input[data-projyear]').forEach(function(inp){inp.addEventListener('change',function(){var y=inp.getAttribute('data-projyear');DB.projYear[y]=inp.value===''?0:Number(inp.value);saveDB();renderSummary();renderProjYear();});});
+}
+
+function renderGrid(){
+  var g=document.getElementById('grid');var sites=S.sites;
+  if(!sites.length){g.querySelector('thead').innerHTML='';g.querySelector('tbody').innerHTML='<tr><td class="empty">Add a site to start entering weeks.</td></tr>';g.querySelector('tfoot').innerHTML='';return;}
+  var groups='<tr class="groups"><th class="wk" rowspan="2">Week ending</th>';
+  sites.forEach(function(s){groups+='<th class="site-group" colspan="2">'+esc(s.name)+'</th>';});
+  groups+='<th rowspan="2">Run. total</th><th rowspan="2">Del</th></tr>';
+  var subs='<tr class="subs">';sites.forEach(function(){subs+='<th>Hrs</th><th>$</th>';});subs+='</tr>';
+  g.querySelector('thead').innerHTML=groups+subs;
+  var map=buildCellMap();var dates=weekDates();
+  if(!dates.length){g.querySelector('tbody').innerHTML='<tr><td class="wk">—</td><td colspan="'+(sites.length*2+2)+'" class="empty">No weeks yet. Add one above.</td></tr>';g.querySelector('tfoot').innerHTML='';return;}
+  var running=0;
+  var body=dates.map(function(d){
+    var tds='<td class="wk">'+d+'</td>';var weekSum=0;
+    sites.forEach(function(s){
+      var c=map[cellKey(s.id,d)];var h=c&&c.hours?c.hours:'';var i=c&&c.income?c.income:'';
+      if(c)weekSum+=num(c.income);
+      tds+='<td><input type="number" step="0.25" min="0" data-site="'+s.id+'" data-date="'+d+'" data-f="hours" value="'+h+'"></td>';
+      tds+='<td class="dollars"><input type="number" step="1" min="0" data-site="'+s.id+'" data-date="'+d+'" data-f="income" value="'+i+'"></td>';
+    });
+    running+=weekSum;
+    tds+='<td class="runtot num">'+usd.format(running)+'</td>';
+    tds+='<td><button class="wk-del" title="Remove this week" data-delweek="'+d+'">✕</button></td>';
+    return '<tr>'+tds+'</tr>';
+  }).join('');
+  g.querySelector('tbody').innerHTML=body;renderGridFoot();
+  g.querySelectorAll('tbody input').forEach(function(inp){inp.addEventListener('change',onCellChange);});
+  g.querySelectorAll('[data-delweek]').forEach(function(b){b.addEventListener('click',function(){delWeekRowUI(b.getAttribute('data-delweek'));});});
+}
+function renderGridFoot(){
+  var g=document.getElementById('grid');var sites=S.sites;if(!sites.length){g.querySelector('tfoot').innerHTML='';return;}
+  var cells='<td class="wk">Total</td>';var grand=0;
+  sites.forEach(function(s){var p=projectSite(s);grand+=p.ytdIncome;cells+='<td class="num">'+nf(p.ytdHours,1)+'</td><td class="num">'+usd.format(p.ytdIncome)+'</td>';});
+  cells+='<td class="runtot num">'+usd.format(grand)+'</td><td></td>';
+  g.querySelector('tfoot').innerHTML='<tr>'+cells+'</tr>';
+}
+
+function onCellChange(e){
+  var inp=e.target;var siteId=inp.getAttribute('data-site');var date=inp.getAttribute('data-date');var field=inp.getAttribute('data-f');
+  var row=inp.closest('tr');
+  var hoursInp=row.querySelector('input[data-site="'+siteId+'"][data-f="hours"]');
+  var incInp=row.querySelector('input[data-site="'+siteId+'"][data-f="income"]');
+  if(field==='hours'&&document.getElementById('autoFill').checked){
+    var site=DB.sites.find(function(s){return s.id===siteId;});
+    var rate=site?rateForDate(site,date):null;
+    if(rate!=null&&hoursInp.value!==''){incInp.value=Math.round((Number(hoursInp.value)*rate)*100)/100;}
+  }
+  var hours=hoursInp.value===''?0:num(hoursInp.value);
+  var income=incInp.value===''?0:num(incInp.value);
+  upsertWeek(siteId,date,hours,income);
+  refresh();
+  // full grid re-render to update the running-total column, then restore focus target loses; acceptable on change (blur)
+  renderGrid();renderDerived();
+}
+function delWeekRowUI(date){
+  var affected=DB.weeks.filter(function(w){return w.week_ending===date;});
+  if(affected.length&&!confirm('Remove the week ending '+date+' from all sites? Deletes '+affected.length+' entr'+(affected.length===1?'y':'ies')+'.'))return;
+  deleteWeekRow(date);S.extraDates=S.extraDates.filter(function(d){return d!==date;});refresh();renderGrid();renderDerived();toast('Week removed');
+}
+
+function renderSites(){
+  var el=document.getElementById('sitesManager');
+  if(!DB.sites.length){el.innerHTML='<p class="empty">No sites yet. Click &ldquo;Add site&rdquo; above.</p>';return;}
+  el.innerHTML=sitesSorted().map(function(s){
+    var usesRate=(s.method!=='income_runrate'&&s.method!=='income_actual');
+    var rates=(s.rates||[]).slice().sort(function(a,b){return a.effective_date<b.effective_date?1:-1;});
+    var liveAvg=projectSite(s).avgHours;
+    var chips=rates.map(function(r){
+      var extra='';
+      if(s.method==='runrate'){
+        extra=' · <input type="number" min="0" step="1" data-rateweeks="'+r.id+'" value="'+(r.proj_weeks==null?52:r.proj_weeks)+'" title="Projection weeks at this rate"> wk'
+          +' · avg <input type="number" min="0" step="0.0001" data-rateavg="'+r.id+'" value="'+(r.avg_hours==null?'':r.avg_hours)+'" placeholder="'+nf(liveAvg,2)+'" title="Average weekly hours for this segment (blank = live average from recorded weeks)"> hr';
+      }
+      return '<span class="rate-chip">'+usd2.format(r.rate)+'/hr from '+r.effective_date+extra+' <button title="Delete rate" data-delrate="'+r.id+'">✕</button></span>';
+    }).join(' ');
+    if(usesRate&&!rates.length)chips='<span class="hint">no rates set — add one</span>';
+    var methodSel='<select class="method-sel" data-method="'+s.id+'">'+
+      [['runrate','Run-rate (avg hrs × wk × rate)'],['actual','Actual hrs to date × rate'],['manual','Manual hrs × rate'],['income_runrate','No rate: avg $ × 52'],['income_actual','No rate: $ actual']]
+        .map(function(o){return '<option value="'+o[0]+'"'+(s.method===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';
+    var manual=(s.method==='manual')?'<span class="rate-chip">annual hrs <input type="number" min="0" step="0.01" data-manual="'+s.id+'" value="'+(s.manual_hours==null?'':s.manual_hours)+'"></span>':'';
+    return '<div class="site-row"><span class="name">'+esc(s.name)+'</span>'+methodSel+manual+
+      '<div style="flex:1;display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+(usesRate?chips:'<span class="hint">dollars entered directly</span>')+'</div>'+
+      (usesRate?'<button class="btn btn-sm" data-addrate="'+s.id+'"><svg class="ic"><use href="#i-plus"/></svg>Rate</button>':'')+
+      '<button class="btn btn-sm" data-editsite="'+s.id+'">Edit</button>'+
+      '<button class="btn btn-sm" data-delsite="'+s.id+'">Delete</button></div>';
+  }).join('');
+  el.querySelectorAll('[data-addrate]').forEach(function(b){b.addEventListener('click',function(){openRateModal(b.getAttribute('data-addrate'));});});
+  el.querySelectorAll('[data-editsite]').forEach(function(b){b.addEventListener('click',function(){openSiteModal(b.getAttribute('data-editsite'));});});
+  el.querySelectorAll('[data-delsite]').forEach(function(b){b.addEventListener('click',function(){delSiteUI(b.getAttribute('data-delsite'));});});
+  el.querySelectorAll('[data-delrate]').forEach(function(b){b.addEventListener('click',function(){if(confirm('Delete this rate?')){deleteRate(b.getAttribute('data-delrate'));renderAll();}});});
+  el.querySelectorAll('[data-rateweeks]').forEach(function(inp){inp.addEventListener('change',function(){updateRateWeeks(inp.getAttribute('data-rateweeks'),inp.value);renderProjection();renderProjYear();renderSummary();});});
+  el.querySelectorAll('[data-rateavg]').forEach(function(inp){inp.addEventListener('change',function(){updateRateAvg(inp.getAttribute('data-rateavg'),inp.value);renderProjection();renderProjYear();renderSummary();});});
+  el.querySelectorAll('[data-method]').forEach(function(sel){sel.addEventListener('change',function(){updateSite(sel.getAttribute('data-method'),{method:sel.value});renderAll();});});
+  el.querySelectorAll('[data-manual]').forEach(function(inp){inp.addEventListener('change',function(){updateSite(inp.getAttribute('data-manual'),{manual_hours:inp.value===''?null:Number(inp.value)});renderProjection();renderProjYear();renderSummary();});});
+}
+
+// ---- site modal ----
+var editingSiteId=null;
+function syncManualBlock(){document.getElementById('manualHoursBlock').style.display=document.getElementById('siteMethod').value==='manual'?'block':'none';}
+document.getElementById('siteMethod').addEventListener('change',syncManualBlock);
+function openSiteModal(id){
+  editingSiteId=id||null;var s=id?DB.sites.find(function(x){return x.id===id;}):null;
+  document.getElementById('siteModalTitle').textContent=id?'Edit site':'Add site';
+  document.getElementById('siteName').value=s?s.name:'';
+  document.getElementById('siteMethod').value=s?s.method:'runrate';
+  document.getElementById('siteManualHours').value=s&&s.manual_hours!=null?s.manual_hours:'';
+  document.getElementById('siteNotes').value=s?s.notes:'';
+  syncManualBlock();document.getElementById('siteModal').classList.add('open');
+  setTimeout(function(){document.getElementById('siteName').focus();},50);
+}
+document.getElementById('siteSaveBtn').addEventListener('click',function(){
+  var name=document.getElementById('siteName').value.trim();if(!name){toast('Enter a site name');return;}
+  var method=document.getElementById('siteMethod').value;
+  var mh=document.getElementById('siteManualHours').value;mh=mh===''?null:Number(mh);
+  var notes=document.getElementById('siteNotes').value.trim();
+  if(editingSiteId)updateSite(editingSiteId,{name:name,method:method,manual_hours:mh,notes:notes});else addSite(name,method,notes,mh);
+  document.getElementById('siteModal').classList.remove('open');renderAll();toast('Saved');
+});
+function delSiteUI(id){var s=DB.sites.find(function(x){return x.id===id;});if(!confirm('Delete "'+(s?s.name:'this site')+'" and all its recorded weeks and rates?'))return;deleteSite(id);renderAll();toast('Site deleted');}
+
+// ---- rate modal ----
+var rateSiteId=null;
+function openRateModal(id){rateSiteId=id;var s=DB.sites.find(function(x){return x.id===id;});document.getElementById('rateModalSite').textContent=s?s.name:'';document.getElementById('rateVal').value='';document.getElementById('rateDate').value=todayISO();document.getElementById('rateWeeks').value=52;document.getElementById('rateModal').classList.add('open');setTimeout(function(){document.getElementById('rateVal').focus();},50);}
+document.getElementById('rateSaveBtn').addEventListener('click',function(){var rate=document.getElementById('rateVal').value;var date=document.getElementById('rateDate').value;var weeks=document.getElementById('rateWeeks').value;if(rate===''||Number(rate)<0){toast('Enter a valid rate');return;}if(!date){toast('Pick an effective date');return;}addRate(rateSiteId,Number(rate),date,weeks===''?52:Number(weeks));document.getElementById('rateModal').classList.remove('open');renderAll();toast('Rate added');});
+
+// ---- toolbar ----
+document.getElementById('yearSel').addEventListener('change',function(e){S.year=Number(e.target.value);S.extraDates=[];renderAll();});
+document.getElementById('addSiteBtn').addEventListener('click',function(){openSiteModal(null);});
+document.getElementById('addYearBtn').addEventListener('click',function(){var y=prompt('View / start which year?',String(new Date().getFullYear()));if(!y)return;y=parseInt(y,10);if(!y||y<2000||y>2100){toast('Enter a valid year');return;}S.year=y;S.extraDates=[];renderAll();});
+document.getElementById('addWeekBtn').addEventListener('click',function(){var d=document.getElementById('newWeekDate').value;if(!d){toast('Pick a week-ending date');return;}if(Number(d.slice(0,4))!==S.year){toast('That date is in '+d.slice(0,4)+', not '+S.year);return;}if(S.extraDates.indexOf(d)<0&&!S.weeks.some(function(w){return w.week_ending===d;}))S.extraDates.push(d);renderGrid();toast('Week added — enter values to save');});
+document.getElementById('addNextWeekBtn').addEventListener('click',function(){var dates=weekDates();var base;if(dates.length){base=new Date(dates[dates.length-1]+'T00:00:00');base.setDate(base.getDate()+7);}else{base=new Date(S.year+'-01-07T00:00:00');}var d=base.toISOString().slice(0,10);if(Number(d.slice(0,4))!==S.year){toast('Next week falls in '+d.slice(0,4)+'; switch to that year.');return;}if(S.extraDates.indexOf(d)<0&&!S.weeks.some(function(w){return w.week_ending===d;}))S.extraDates.push(d);document.getElementById('newWeekDate').value=d;renderGrid();toast('Added week ending '+d);});
+document.querySelectorAll('.modal-back').forEach(function(m){m.addEventListener('click',function(e){if(e.target===m)m.classList.remove('open');});});
+document.querySelectorAll('[data-close]').forEach(function(b){b.addEventListener('click',function(){document.getElementById(b.getAttribute('data-close')).classList.remove('open');});});
+
+// ---- backup / restore / csv ----
+function download(name,text,mime){var blob=new Blob([text],{type:mime||'text/plain'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},100);}
+document.getElementById('backupBtn').addEventListener('click',function(){download('income-tracker-backup-'+todayISO()+'.json',JSON.stringify({app:'income-tracker',version:DB.version||2,exported:new Date().toISOString(),data:DB},null,2),'application/json');toast('Backup downloaded');});
+document.getElementById('restoreBtn').addEventListener('click',function(){document.getElementById('restoreFile').click();});
+document.getElementById('restoreFile').addEventListener('change',function(e){var file=e.target.files&&e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(){try{var parsed=JSON.parse(reader.result);var incoming=parsed&&parsed.data?parsed.data:parsed;if(!incoming||!Array.isArray(incoming.sites)||!Array.isArray(incoming.weeks))throw new Error('bad');if(!confirm('Restore will REPLACE all current data ('+incoming.sites.length+' sites, '+incoming.weeks.length+' week entries). Continue?'))return;DB={version:incoming.version||2,sites:incoming.sites,weeks:incoming.weeks,yoy:incoming.yoy||{cols:[],rows:{}},projYear:incoming.projYear||{},kettering:incoming.kettering||{payPeriods:[],weeks:[]},dp:incoming.dp||{onsite:{weeks:[]},remote:{weeks:[]}}};saveDB();renderAll();toast('Data restored');}catch(err){alert('That file could not be read as an Income Tracker backup.');}finally{e.target.value='';}};reader.readAsText(file);});
+function csvCell(v){v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+document.getElementById('csvBtn').addEventListener('click',function(){if(!DB.weeks.length){toast('Nothing to export yet');return;}var rows=[['Site','Week ending','Year','Hours','Income']];DB.weeks.slice().sort(function(a,b){return a.week_ending<b.week_ending?-1:1;}).forEach(function(w){var s=DB.sites.find(function(x){return x.id===w.site_id;});rows.push([s?s.name:w.site_id,w.week_ending,yearOf(w),w.hours,w.income]);});download('income-tracker-'+todayISO()+'.csv',rows.map(function(r){return r.map(csvCell).join(',');}).join('\n'),'text/csv');toast('CSV exported');});
+
+// =====================================================================
+//  Tabs
+// =====================================================================
+function switchTab(name){
+  document.querySelectorAll('.tabbtn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===name);});
+  ['income','kettering','dp'].forEach(function(t){document.getElementById('tab-'+t).hidden=(t!==name);});
+  if(name==='kettering')renderKettering();
+  if(name==='dp')renderDP();
+}
+document.querySelectorAll('.tabbtn').forEach(function(b){b.addEventListener('click',function(){switchTab(b.getAttribute('data-tab'));});});
+
+// =====================================================================
+//  Kettering detail — timeclock pay periods + RO charts / GK Co-Reg
+// =====================================================================
+function ktEnsure(){DB.kettering=DB.kettering||{payPeriods:[],weeks:[]};DB.kettering.payPeriods=DB.kettering.payPeriods||[];DB.kettering.weeks=DB.kettering.weeks||[];}
+// Hours between two 'HH:MM' clock strings; wraps past midnight if out<in.
+function clockHours(inT,outT){
+  if(!inT||!outT)return 0;
+  var a=inT.split(':'),b=outT.split(':');
+  if(a.length<2||b.length<2)return 0;
+  var m1=(+a[0])*60+(+a[1]),m2=(+b[0])*60+(+b[1]);
+  var d=m2-m1;if(d<0)d+=1440;
+  return Math.round((d/60)*100)/100;
+}
+function daysBetween(a,b){return Math.floor((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);}
+function ppLabel(pp){
+  if(!pp.start)return 'Pay period';
+  var end=new Date(pp.start+'T00:00:00');end.setDate(end.getDate()+13);
+  return pp.start+' → '+end.toISOString().slice(0,10);
+}
+function ppSummary(pp){
+  var s={gk1:0,ro1:0,gk2:0,ro2:0};
+  (pp.entries||[]).forEach(function(e){
+    var h=clockHours(e.start,e.stop);
+    var wk=(pp.start&&e.date&&daysBetween(pp.start,e.date)>=7)?2:1;
+    var cc=(e.cc==='RO')?'ro':'gk';
+    s[cc+wk]+=h;
+  });
+  s.gkTot=s.gk1+s.gk2;s.roTot=s.ro1+s.ro2;s.grand=s.gkTot+s.roTot;
+  return s;
+}
+// ---- mutations ----
+function ktAddPP(start){ktEnsure();var pp={id:newId(),start:start,entries:[]};DB.kettering.payPeriods.push(pp);saveDB();return pp.id;}
+function ktDelPP(id){ktEnsure();DB.kettering.payPeriods=DB.kettering.payPeriods.filter(function(p){return p.id!==id;});saveDB();}
+function ktActivePP(){ktEnsure();var pps=DB.kettering.payPeriods;if(!pps.length)return null;var found=pps.filter(function(p){return p.id===S.ktPP;})[0];return found||pps[pps.length-1];}
+function ktAddEntry(ppId){var pp=DB.kettering.payPeriods.filter(function(p){return p.id===ppId;})[0];if(!pp)return;pp.entries.push({id:newId(),date:pp.start||todayISO(),start:'',stop:'',cc:'GK'});saveDB();}
+function ktUpdEntry(ppId,eId,field,val){var pp=DB.kettering.payPeriods.filter(function(p){return p.id===ppId;})[0];if(!pp)return;var e=pp.entries.filter(function(x){return x.id===eId;})[0];if(e){e[field]=val;saveDB();}}
+function ktDelEntry(ppId,eId){var pp=DB.kettering.payPeriods.filter(function(p){return p.id===ppId;})[0];if(!pp)return;pp.entries=pp.entries.filter(function(x){return x.id!==eId;});saveDB();}
+function ktAddWeek(date){ktEnsure();if(DB.kettering.weeks.some(function(w){return w.week_ending===date;}))return;DB.kettering.weeks.push({id:newId(),week_ending:date,gk_hours:0,coreg:0,ro_hours:0,sunmon:0,tue:0,wed:0,thu:0,frisat:0,qc:0});saveDB();}
+function ktUpdWeek(id,field,val){ktEnsure();var w=DB.kettering.weeks.filter(function(x){return x.id===id;})[0];if(w){w[field]=val;saveDB();}}
+function ktDelWeek(id){ktEnsure();DB.kettering.weeks=DB.kettering.weeks.filter(function(x){return x.id!==id;});saveDB();}
+function chartsTot(w){return num(w.sunmon)+num(w.tue)+num(w.wed)+num(w.thu)+num(w.frisat);}
+
+// ---- render ----
+function renderKettering(){ktEnsure();renderPPSelect();renderPPTable();renderPPSummary();renderKtWeeks();}
+function renderPPSelect(){
+  var sel=document.getElementById('ppSel');var pps=DB.kettering.payPeriods;
+  var act=ktActivePP();S.ktPP=act?act.id:null;
+  sel.innerHTML=pps.length?pps.map(function(p){return '<option value="'+p.id+'"'+(act&&p.id===act.id?' selected':'')+'>'+esc(ppLabel(p))+'</option>';}).join(''):'<option value="">— none —</option>';
+}
+function renderPPTable(){
+  var t=document.getElementById('ppTable');var pp=ktActivePP();
+  if(!pp){t.querySelector('thead').innerHTML='';t.querySelector('tbody').innerHTML='<tr><td class="empty">No pay period. Click &ldquo;New pay period&rdquo;.</td></tr>';return;}
+  t.querySelector('thead').innerHTML='<tr><th style="width:130px">Date</th><th>Clock in</th><th>Clock out</th><th>Hours</th><th>Wk</th><th>Cost center</th><th></th></tr>';
+  var rows=(pp.entries||[]).slice().sort(function(a,b){return (a.date||'')<(b.date||'')?-1:1;}).map(function(e){
+    var h=clockHours(e.start,e.stop);
+    var wk=(pp.start&&e.date&&daysBetween(pp.start,e.date)>=7)?2:1;
+    return '<tr>'+
+      '<td><input type="date" data-e="'+e.id+'" data-f="date" value="'+(e.date||'')+'"></td>'+
+      '<td><input type="time" data-e="'+e.id+'" data-f="start" value="'+(e.start||'')+'"></td>'+
+      '<td><input type="time" data-e="'+e.id+'" data-f="stop" value="'+(e.stop||'')+'"></td>'+
+      '<td class="num">'+nf(h,2)+'</td>'+
+      '<td class="num muted">'+wk+'</td>'+
+      '<td><select data-e="'+e.id+'" data-f="cc" class="'+(e.cc==='RO'?'cc-ro':'cc-gk')+'"><option value="GK"'+(e.cc!=='RO'?' selected':'')+'>GK</option><option value="RO"'+(e.cc==='RO'?' selected':'')+'>RO</option></select></td>'+
+      '<td><button class="wk-del" data-dele="'+e.id+'">✕</button></td></tr>';
+  }).join('');
+  t.querySelector('tbody').innerHTML=rows||'<tr><td colspan="7" class="empty">No entries yet — click &ldquo;Add entry&rdquo;.</td></tr>';
+  t.querySelectorAll('[data-e]').forEach(function(inp){inp.addEventListener('change',function(){ktUpdEntry(pp.id,inp.getAttribute('data-e'),inp.getAttribute('data-f'),inp.value);renderPPTable();renderPPSummary();});});
+  t.querySelectorAll('[data-dele]').forEach(function(b){b.addEventListener('click',function(){ktDelEntry(pp.id,b.getAttribute('data-dele'));renderPPTable();renderPPSummary();});});
+}
+function renderPPSummary(){
+  var el=document.getElementById('ppSummary');var pp=ktActivePP();
+  if(!pp){el.innerHTML='';return;}
+  var s=ppSummary(pp);
+  var cells=[['GK · Wk 1',s.gk1],['RO · Wk 1',s.ro1],['GK · Wk 2',s.gk2],['RO · Wk 2',s.ro2],['GK total',s.gkTot],['RO total',s.roTot]];
+  el.innerHTML=cells.map(function(c){return '<div class="pp-cell"><div class="k">'+c[0]+'</div><div class="v">'+nf(c[1],2)+'</div></div>';}).join('')+
+    '<div class="pp-cell grand"><div class="k">Pay-period total</div><div class="v">'+nf(s.grand,2)+'</div></div>';
+}
+function renderKtWeeks(){
+  var t=document.getElementById('ktWeekTable');var ws=DB.kettering.weeks.slice().sort(function(a,b){return a.week_ending<b.week_ending?-1:1;});
+  t.querySelector('thead').innerHTML='<tr><th style="width:120px">Week ending</th><th>GK hrs</th><th>Co-Reg</th><th>RO hrs</th><th>Sun/Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri/Sat</th><th>Charts tot</th><th>QC</th><th></th></tr>';
+  if(!ws.length){t.querySelector('tbody').innerHTML='<tr><td colspan="12" class="empty">No weeks yet — add one above.</td></tr>';t.querySelector('tfoot').innerHTML='';return;}
+  var F=['gk_hours','coreg','ro_hours','sunmon','tue','wed','thu','frisat','qc'];
+  t.querySelector('tbody').innerHTML=ws.map(function(w){
+    function inp(f,step){return '<td><input type="number" min="0" step="'+(step||'1')+'" data-w="'+w.id+'" data-f="'+f+'" value="'+(w[f]?w[f]:'')+'"></td>';}
+    return '<tr><td class="num">'+w.week_ending+'</td>'+inp('gk_hours','0.25')+inp('coreg')+inp('ro_hours','0.25')+inp('sunmon')+inp('tue')+inp('wed')+inp('thu')+inp('frisat')+
+      '<td class="num"><strong>'+nf(chartsTot(w),0)+'</strong></td>'+inp('qc')+'<td><button class="wk-del" data-delw="'+w.id+'">✕</button></td></tr>';
+  }).join('');
+  // season totals + averages
+  var n=ws.length,tot={gk_hours:0,coreg:0,ro_hours:0,sunmon:0,tue:0,wed:0,thu:0,frisat:0,qc:0,ct:0};
+  ws.forEach(function(w){F.forEach(function(f){tot[f]+=num(w[f]);});tot.ct+=chartsTot(w);});
+  function tc(v,dec){return '<td class="num">'+nf(v,dec===undefined?0:dec)+'</td>';}
+  var totalRow='<tr><td>Totals ('+n+' wk)</td>'+tc(tot.gk_hours,1)+tc(tot.coreg)+tc(tot.ro_hours,1)+tc(tot.sunmon)+tc(tot.tue)+tc(tot.wed)+tc(tot.thu)+tc(tot.frisat)+tc(tot.ct)+tc(tot.qc)+'<td></td></tr>';
+  var avgRow='<tr><td>Avg / wk</td>'+tc(tot.gk_hours/n,2)+tc(tot.coreg/n,1)+tc(tot.ro_hours/n,2)+tc(tot.sunmon/n,1)+tc(tot.tue/n,1)+tc(tot.wed/n,1)+tc(tot.thu/n,1)+tc(tot.frisat/n,1)+tc(tot.ct/n,1)+tc(tot.qc/n,1)+'<td></td></tr>';
+  t.querySelector('tfoot').innerHTML=totalRow+avgRow;
+  t.querySelectorAll('[data-w]').forEach(function(inp){inp.addEventListener('change',function(){ktUpdWeek(inp.getAttribute('data-w'),inp.getAttribute('data-f'),inp.value===''?0:num(inp.value));renderKtWeeks();});});
+  t.querySelectorAll('[data-delw]').forEach(function(b){b.addEventListener('click',function(){ktDelWeek(b.getAttribute('data-delw'));renderKtWeeks();});});
+}
+// ---- link timeclock hours -> Income grid ----
+// GK hours feed "Kettering - Gamma Knife"; RO hours feed "Kettering Health
+// - RadOnc". Sites are matched by their kt_cc tag, falling back to name so
+// migrated saves (no tag) still link. Entries are grouped into Monday-keyed
+// weeks (matching the Income grid) across all pay periods; dollars are set
+// at the Kettering rate in effect that week.
+function findKetteringSite(cc){
+  var byTag=DB.sites.filter(function(s){return s.kt_cc===cc;})[0];
+  if(byTag)return byTag;
+  var re=cc==='GK'?/gamma\s*knife/i:/rad\s*onc|radonc/i;
+  return DB.sites.filter(function(s){return re.test(s.name);})[0]||null;
+}
+function syncTimeclockToIncome(){
+  ktEnsure();
+  var gk=findKetteringSite('GK'),ro=findKetteringSite('RO');
+  if(!gk||!ro){toast('Could not find both Kettering sites in the Income tab.');return;}
+  var agg={};
+  DB.kettering.payPeriods.forEach(function(pp){(pp.entries||[]).forEach(function(e){
+    if(!e.date)return;var h=clockHours(e.start,e.stop);if(!h)return;
+    var wk=mondayOf(e.date);var a=agg[wk]=agg[wk]||{GK:0,RO:0};
+    a[e.cc==='RO'?'RO':'GK']+=h;
+  });});
+  var weeks=Object.keys(agg).sort();
+  if(!weeks.length){toast('No timeclock hours to push yet.');return;}
+  if(!confirm('Push GK/RO hours from the timeclock into the Income grid for '+weeks.length+' week(s)?\n\nThis sets each of those weeks’ Kettering GK and RadOnc hours (and $ at the rate in effect that week) from your clock entries, overwriting whatever those two sites held for those weeks.'))return;
+  weeks.forEach(function(wk){
+    [['GK',gk],['RO',ro]].forEach(function(p){
+      var site=p[1];var h=Math.round(agg[wk][p[0]]*100)/100;
+      var rate=rateForDate(site,wk);var inc=rate!=null?Math.round(h*rate*100)/100:0;
+      upsertWeek(site.id,wk,h,inc);
+    });
+  });
+  // Jump the Income tab to the year those weeks belong to, so the result is visible.
+  var yr=parseInt(weeks[weeks.length-1].slice(0,4),10);if(yr)S.year=yr;
+  refresh();renderAll();
+  toast('Pushed '+weeks.length+' week(s) into the Income grid');
+}
+
+// ---- kettering toolbar ----
+document.getElementById('ktSyncBtn').addEventListener('click',syncTimeclockToIncome);
+document.getElementById('ppSel').addEventListener('change',function(e){S.ktPP=e.target.value;renderPPTable();renderPPSummary();});
+document.getElementById('addPPBtn').addEventListener('click',function(){var d=prompt('Pay-period start date (YYYY-MM-DD, first Monday):',todayISO());if(!d)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast('Use YYYY-MM-DD');return;}S.ktPP=ktAddPP(d);renderKettering();toast('Pay period added');});
+document.getElementById('delPPBtn').addEventListener('click',function(){var pp=ktActivePP();if(!pp){return;}if(!confirm('Delete this pay period and its '+(pp.entries||[]).length+' entries?'))return;ktDelPP(pp.id);S.ktPP=null;renderKettering();toast('Pay period deleted');});
+document.getElementById('addEntryBtn').addEventListener('click',function(){var pp=ktActivePP();if(!pp){toast('Add a pay period first');return;}ktAddEntry(pp.id);renderPPTable();renderPPSummary();});
+document.getElementById('ktAddWeekBtn').addEventListener('click',function(){var d=document.getElementById('ktNewWeek').value;if(!d){toast('Pick a week-ending date');return;}ktAddWeek(d);renderKtWeeks();});
+document.getElementById('ktNextWeekBtn').addEventListener('click',function(){var ws=DB.kettering.weeks.slice().sort(function(a,b){return a.week_ending<b.week_ending?-1:1;});var base;if(ws.length){base=new Date(ws[ws.length-1].week_ending+'T00:00:00');base.setDate(base.getDate()+7);}else{base=new Date(todayISO()+'T00:00:00');}var d=base.toISOString().slice(0,10);ktAddWeek(d);document.getElementById('ktNewWeek').value=d;renderKtWeeks();});
+
+// =====================================================================
+//  DP PRN Log — two weekly logs (OnSite / Remote)
+// =====================================================================
+var DP_TASKS=[
+  {k:'closeout',label:'Weekly Closeout'},{k:'fusions',label:'Fusions'},{k:'spc',label:'SPC'},
+  {k:'peer',label:'Peer (Plans)'},{k:'imrtP',label:'IMRT QA — Plans'},{k:'imrtA',label:'IMRT QA — Analyze'},
+  {k:'imrtU',label:'IMRT QA — Upload'},{k:'planchecks',label:'Plan Checks'},{k:'srs',label:'SRS/SBRT Reviews'},
+  {k:'hours',label:'Hours',hours:true}
+];
+var DP_LOCS=['MVN','GDCC','AMC','MVHS','UVMC'];
+var DP_DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function dpEnsure(){DB.dp=DB.dp||{onsite:{weeks:[]},remote:{weeks:[]}};DB.dp.onsite=DB.dp.onsite||{weeks:[]};DB.dp.remote=DB.dp.remote||{weeks:[]};}
+function dpBlankWeek(start){
+  var days=[];for(var i=0;i<7;i++){var d={notes:''};DP_TASKS.forEach(function(t){d[t.k]=0;});days.push(d);}
+  var loc={};DP_LOCS.forEach(function(L){loc[L]=[0,0,0,0,0,0,0];});
+  return {id:newId(),week_start:start,days:days,loc:loc};
+}
+function dpLogObj(){dpEnsure();return DB.dp[S.dpLog||'onsite'];}
+function dpActiveWeek(){var wk=dpLogObj().weeks;if(!wk.length)return null;var f=wk.filter(function(w){return w.id===S.dpWeek;})[0];return f||wk[wk.length-1];}
+function dpDayDate(start,idx){if(!start)return '';var d=new Date(start+'T00:00:00');d.setDate(d.getDate()+idx);return d.toISOString().slice(0,10);}
+function dpAddWeek(start){var lg=dpLogObj();if(lg.weeks.some(function(w){return w.week_start===start;})){S.dpWeek=lg.weeks.filter(function(w){return w.week_start===start;})[0].id;return;}var w=dpBlankWeek(start);lg.weeks.push(w);S.dpWeek=w.id;saveDB();}
+function dpDelWeek(id){var lg=dpLogObj();lg.weeks=lg.weeks.filter(function(w){return w.id!==id;});saveDB();}
+function dpUpdDay(w,idx,field,val){w.days[idx][field]=val;saveDB();}
+function dpUpdLoc(w,L,idx,val){w.loc[L][idx]=val;saveDB();}
+function dpTotalHours(w){var t=0;for(var i=0;i<7;i++)t+=num(w.days[i].hours);return t;}
+function dpLocGrand(w){var t=0;DP_LOCS.forEach(function(L){for(var i=0;i<7;i++)t+=num(w.loc[L][i]);});return t;}
+
+function renderDP(){
+  dpEnsure();S.dpLog=S.dpLog||'onsite';
+  document.querySelectorAll('#dpLogTog button').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-dplog')===S.dpLog);});
+  document.getElementById('dpTitle').textContent='Weekly PRN Hours — '+(S.dpLog==='onsite'?'OnSite (Dayton Physicians)':'Remote');
+  renderDPWeekSel();renderDPTask();renderDPNotes();renderDPLoc();
+}
+function renderDPWeekSel(){
+  var sel=document.getElementById('dpWeekSel');var wk=dpLogObj().weeks.slice().sort(function(a,b){return a.week_start<b.week_start?-1:1;});
+  var act=dpActiveWeek();S.dpWeek=act?act.id:null;
+  sel.innerHTML=wk.length?wk.map(function(w){return '<option value="'+w.id+'"'+(act&&w.id===act.id?' selected':'')+'>'+w.week_start+'</option>';}).join(''):'<option value="">— none —</option>';
+}
+function renderDPTask(){
+  var t=document.getElementById('dpTaskTable');var w=dpActiveWeek();
+  if(!w){t.querySelector('thead').innerHTML='';t.querySelector('tbody').innerHTML='<tr><td class="empty">No week yet — click &ldquo;New week&rdquo; (pick a Monday).</td></tr>';return;}
+  var head='<tr><th class="rowlabel">Task</th>'+DP_DAYS.map(function(d,i){return '<th>'+d+'<br><span class="muted" style="font-weight:400;font-size:10px">'+dpDayDate(w.week_start,i).slice(5)+'</span></th>';}).join('')+'<th>Total</th></tr>';
+  t.querySelector('thead').innerHTML=head;
+  var body=DP_TASKS.map(function(tk){
+    var rowTot=0;
+    var cells=DP_DAYS.map(function(d,i){var v=w.days[i][tk.k];rowTot+=num(v);return '<td><input class="wide" type="number" min="0" step="'+(tk.hours?'0.25':'1')+'" data-dpday="'+i+'" data-dpf="'+tk.k+'" value="'+(v?v:'')+'"></td>';}).join('');
+    return '<tr><td class="rowlabel">'+tk.label+'</td>'+cells+'<td class="num"><strong>'+nf(rowTot,tk.hours?1:0)+'</strong></td></tr>';
+  }).join('');
+  t.querySelector('tbody').innerHTML=body;
+  t.querySelectorAll('input[data-dpday]').forEach(function(inp){inp.addEventListener('change',function(){dpUpdDay(w,+inp.getAttribute('data-dpday'),inp.getAttribute('data-dpf'),inp.value===''?0:num(inp.value));renderDPTask();renderDPTotals();});});
+}
+function renderDPNotes(){
+  var el=document.getElementById('dpNotes');var w=dpActiveWeek();
+  if(!w){el.innerHTML='';return;}
+  el.innerHTML=DP_DAYS.map(function(d,i){return '<div class="dn"><label>'+d+' '+dpDayDate(w.week_start,i).slice(5)+'</label><textarea data-dpnote="'+i+'" placeholder="Notes…">'+esc(w.days[i].notes||'')+'</textarea></div>';}).join('');
+  el.querySelectorAll('[data-dpnote]').forEach(function(ta){ta.addEventListener('change',function(){dpUpdDay(w,+ta.getAttribute('data-dpnote'),'notes',ta.value);});});
+}
+function renderDPLoc(){
+  var t=document.getElementById('dpLocTable');var w=dpActiveWeek();
+  if(!w){t.querySelector('thead').innerHTML='';t.querySelector('tbody').innerHTML='';t.querySelector('tfoot').innerHTML='';renderDPTotals();return;}
+  t.querySelector('thead').innerHTML='<tr><th class="rowlabel">Location</th>'+DP_DAYS.map(function(d){return '<th>'+d+'</th>';}).join('')+'<th>Total</th></tr>';
+  t.querySelector('tbody').innerHTML=DP_LOCS.map(function(L){
+    var rt=0;var cells=DP_DAYS.map(function(d,i){var v=w.loc[L][i];rt+=num(v);return '<td><input class="wide" type="number" min="0" step="0.25" data-dploc="'+L+'" data-dpi="'+i+'" value="'+(v?v:'')+'"></td>';}).join('');
+    return '<tr><td class="rowlabel">'+L+'</td>'+cells+'<td class="num"><strong>'+nf(rt,1)+'</strong></td></tr>';
+  }).join('');
+  var dayTot=DP_DAYS.map(function(d,i){var s=0;DP_LOCS.forEach(function(L){s+=num(w.loc[L][i]);});return s;});
+  t.querySelector('tfoot').innerHTML='<tr><td class="rowlabel">Totals</td>'+dayTot.map(function(s){return '<td class="num">'+nf(s,1)+'</td>';}).join('')+'<td class="num"><strong>'+nf(dpLocGrand(w),1)+'</strong></td></tr>';
+  t.querySelectorAll('input[data-dploc]').forEach(function(inp){inp.addEventListener('change',function(){dpUpdLoc(w,inp.getAttribute('data-dploc'),+inp.getAttribute('data-dpi'),inp.value===''?0:num(inp.value));renderDPLoc();});});
+  renderDPTotals();
+}
+function renderDPTotals(){
+  var el=document.getElementById('dpTotals');var w=dpActiveWeek();
+  if(!w){el.innerHTML='';return;}
+  el.innerHTML='<span>Total Hours (from the Hours row): <strong>'+nf(dpTotalHours(w),2)+'</strong></span>'+
+    '<span>Location hours total: <strong>'+nf(dpLocGrand(w),2)+'</strong></span>';
+}
+// ---- dp toolbar ----
+document.querySelectorAll('#dpLogTog button').forEach(function(b){b.addEventListener('click',function(){S.dpLog=b.getAttribute('data-dplog');S.dpWeek=null;renderDP();});});
+document.getElementById('dpWeekSel').addEventListener('change',function(e){S.dpWeek=e.target.value;renderDP();});
+function mondayOf(iso){var d=new Date(iso+'T00:00:00');var wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);}
+document.getElementById('dpNewWeekBtn').addEventListener('click',function(){var d=prompt('Week — enter any date in it (snaps to Monday):',todayISO());if(!d||!/^\d{4}-\d{2}-\d{2}$/.test(d)){if(d)toast('Use YYYY-MM-DD');return;}dpAddWeek(mondayOf(d));renderDP();toast('Week added');});
+document.getElementById('dpNextWeekBtn').addEventListener('click',function(){var wk=dpLogObj().weeks.slice().sort(function(a,b){return a.week_start<b.week_start?-1:1;});var base;if(wk.length){base=new Date(wk[wk.length-1].week_start+'T00:00:00');base.setDate(base.getDate()+7);}else{base=new Date(mondayOf(todayISO())+'T00:00:00');}dpAddWeek(base.toISOString().slice(0,10));renderDP();});
+document.getElementById('dpDelWeekBtn').addEventListener('click',function(){var w=dpActiveWeek();if(!w)return;if(!confirm('Delete the week of '+w.week_start+' from this log?'))return;dpDelWeek(w.id);S.dpWeek=null;renderDP();toast('Week deleted');});
+document.getElementById('dpCsvBtn').addEventListener('click',function(){
+  var lg=dpLogObj();if(!lg.weeks.length){toast('Nothing to export');return;}
+  var head=['Log','Week (Mon)','Day','Date'].concat(DP_TASKS.map(function(t){return t.label;})).concat(['Notes']).concat(DP_LOCS.map(function(L){return L+' hrs';}));
+  var rows=[head];
+  lg.weeks.slice().sort(function(a,b){return a.week_start<b.week_start?-1:1;}).forEach(function(w){
+    for(var i=0;i<7;i++){
+      var r=[S.dpLog,w.week_start,DP_DAYS[i],dpDayDate(w.week_start,i)];
+      DP_TASKS.forEach(function(t){r.push(w.days[i][t.k]||0);});
+      r.push(w.days[i].notes||'');
+      DP_LOCS.forEach(function(L){r.push(w.loc[L][i]||0);});
+      rows.push(r);
+    }
+  });
+  download('dp-prn-log-'+S.dpLog+'-'+todayISO()+'.csv',rows.map(function(r){return r.map(csvCell).join(',');}).join('\n'),'text/csv');
+  toast('CSV exported');
+});
+
+renderAll();updateStorageWarn();
+</script>
+</body>
+</html>
