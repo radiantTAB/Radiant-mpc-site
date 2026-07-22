@@ -95,10 +95,20 @@ export async function freeBusy(accessTok, calendarId, timeMinISO, timeMaxISO) {
 
 export async function insertEvent(accessTok, calendarId, event) {
   const id = calendarId || "primary";
+  // conferenceDataVersion=1 lets the event request a Google Meet link.
   const res = await fetch(
-    "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(id) + "/events?sendUpdates=all",
+    "https://www.googleapis.com/calendar/v3/calendars/" + encodeURIComponent(id) + "/events?sendUpdates=all&conferenceDataVersion=1",
     { method: "POST", headers: { authorization: "Bearer " + accessTok, "content-type": "application/json" }, body: JSON.stringify(event) }
   );
   if (!res.ok) throw new Error("google event insert failed: " + res.status);
   return res.json();
+}
+
+// Pull a Meet (or other conference) join URL out of a created event.
+export function meetLinkFrom(ev) {
+  if (!ev) return "";
+  if (ev.hangoutLink) return ev.hangoutLink;
+  const eps = (ev.conferenceData && ev.conferenceData.entryPoints) || [];
+  const video = eps.find((e) => e.entryPointType === "video");
+  return (video && video.uri) || "";
 }

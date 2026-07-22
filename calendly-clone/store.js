@@ -294,7 +294,8 @@
       name: b.name, email: b.email, notes: b.notes || "", date: b.date,
       start: b.start_min, end: b.end_min, label: minutesLabel(b.start_min), tz: b.tz || "",
       created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {},
-      host_id: b.host_id || "", hostName: settings ? memberById(settings, b.host_id || "").name : undefined
+      host_id: b.host_id || "", hostName: settings ? memberById(settings, b.host_id || "").name : undefined,
+      meetLink: b.meet_link || ""
     };
   }
   function normalizeApiBooking(b) {
@@ -303,7 +304,7 @@
       location: b.location || "", name: b.name, email: b.email, notes: b.notes || "", date: b.date,
       start: b.start, end: b.end, label: b.label || minutesLabel(b.start), tz: b.tz || "",
       created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {},
-      host_id: b.host_id || "", hostName: b.hostName
+      host_id: b.host_id || "", hostName: b.hostName, meetLink: b.meetLink || ""
     };
   }
 
