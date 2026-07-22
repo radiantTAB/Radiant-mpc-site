@@ -560,43 +560,64 @@ namespace VMS.TPS
 
         private static string HtmlHead()
         {
-            // Self-contained, print-friendly styling in Radiant's palette.
+            // Self-contained styling that mirrors the Varian Portal Dosimetry /
+            // Eclipse clinical UI: dark charcoal panels, light text, Varian blue
+            // accent. A print override drops to a clean white sheet so the PDF
+            // stays legible and toner-friendly.
             return
 "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>" +
 "<title>Radiant Treatment Summary</title><style>" +
-":root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#0891b2;--bg:#f8fafc;}" +
+// ---- Varian Portal Dosimetry palette ----
+":root{--bg:#1e1e1e;--panel:#252526;--panel2:#2d2d30;--ink:#e6e6e6;" +
+"--muted:#9d9d9d;--line:#3f3f46;--accent:#3a9fd4;--accent2:#2b7bb0;" +
+"--head:#16466b;--headink:#dbeafe;--row:#2a2a2c;--rowalt:#242426;}" +
 "*{box-sizing:border-box}" +
 "body{margin:0;background:var(--bg);color:var(--ink);" +
-"font:14px/1.5 'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}" +
-".sheet{max-width:850px;margin:24px auto;background:#fff;padding:32px 40px;" +
-"box-shadow:0 1px 4px rgba(0,0,0,.08);border-radius:6px;}" +
-"header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;" +
-"border-bottom:3px solid var(--accent);padding-bottom:12px;}" +
-".mark{font-size:22px;font-weight:800;color:var(--accent);letter-spacing:-.5px;}" +
-".doctitle{font-size:20px;font-weight:700;}" +
-".stamp{margin-left:auto;color:var(--muted);font-size:12px;}" +
-".disclaimer{color:var(--muted);font-size:12px;font-style:italic;margin:12px 0 4px;}" +
-"section{margin-top:22px;}" +
-"h2{font-size:14px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent);" +
-"border-bottom:1px solid var(--line);padding-bottom:4px;margin:0 0 10px;}" +
-".subhead{font-weight:700;margin:14px 0 6px;font-size:13px;}" +
-"table{border-collapse:collapse;width:100%;font-size:13px;}" +
+"font:13px/1.5 'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}" +
+".sheet{max-width:880px;margin:0 auto;background:var(--panel);min-height:100vh;" +
+"border-left:1px solid var(--line);border-right:1px solid var(--line);}" +
+// title bar, like the PD workspace header
+"header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;" +
+"background:linear-gradient(180deg,#2d2d30,#232326);" +
+"border-bottom:2px solid var(--accent);padding:14px 40px;}" +
+".mark{font-size:20px;font-weight:700;color:var(--accent);letter-spacing:-.3px;}" +
+".doctitle{font-size:18px;font-weight:600;color:var(--ink);}" +
+".stamp{margin-left:auto;color:var(--muted);font-size:11px;text-align:right;}" +
+".sheet>section,.sheet>.disclaimer,.sheet>footer{margin-left:40px;margin-right:40px;}" +
+".disclaimer{color:var(--muted);font-size:11px;font-style:italic;margin-top:14px;}" +
+"section{margin-top:20px;}" +
+"h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);" +
+"border-bottom:1px solid var(--line);padding-bottom:5px;margin:0 0 10px;}" +
+".subhead{font-weight:600;margin:14px 0 6px;font-size:12px;color:var(--headink);}" +
+"table{border-collapse:collapse;width:100%;font-size:12.5px;}" +
 ".kv{width:100%;}" +
 ".kv th{width:170px;text-align:left;color:var(--muted);font-weight:600;" +
 "padding:3px 8px 3px 0;vertical-align:top;}" +
-".kv td{padding:3px 0;}" +
-".grid th,.grid td{border:1px solid var(--line);padding:6px 8px;text-align:left;}" +
-".grid thead th{background:#ecfeff;color:var(--ink);}" +
-".grid tfoot td{background:#f1f5f9;font-weight:700;}" +
-".signoff td{padding:14px 8px 4px;color:var(--muted);}" +
-".signoff .line{border-bottom:1px solid #94a3b8;width:180px;}" +
-".empty,.note,.meta{color:var(--muted);font-size:12px;font-style:italic;}" +
+".kv td{padding:3px 0;color:var(--ink);}" +
+".grid th,.grid td{border:1px solid var(--line);padding:6px 9px;text-align:left;}" +
+".grid thead th{background:var(--head);color:var(--headink);font-weight:600;}" +
+".grid tbody tr:nth-child(odd){background:var(--row);}" +
+".grid tbody tr:nth-child(even){background:var(--rowalt);}" +
+".grid tfoot td{background:var(--panel2);font-weight:700;color:var(--accent);}" +
+".signoff td{padding:16px 8px 4px;color:var(--muted);}" +
+".signoff .line{border-bottom:1px solid #6b7280;width:180px;}" +
+".empty,.note,.meta{color:var(--muted);font-size:11px;font-style:italic;}" +
 ".meta{margin-top:6px;}" +
-"code{background:#f1f5f9;padding:1px 4px;border-radius:3px;font-size:12px;}" +
-"footer{margin-top:26px;border-top:1px solid var(--line);padding-top:10px;" +
-"color:var(--muted);font-size:11px;text-align:center;}" +
-"@media print{body{background:#fff;}.sheet{box-shadow:none;margin:0;max-width:none;}" +
-".stamp{margin-left:auto;}}" +
+"code{background:var(--panel2);padding:1px 4px;border-radius:3px;font-size:11px;color:var(--accent);}" +
+"footer{margin-top:24px;border-top:1px solid var(--line);padding:10px 0 24px;" +
+"color:var(--muted);font-size:10.5px;text-align:center;}" +
+// ---- print: clean white sheet, keep accents ----
+"@media print{" +
+"body{background:#fff;color:#111;}" +
+".sheet{background:#fff;border:none;max-width:none;margin:0;}" +
+"header{background:#fff;border-bottom:2px solid var(--accent2);}" +
+".doctitle{color:#111;}.kv td{color:#111;}" +
+".grid thead th{background:var(--head);color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}" +
+".grid tbody tr:nth-child(odd),.grid tbody tr:nth-child(even){background:#fff;}" +
+".grid tfoot td{background:#f1f5f9;color:var(--accent2);}" +
+".grid th,.grid td{border-color:#cbd5e1;}" +
+"h2{color:var(--accent2);}.subhead{color:#111;}" +
+"}" +
 "</style></head><body>";
         }
 

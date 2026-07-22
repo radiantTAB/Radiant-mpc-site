@@ -8,6 +8,11 @@ summary / prescription document that opens in your browser (print to PDF with
 > Read-only. This plugin never modifies the Eclipse database — it only reads
 > the active plan of record.
 
+The report is styled to match the **Varian Portal Dosimetry / Eclipse clinical
+UI** — dark charcoal panels, light text, Varian-blue accent — so it feels native
+on the treatment-planning workstation. A print override swaps to a clean white
+sheet (accents preserved) so the saved PDF stays legible and toner-friendly.
+
 ## What it reports
 
 - **Patient & plan** — MRN, name, DOB, course/plan IDs, approval status, CT/image
