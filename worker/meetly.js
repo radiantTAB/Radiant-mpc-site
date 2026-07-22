@@ -35,6 +35,9 @@ const DEFAULT_SETTINGS = {
   minNotice: 120,      // earliest a slot may be booked, minutes from now
   horizonDays: 60,     // furthest ahead a date may be booked
   dailyCap: 0,         // max bookings per day (0 = unlimited)
+  // Date-specific exceptions keyed "YYYY-MM-DD". A value overrides that day's
+  // weekly windows entirely; an empty array [] blocks the day (holiday/PTO).
+  overrides: {},
   hours: {
     0: [],
     1: [[9, 12], [13, 17]],
@@ -106,8 +109,18 @@ async function readSettings(env) {
     minNotice: s.minNotice != null ? s.minNotice : DEFAULT_SETTINGS.minNotice,
     horizonDays: s.horizonDays != null ? s.horizonDays : DEFAULT_SETTINGS.horizonDays,
     dailyCap: s.dailyCap != null ? s.dailyCap : DEFAULT_SETTINGS.dailyCap,
+    overrides: s.overrides && typeof s.overrides === "object" ? s.overrides : {},
     hours: s.hours || DEFAULT_SETTINGS.hours,
   };
+}
+
+// The availability windows in effect for a date: a date-specific override
+// (which may be [] to block the day) wins over the weekly recurring hours.
+function windowsFor(settings, date) {
+  if (settings.overrides && Object.prototype.hasOwnProperty.call(settings.overrides, date)) {
+    return settings.overrides[date] || [];
+  }
+  return (settings.hours && settings.hours[weekdayOf(date)]) || [];
 }
 
 async function readEventTypes(env) {
@@ -122,8 +135,7 @@ async function readEventTypes(env) {
 // `date` is "YYYY-MM-DD"; `bookings` are that day's non-cancelled bookings.
 // nowMs lets the minimum-notice rule (and tests) be deterministic.
 export function computeSlots(settings, event, date, bookings, nowMs) {
-  const weekday = weekdayOf(date);
-  const windows = (settings.hours && settings.hours[weekday]) || [];
+  const windows = windowsFor(settings, date);
   const step = settings.slotStep || 30;
   const buffer = settings.buffer || 0;
   const minNotice = settings.minNotice || 0;
@@ -380,7 +392,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     const events = await readEventTypes(env);
     // host.email is private — never exposed in the public config.
     const host = { name: settings.host.name, initials: settings.host.initials, title: settings.host.title, timezone: settings.host.timezone };
-    return json({ host, slotStep: settings.slotStep, buffer: settings.buffer, minNotice: settings.minNotice, horizonDays: settings.horizonDays, events });
+    return json({ host, slotStep: settings.slotStep, buffer: settings.buffer, minNotice: settings.minNotice, horizonDays: settings.horizonDays, overrides: settings.overrides, events });
   }
 
   if (path === "/api/meetly/slots" && method === "GET") {
@@ -515,6 +527,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         minNotice: clampInt(body.minNotice, 0, 43200, current.minNotice),
         horizonDays: clampInt(body.horizonDays, 1, 730, current.horizonDays),
         dailyCap: clampInt(body.dailyCap, 0, 100, current.dailyCap),
+        overrides: sanitizeOverrides(body.overrides, current.overrides),
         hours: sanitizeHours(body.hours, current.hours),
       };
       await env.DB.prepare("UPDATE meetly_settings SET json = ? WHERE id = ?")
@@ -583,6 +596,17 @@ function sanitizeHost(host, fallback) {
   const emailRaw = String(host.email || "").trim().slice(0, 160);
   const email = emailRaw && isEmail(emailRaw) ? emailRaw : "";
   return { name, initials, title: String(host.title || fallback.title || "").trim().slice(0, 120), timezone, email };
+}
+function sanitizeOverrides(ov, fallback) {
+  if (!ov || typeof ov !== "object") return fallback || {};
+  const out = {};
+  for (const [date, windows] of Object.entries(ov)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const ws = Array.isArray(windows) ? windows : [];
+    // Empty array is kept intentionally — it blocks the day.
+    out[date] = ws.map((w) => [clampInt(w[0], 0, 24, 0), clampInt(w[1], 0, 24, 0)]).filter((w) => w[1] > w[0]);
+  }
+  return out;
 }
 function sanitizeHours(hours, fallback) {
   if (!hours || typeof hours !== "object") return fallback;

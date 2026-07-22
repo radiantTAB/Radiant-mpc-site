@@ -82,16 +82,105 @@
   function renderAll(bookings) {
     root.innerHTML =
       '<div class="admin-wrap">' +
-      '<h1>Settings</h1>' +
+      '<h1>Dashboard</h1>' +
       '<p class="admin-sub">Changes here drive the public booking page.' +
       (store.mode === "local" ? " You're editing this browser's local copy." : "") + "</p>" +
+      summarySection(bookings) +
       hostSection() +
       rulesSection() +
       availabilitySection() +
+      overridesSection() +
       eventsSection() +
       bookingsSection(bookings) +
       "</div>";
-    wireHost(); wireRules(); wireAvailability(); wireEvents(); wireBookings(bookings);
+    wireHost(); wireRules(); wireAvailability(); wireOverrides(); wireEvents(); wireBookings(bookings);
+  }
+
+  // ---- summary / analytics (computed client-side from the bookings list) ----
+  function summarySection(bookings) {
+    var today = new Date().toISOString().slice(0, 10);
+    var weekEnd = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    var active = bookings.filter(function (b) { return !b.canceled; });
+    var upcoming = active.filter(function (b) { return b.date >= today; });
+    var next7 = upcoming.filter(function (b) { return b.date <= weekEnd; });
+    var cancelled = bookings.filter(function (b) { return b.canceled; }).length;
+
+    var byEvent = {};
+    active.forEach(function (b) { var k = b.eventName || b.event; byEvent[k] = (byEvent[k] || 0) + 1; });
+    var breakdown = Object.keys(byEvent).sort(function (a, c) { return byEvent[c] - byEvent[a]; })
+      .map(function (k) { return '<div class="bd-row"><span>' + esc(k) + '</span><b>' + byEvent[k] + "</b></div>"; }).join("");
+
+    return '<section class="admin-card summary-card-wrap"><h2><span aria-hidden="true">📈</span> At a glance</h2>' +
+      '<div class="stat-row">' +
+      stat(upcoming.length, "Upcoming") +
+      stat(next7.length, "Next 7 days") +
+      stat(active.length, "Confirmed total") +
+      stat(cancelled, "Cancelled") +
+      "</div>" +
+      (breakdown ? '<div class="breakdown"><h3>By event type</h3>' + breakdown + "</div>" : "") +
+      "</section>";
+  }
+  function stat(n, label) {
+    return '<div class="stat"><div class="stat-num">' + n + '</div><div class="stat-label">' + esc(label) + "</div></div>";
+  }
+
+  // ---- availability exceptions (date-specific overrides) ----
+  function overridesSection() {
+    var ov = settings.overrides || {};
+    var dates = Object.keys(ov).sort();
+    var rows = dates.map(function (d) { return overrideRow(d, ov[d]); }).join("");
+    return card("Availability exceptions", "🚫",
+      '<p class="hint">Override a specific date — block it (holiday / time off) or set custom hours just for that day. These win over the weekly schedule.</p>' +
+      '<div class="ovr-list" id="ovrList">' + rows + "</div>" +
+      '<button class="btn btn-ghost btn-sm" id="addOverride" type="button">+ Add exception</button>' +
+      '<div class="card-actions"><button class="btn btn-primary" id="saveOverrides">Save exceptions</button>' +
+      '<span class="save-note" id="ovrNote"></span></div>'
+    );
+  }
+  function overrideRow(date, windows) {
+    var blocked = !windows || windows.length === 0;
+    var winHtml = (windows && windows.length ? windows : []).map(windowRow).join("");
+    return '<div class="ovr-row" data-date="' + esc(date || "") + '">' +
+      '<div class="ovr-head"><input type="date" class="ovr-date" value="' + esc(date || "") + '" aria-label="Exception date" />' +
+      '<label class="ovr-block"><input type="checkbox" class="ovr-blocked"' + (blocked ? " checked" : "") + " /> Blocked (day off)</label>" +
+      '<button class="win-remove ovr-remove" type="button" aria-label="Remove exception">✕</button></div>' +
+      '<div class="ovr-windows"' + (blocked ? ' style="display:none"' : "") + ">" + winHtml +
+      '<button class="btn btn-ghost btn-sm add-window" type="button">+ Add window</button></div></div>';
+  }
+  function wireOverrides() {
+    var list = root.querySelector("#ovrList");
+    list.querySelectorAll(".ovr-row").forEach(bindOverrideRow);
+    root.querySelector("#addOverride").addEventListener("click", function () {
+      var wrap = document.createElement("div"); wrap.innerHTML = overrideRow("", []);
+      var rowEl = wrap.firstChild; list.appendChild(rowEl); bindOverrideRow(rowEl);
+    });
+    root.querySelector("#saveOverrides").addEventListener("click", function () {
+      var overrides = {};
+      list.querySelectorAll(".ovr-row").forEach(function (rowEl) {
+        var date = rowEl.querySelector(".ovr-date").value;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        if (rowEl.querySelector(".ovr-blocked").checked) { overrides[date] = []; return; }
+        var ws = [];
+        rowEl.querySelectorAll(".window-row").forEach(function (w) {
+          var s = parseInt(w.querySelector(".win-start").value, 10);
+          var e = parseInt(w.querySelector(".win-end").value, 10);
+          if (Number.isInteger(s) && Number.isInteger(e) && e > s) ws.push([s, e]);
+        });
+        overrides[date] = ws;
+      });
+      saveSettings(Object.assign({}, settings, { overrides: overrides }), "ovrNote");
+    });
+  }
+  function bindOverrideRow(rowEl) {
+    rowEl.querySelector(".ovr-remove").addEventListener("click", function () { rowEl.remove(); });
+    var cb = rowEl.querySelector(".ovr-blocked");
+    var wins = rowEl.querySelector(".ovr-windows");
+    cb.addEventListener("change", function () { wins.style.display = cb.checked ? "none" : ""; });
+    wins.querySelector(".add-window").addEventListener("click", function () {
+      var wrap = document.createElement("div"); wrap.innerHTML = windowRow(null);
+      var r = wrap.firstChild; wins.insertBefore(r, wins.querySelector(".add-window")); bindRemove(r);
+    });
+    wins.querySelectorAll(".window-row").forEach(bindRemove);
   }
 
   // ---- host ----

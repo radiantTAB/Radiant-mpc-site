@@ -186,6 +186,18 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   r = await call(env3, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: s3[1].start, name: "B", email: "b@x.com" } });
   ok(r.status === 409, "booking over daily cap refused");
 
+  // --- date overrides (block / custom hours) ---
+  const ovr = makeDb(); const env5 = { DB: ovr.DB, MEETLY_ADMIN_TOKEN: "t" };
+  seed(ovr.state);
+  ok((await call(env5, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON)).data.slots.length === 14, "override baseline 14 slots");
+  await call(env5, "PUT", "/api/meetly/admin/settings", { token: "t", body: { overrides: { [MON]: [] } } });
+  ok((await call(env5, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON)).data.slots.length === 0, "blocked date -> 0 slots");
+  await call(env5, "PUT", "/api/meetly/admin/settings", { token: "t", body: { overrides: { [MON]: [[14, 16]] } } });
+  r = await call(env5, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON);
+  ok(r.data.slots.length === 4 && r.data.slots[0].start === 840, "custom-hours override -> 4 afternoon slots from 14:00");
+  r = await call(env5, "GET", "/api/meetly/config");
+  ok(r.data.overrides && r.data.overrides[MON] && r.data.overrides[MON][0][0] === 14, "config exposes overrides");
+
   // --- .ics generation ---
   const ics = buildIcs({ id: "ml_x", event_id: "meeting-30", event_name: "30 Minute Meeting", date: MON, start_min: 540, end_min: 570, location: "Zoom" }, { host: { name: "Alex Lark", timezone: "America/New_York" } });
   ok(/BEGIN:VCALENDAR/.test(ics) && /BEGIN:VEVENT/.test(ics) && /DTSTART:\d{8}T\d{6}Z/.test(ics), "ics has calendar + event + DTSTART");

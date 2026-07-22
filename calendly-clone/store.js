@@ -28,6 +28,7 @@
     minNotice: 120,
     horizonDays: 60,
     dailyCap: 0,
+    overrides: {},
     hours: { 0: [], 1: [[9, 12], [13, 17]], 2: [[9, 12], [13, 17]], 3: [[9, 12], [13, 17]], 4: [[9, 12], [13, 17]], 5: [[9, 12], [13, 16]], 6: [] }
   };
   var DEFAULT_EVENTS = [
@@ -47,8 +48,14 @@
     var p = dateStr.split("-").map(Number);
     return new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay();
   }
+  function windowsFor(settings, dateStr) {
+    if (settings.overrides && Object.prototype.hasOwnProperty.call(settings.overrides, dateStr)) {
+      return settings.overrides[dateStr] || [];
+    }
+    return (settings.hours && settings.hours[weekdayOf(dateStr)]) || [];
+  }
   function computeSlots(settings, event, dateStr, bookings) {
-    var windows = (settings.hours && settings.hours[weekdayOf(dateStr)]) || [];
+    var windows = windowsFor(settings, dateStr);
     var step = settings.slotStep || 30, buffer = settings.buffer || 0, dur = event.duration;
     var minNotice = settings.minNotice || 0;
     var tz = (settings.host && settings.host.timezone) || "America/New_York";
@@ -126,7 +133,7 @@
     var events = this._events().filter(function (e) { return e.active !== 0; })
       .sort(function (a, b) { return (a.sort - b.sort) || a.name.localeCompare(b.name); });
     var host = { name: s.host.name, initials: s.host.initials, title: s.host.title, timezone: s.host.timezone };
-    return Promise.resolve({ host: host, slotStep: s.slotStep, buffer: s.buffer, minNotice: s.minNotice, horizonDays: s.horizonDays, hours: s.hours, events: events });
+    return Promise.resolve({ host: host, slotStep: s.slotStep, buffer: s.buffer, minNotice: s.minNotice, horizonDays: s.horizonDays, overrides: s.overrides || {}, hours: s.hours, events: events });
   };
   LocalStore.prototype.getSlots = function (eventId, date) {
     var s = this._settings();
@@ -275,8 +282,19 @@
       minNotice: clampInt(body.minNotice, 0, 43200, current.minNotice),
       horizonDays: clampInt(body.horizonDays, 1, 730, current.horizonDays),
       dailyCap: clampInt(body.dailyCap, 0, 100, current.dailyCap),
+      overrides: sanitizeOverrides(body.overrides, current.overrides),
       hours: hours
     };
+  }
+  function sanitizeOverrides(ov, fallback) {
+    if (!ov || typeof ov !== "object") return fallback || {};
+    var out = {};
+    Object.keys(ov).forEach(function (date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+      var ws = Array.isArray(ov[date]) ? ov[date] : [];
+      out[date] = ws.map(function (w) { return [clampInt(w[0], 0, 24, 0), clampInt(w[1], 0, 24, 0)]; }).filter(function (w) { return w[1] > w[0]; });
+    });
+    return out;
   }
   function sanitizeEvents(list) {
     list = Array.isArray(list) ? list : [];

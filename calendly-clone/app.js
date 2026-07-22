@@ -528,9 +528,13 @@
     return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }
   function dayHasWindows(iso) {
-    var p = iso.split("-").map(Number);
-    var wd = new Date(p[0], p[1] - 1, p[2]).getDay();
-    var w = CFG.hours && CFG.hours[wd];
+    var w;
+    if (CFG.overrides && Object.prototype.hasOwnProperty.call(CFG.overrides, iso)) {
+      w = CFG.overrides[iso]; // may be [] to block the day
+    } else {
+      var p = iso.split("-").map(Number);
+      w = CFG.hours && CFG.hours[new Date(p[0], p[1] - 1, p[2]).getDay()];
+    }
     return !!(w && w.length);
   }
   function withinHorizon(iso) {
