@@ -4,7 +4,7 @@
 // guardrails (min-notice / horizon / daily cap), honeypot, rate limiting,
 // .ics generation, and reminder selection + sending (Resend fetch mocked).
 import assert from "node:assert";
-import { handleMeetlyApi, computeSlots, ensureMeetlySchema, hostInstant, buildIcs, dueReminders, handleMeetlyReminders } from "./meetly.js";
+import { handleMeetlyApi, computeSlots, ensureMeetlySchema, hostInstant, buildIcs, buildFeedIcs, dueReminders, handleMeetlyReminders } from "./meetly.js";
 
 // ---- Minimal in-memory D1 mock (only the queries meetly.js issues) --------
 function makeDb() {
@@ -58,6 +58,8 @@ function makeDb() {
       return { _first: state.bookings.find((b) => b.id === a[0]) ? { id: a[0] } : null };
     if (/SELECT \* FROM meetly_bookings WHERE id = \?/.test(sql))
       return { _first: state.bookings.find((b) => b.id === a[0]) || null };
+    if (/SELECT \* FROM meetly_bookings WHERE canceled = 0 AND date >= \?/.test(sql))
+      return { _all: state.bookings.filter((b) => b.canceled === 0 && b.date >= a[0]).sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : x.start_min - y.start_min)) };
     if (/SELECT \* FROM meetly_bookings ORDER BY/.test(sql)) return { _all: [...state.bookings] };
     if (/SELECT \* FROM meetly_bookings WHERE canceled = 0 ORDER BY/.test(sql)) return { _all: state.bookings.filter((b) => b.canceled === 0) };
 
@@ -202,6 +204,28 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   const ics = buildIcs({ id: "ml_x", event_id: "meeting-30", event_name: "30 Minute Meeting", date: MON, start_min: 540, end_min: 570, location: "Zoom" }, { host: { name: "Alex Lark", timezone: "America/New_York" } });
   ok(/BEGIN:VCALENDAR/.test(ics) && /BEGIN:VEVENT/.test(ics) && /DTSTART:\d{8}T\d{6}Z/.test(ics), "ics has calendar + event + DTSTART");
   ok(/SUMMARY:.*Alex Lark/.test(ics) && /LOCATION:Zoom/.test(ics), "ics summary + location present");
+
+  // --- calendar feed (multi-event .ics) ---
+  const bf = buildFeedIcs(
+    [{ id: "b1", event_id: "meeting-30", name: "Ann", email: "a@x.com", notes: "", date: MON, start_min: 540, end_min: 570, canceled: 0 },
+     { id: "b2", event_id: "meeting-30", name: "Bob", date: MON, start_min: 600, end_min: 630, canceled: 1 }],
+    [{ id: "meeting-30", name: "30 Minute Meeting", location: "Zoom" }],
+    { host: { timezone: "America/New_York" } });
+  ok(/BEGIN:VCALENDAR/.test(bf) && (bf.match(/BEGIN:VEVENT/g) || []).length === 1, "feed skips cancelled -> 1 event");
+  ok(/SUMMARY:30 Minute Meeting — Ann/.test(bf), "feed summary has event + booker");
+
+  const fe = makeDb(); const env6 = { DB: fe.DB, MEETLY_ADMIN_TOKEN: "ft" };
+  seed(fe.state);
+  const fslots = (await call(env6, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON)).data.slots;
+  await call(env6, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: fslots[0].start, name: "Feed Guy", email: "f@x.com" } });
+  let fresp = await handleMeetlyApi(req("GET", "/api/meetly/feed.ics"), env6, U("/api/meetly/feed.ics"));
+  ok(fresp.status === 401, "feed without token -> 401");
+  fresp = await handleMeetlyApi(req("GET", "/api/meetly/feed.ics?token=wrong"), env6, U("/api/meetly/feed.ics?token=wrong"));
+  ok(fresp.status === 401, "feed with wrong token -> 401");
+  fresp = await handleMeetlyApi(req("GET", "/api/meetly/feed.ics?token=ft"), env6, U("/api/meetly/feed.ics?token=ft"));
+  ok(fresp.status === 200 && /text\/calendar/.test(fresp.headers.get("content-type") || ""), "feed with token -> 200 text/calendar");
+  const ftext = await fresp.text();
+  ok(/BEGIN:VEVENT/.test(ftext) && /Feed Guy/.test(ftext), "feed contains the booking");
 
   // --- reminder selection (pure) ---
   const rSettings = { host: { timezone: "America/New_York" } };

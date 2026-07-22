@@ -244,6 +244,32 @@ export function buildIcs(booking, settings, opts) {
   return lines.join("\r\n");
 }
 
+// Multi-event VCALENDAR feed the host can subscribe to in their calendar app.
+export function buildFeedIcs(bookings, events, settings) {
+  const tz = (settings.host && settings.host.timezone) || "America/New_York";
+  const evById = {};
+  (events || []).forEach((e) => { evById[e.id] = e; });
+  const esc2 = (s) => String(s == null ? "" : s).replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
+  const z = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const out = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Meetly//Feed//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Meetly bookings"];
+  for (const b of bookings) {
+    if (b.canceled) continue;
+    const ev = evById[b.event_id] || { name: b.event_id, location: "" };
+    const startUtc = hostInstant(b.date, b.start_min, tz);
+    const endUtc = hostInstant(b.date, b.end_min, tz);
+    out.push(
+      "BEGIN:VEVENT", "UID:" + b.id + "@meetly", "DTSTAMP:" + z(startUtc),
+      "DTSTART:" + z(startUtc), "DTEND:" + z(endUtc),
+      "SUMMARY:" + esc2(ev.name + " — " + b.name),
+      "DESCRIPTION:" + esc2((b.email || "") + (b.notes ? " · " + b.notes : "")),
+      ev.location ? "LOCATION:" + esc2(ev.location) : "",
+      "END:VEVENT"
+    );
+  }
+  out.push("END:VCALENDAR");
+  return out.filter(Boolean).join("\r\n");
+}
+
 // ------------------------------------------------------------- mail ---------
 async function resendSend(env, payload) {
   if (!env.RESEND_API_KEY) return { ok: false, skipped: true };
@@ -393,6 +419,25 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     // host.email is private — never exposed in the public config.
     const host = { name: settings.host.name, initials: settings.host.initials, title: settings.host.title, timezone: settings.host.timezone };
     return json({ host, slotStep: settings.slotStep, buffer: settings.buffer, minNotice: settings.minNotice, horizonDays: settings.horizonDays, overrides: settings.overrides, events });
+  }
+
+  // Host calendar subscription feed. Authenticated by a token in the URL
+  // (calendar clients can't send Authorization headers). The whole URL is the
+  // secret — same admin token, passed as ?token=.
+  if (path === "/api/meetly/feed.ics" && method === "GET") {
+    const token = url.searchParams.get("token") || "";
+    if (!env.MEETLY_ADMIN_TOKEN || !timingSafeEqual(token, env.MEETLY_ADMIN_TOKEN)) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+    const settings = await readSettings(env);
+    const events = await readEventTypes(env);
+    // Recent + upcoming, so the calendar isn't unbounded.
+    const cutoff = dateInZone(Date.now() - 30 * 86400000, settings.host.timezone || "America/New_York");
+    const { results } = await env.DB.prepare(
+      "SELECT * FROM meetly_bookings WHERE canceled = 0 AND date >= ? ORDER BY date, start_min"
+    ).bind(cutoff).all();
+    const ics = buildFeedIcs(results || [], events, settings);
+    return new Response(ics, { headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "no-cache" } });
   }
 
   if (path === "/api/meetly/slots" && method === "GET") {
