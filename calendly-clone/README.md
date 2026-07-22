@@ -63,6 +63,14 @@ token is passed in the URL (calendar clients can't send auth headers), so treat
 the whole URL as a secret. The admin console shows the ready-made URL with a
 copy button when running against the deployed backend.
 
+### Custom questions per event type
+
+Each event type can define extra **questions** asked at booking time (short or
+long answer, optionally required). Answers are validated, stored with the
+booking, shown on the confirmation and in the admin bookings list, and included
+in the host notification email. Edit them inline in each event type's row in
+the admin console.
+
 ### Availability exceptions (date overrides)
 
 Override a specific date on top of the weekly schedule: **block** it entirely

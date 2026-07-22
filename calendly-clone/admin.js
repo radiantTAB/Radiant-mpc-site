@@ -300,7 +300,8 @@
     );
   }
   function eventRow(e) {
-    e = e || { name: "", duration: 30, description: "", location: "", active: 1 };
+    e = e || { name: "", duration: 30, description: "", location: "", active: 1, questions: [] };
+    var qs = e.questions || [];
     return '<div class="event-edit-row" data-id="' + esc(e.id || "") + '">' +
       '<div class="eer-grid">' +
       '<input class="ee-name" placeholder="Name (e.g. 30 Minute Meeting)" value="' + esc(e.name) + '" aria-label="Event name" />' +
@@ -309,25 +310,45 @@
       '<input class="ee-desc" placeholder="Short description" value="' + esc(e.description || "") + '" aria-label="Description" />' +
       '<label class="ee-active"><input type="checkbox" class="ee-active-cb" ' + (e.active === 0 ? "" : "checked") + " /> Active</label>" +
       '<button class="win-remove ee-remove" type="button" aria-label="Remove event type">✕</button>' +
-      "</div></div>";
+      "</div>" +
+      '<div class="ee-questions"><div class="eeq-head">Custom questions asked when booking</div>' +
+      '<div class="eeq-list">' + qs.map(questionEditorRow).join("") + "</div>" +
+      '<button class="btn btn-ghost btn-sm add-question" type="button">+ Add question</button></div>' +
+      "</div>";
+  }
+  function questionEditorRow(q) {
+    q = q || { label: "", type: "text", required: false };
+    return '<div class="eeq-row">' +
+      '<input class="q-label" placeholder="Question (e.g. What would you like to cover?)" value="' + esc(q.label) + '" aria-label="Question label" />' +
+      '<select class="q-type" aria-label="Answer type"><option value="text"' + (q.type !== "textarea" ? " selected" : "") + ">Short</option>" +
+      '<option value="textarea"' + (q.type === "textarea" ? " selected" : "") + ">Long</option></select>" +
+      '<label class="q-req"><input type="checkbox" class="q-required"' + (q.required ? " checked" : "") + " /> Required</label>" +
+      '<button class="win-remove q-remove" type="button" aria-label="Remove question">✕</button></div>';
   }
   function wireEvents() {
     var editor = root.querySelector("#eventEditor");
-    editor.querySelectorAll(".event-edit-row").forEach(bindEventRemove);
+    editor.querySelectorAll(".event-edit-row").forEach(bindEventRow);
     root.querySelector("#addEvent").addEventListener("click", function () {
       var wrap = document.createElement("div"); wrap.innerHTML = eventRow(null);
-      var rowEl = wrap.firstChild; editor.appendChild(rowEl); bindEventRemove(rowEl);
+      var rowEl = wrap.firstChild; editor.appendChild(rowEl); bindEventRow(rowEl);
     });
     root.querySelector("#saveEvents").addEventListener("click", function () {
       var list = [];
       editor.querySelectorAll(".event-edit-row").forEach(function (rowEl) {
+        var questions = [];
+        rowEl.querySelectorAll(".eeq-row").forEach(function (qr) {
+          var label = qr.querySelector(".q-label").value.trim();
+          if (!label) return;
+          questions.push({ label: label, type: qr.querySelector(".q-type").value, required: qr.querySelector(".q-required").checked });
+        });
         list.push({
           id: rowEl.dataset.id || "",
           name: rowEl.querySelector(".ee-name").value.trim(),
           duration: parseInt(rowEl.querySelector(".ee-duration").value, 10),
           location: rowEl.querySelector(".ee-location").value.trim(),
           description: rowEl.querySelector(".ee-desc").value.trim(),
-          active: rowEl.querySelector(".ee-active-cb").checked
+          active: rowEl.querySelector(".ee-active-cb").checked,
+          questions: questions
         });
       });
       var note = root.querySelector("#eventsNote");
@@ -340,8 +361,17 @@
       }).catch(function (err) { note.textContent = err.message || "Save failed"; note.className = "save-note err"; });
     });
   }
-  function bindEventRemove(rowEl) {
+  function bindEventRow(rowEl) {
     rowEl.querySelector(".ee-remove").addEventListener("click", function () { rowEl.remove(); });
+    var qlist = rowEl.querySelector(".eeq-list");
+    rowEl.querySelector(".add-question").addEventListener("click", function () {
+      var wrap = document.createElement("div"); wrap.innerHTML = questionEditorRow(null);
+      var qr = wrap.firstChild; qlist.appendChild(qr); bindQuestionRemove(qr);
+    });
+    qlist.querySelectorAll(".eeq-row").forEach(bindQuestionRemove);
+  }
+  function bindQuestionRemove(qr) {
+    qr.querySelector(".q-remove").addEventListener("click", function () { qr.remove(); });
   }
 
   // ---- bookings ----
