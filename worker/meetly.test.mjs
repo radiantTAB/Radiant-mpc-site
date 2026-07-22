@@ -22,17 +22,17 @@ function makeDb() {
 
     if (/SELECT id FROM meetly_event_types LIMIT 1/.test(sql)) return { _first: state.events[0] || null };
     if (/INSERT INTO meetly_event_types/.test(sql)) {
-      state.events.push({ id: a[0], name: a[1], duration: a[2], description: a[3], location: a[4], sort: a[5], active: a[6] === undefined ? 1 : a[6] });
+      state.events.push({ id: a[0], name: a[1], duration: a[2], description: a[3], location: a[4], sort: a[5], active: a[6] === undefined ? 1 : a[6], questions: a[7] });
       return { _run: { meta: { changes: 1 } } };
     }
     if (/DELETE FROM meetly_event_types/.test(sql)) { const n = state.events.length; state.events = []; return { _run: { meta: { changes: n } } }; }
-    if (/SELECT id, name, duration, description, location, sort FROM meetly_event_types WHERE active = 1/.test(sql))
+    if (/FROM meetly_event_types WHERE active = 1/.test(sql))
       return { _all: state.events.filter((e) => e.active === 1).sort(bySort) };
-    if (/SELECT id, name, duration, description, location, sort, active FROM meetly_event_types/.test(sql))
+    if (/FROM meetly_event_types ORDER BY sort, name/.test(sql))
       return { _all: [...state.events].sort(bySort) };
 
     if (/INSERT INTO meetly_bookings/.test(sql)) {
-      state.bookings.push({ id: a[0], event_id: a[1], name: a[2], email: a[3], notes: a[4], date: a[5], start_min: a[6], end_min: a[7], tz: a[8], created_at: a[9], canceled: 0, ip: a[10], reminded_24: 0, reminded_1: 0 });
+      state.bookings.push({ id: a[0], event_id: a[1], name: a[2], email: a[3], notes: a[4], date: a[5], start_min: a[6], end_min: a[7], tz: a[8], created_at: a[9], canceled: 0, ip: a[10], reminded_24: 0, reminded_1: 0, answers: a[11] });
       return { _run: { meta: { changes: 1 } } };
     }
     if (/SELECT COUNT\(\*\) AS n FROM meetly_bookings WHERE ip = \? AND created_at > \?/.test(sql)) {
@@ -199,6 +199,23 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   ok(r.data.slots.length === 4 && r.data.slots[0].start === 840, "custom-hours override -> 4 afternoon slots from 14:00");
   r = await call(env5, "GET", "/api/meetly/config");
   ok(r.data.overrides && r.data.overrides[MON] && r.data.overrides[MON][0][0] === 14, "config exposes overrides");
+
+  // --- custom questions per event type + answers on bookings ---
+  const qd = makeDb(); const env7 = { DB: qd.DB, MEETLY_ADMIN_TOKEN: "t" };
+  seed(qd.state);
+  await call(env7, "PUT", "/api/meetly/admin/events", { token: "t", body: { events: [
+    { id: "meeting-30", name: "30 Minute Meeting", duration: 30, location: "Zoom", questions: [{ label: "Topic", type: "text", required: true }, { label: "Extra", type: "textarea", required: false }] },
+  ] } });
+  r = await call(env7, "GET", "/api/meetly/config");
+  ok(r.data.events[0].questions.length === 2 && r.data.events[0].questions[0].required === true, "config exposes event questions");
+  const qslots = (await call(env7, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON)).data.slots;
+  r = await call(env7, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: qslots[0].start, name: "Q", email: "q@x.com" } });
+  ok(r.status === 400 && /Topic/.test(r.data.error), "required question enforced (400)");
+  r = await call(env7, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: qslots[0].start, name: "Q", email: "q@x.com", answers: { Topic: "Pricing", Extra: "" } } });
+  ok(r.status === 201 && r.data.booking.answers.Topic === "Pricing", "answer stored on booking");
+  ok(r.data.booking.answers.Extra === undefined, "empty optional answer omitted");
+  r = await call(env7, "GET", "/api/meetly/bookings/" + r.data.booking.id);
+  ok(r.data.booking.answers.Topic === "Pricing", "answer readable via lookup");
 
   // --- .ics generation ---
   const ics = buildIcs({ id: "ml_x", event_id: "meeting-30", event_name: "30 Minute Meeting", date: MON, start_min: 540, end_min: 570, location: "Zoom" }, { host: { name: "Alex Lark", timezone: "America/New_York" } });

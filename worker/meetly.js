@@ -65,7 +65,7 @@ export async function ensureMeetlySchema(env) {
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS meetly_event_types (" +
       "id TEXT PRIMARY KEY, name TEXT NOT NULL, duration INTEGER NOT NULL, " +
-      "description TEXT, location TEXT, sort INTEGER DEFAULT 0, active INTEGER DEFAULT 1)"
+      "description TEXT, location TEXT, sort INTEGER DEFAULT 0, active INTEGER DEFAULT 1, questions TEXT)"
   ).run();
   await env.DB.prepare(
     "CREATE TABLE IF NOT EXISTS meetly_bookings (" +
@@ -73,12 +73,13 @@ export async function ensureMeetlySchema(env) {
       "email TEXT NOT NULL, notes TEXT, date TEXT NOT NULL, " +
       "start_min INTEGER NOT NULL, end_min INTEGER NOT NULL, tz TEXT, " +
       "created_at TEXT NOT NULL, canceled INTEGER DEFAULT 0, " +
-      "ip TEXT, reminded_24 INTEGER DEFAULT 0, reminded_1 INTEGER DEFAULT 0)"
+      "ip TEXT, reminded_24 INTEGER DEFAULT 0, reminded_1 INTEGER DEFAULT 0, answers TEXT)"
   ).run();
-  // Self-healing: add the guardrail/reminder columns if an older table exists.
-  for (const col of ["ip TEXT", "reminded_24 INTEGER DEFAULT 0", "reminded_1 INTEGER DEFAULT 0"]) {
+  // Self-healing: add newer columns if an older table exists.
+  for (const col of ["ip TEXT", "reminded_24 INTEGER DEFAULT 0", "reminded_1 INTEGER DEFAULT 0", "answers TEXT"]) {
     try { await env.DB.prepare("ALTER TABLE meetly_bookings ADD COLUMN " + col).run(); } catch (_) {}
   }
+  try { await env.DB.prepare("ALTER TABLE meetly_event_types ADD COLUMN questions TEXT").run(); } catch (_) {}
 
   const s = await env.DB.prepare("SELECT id FROM meetly_settings WHERE id = ?").bind(SETTINGS_ID).first();
   if (!s) {
@@ -125,9 +126,26 @@ function windowsFor(settings, date) {
 
 async function readEventTypes(env) {
   const { results } = await env.DB.prepare(
-    "SELECT id, name, duration, description, location, sort FROM meetly_event_types WHERE active = 1 ORDER BY sort, name"
+    "SELECT id, name, duration, description, location, sort, questions FROM meetly_event_types WHERE active = 1 ORDER BY sort, name"
   ).all();
-  return results || [];
+  return (results || []).map((e) => ({ ...e, questions: parseQuestions(e.questions) }));
+}
+function parseQuestions(s) {
+  try { const a = JSON.parse(s || "[]"); return Array.isArray(a) ? a : []; } catch (_) { return []; }
+}
+function parseAnswers(s) {
+  try { const o = JSON.parse(s || "{}"); return o && typeof o === "object" ? o : {}; } catch (_) { return {}; }
+}
+function sanitizeQuestions(qs) {
+  if (!Array.isArray(qs)) return [];
+  const out = [];
+  for (const q of qs) {
+    const label = String((q && q.label) || "").trim().slice(0, 120);
+    if (!label) continue;
+    out.push({ label, type: q && q.type === "textarea" ? "textarea" : "text", required: !!(q && q.required) });
+    if (out.length >= 10) break;
+  }
+  return out;
 }
 
 // ---------------------------------------------------- slot computation -----
@@ -307,11 +325,14 @@ async function sendConfirmation(env, booking, settings, event) {
   await resendSend(env, { from: MEETLY_FROM, to: [booking.email], subject: "Confirmed: " + event.name + " with " + settings.host.name, text, html, attachments });
   // Host notification (if an address is set).
   if (settings.host.email && isEmail(settings.host.email)) {
+    const ans = booking.answers && typeof booking.answers === "object" ? Object.entries(booking.answers) : [];
+    const ansText = ans.length ? "\n" + ans.map(([k, v]) => k + ": " + v).join("\n") + "\n" : "";
+    const ansHtml = ans.length ? "<ul>" + ans.map(([k, v]) => "<li><strong>" + esc(k) + ":</strong> " + esc(v) + "</li>").join("") + "</ul>" : "";
     await resendSend(env, {
       from: MEETLY_FROM, to: [settings.host.email],
       subject: "New booking: " + booking.name + " — " + event.name,
-      text: booking.name + " (" + booking.email + ") booked " + event.name + "\n" + when + "\n" + (booking.notes ? "\nNotes: " + booking.notes + "\n" : "") + "\nManage: " + manage,
-      html: "<p><strong>" + esc(booking.name) + "</strong> (" + esc(booking.email) + ") booked <strong>" + esc(event.name) + "</strong></p><p>" + esc(when) + "</p>" + (booking.notes ? "<p>Notes: " + esc(booking.notes) + "</p>" : ""),
+      text: booking.name + " (" + booking.email + ") booked " + event.name + "\n" + when + "\n" + (booking.notes ? "\nNotes: " + booking.notes + "\n" : "") + ansText + "\nManage: " + manage,
+      html: "<p><strong>" + esc(booking.name) + "</strong> (" + esc(booking.email) + ") booked <strong>" + esc(event.name) + "</strong></p><p>" + esc(when) + "</p>" + (booking.notes ? "<p>Notes: " + esc(booking.notes) + "</p>" : "") + ansHtml,
       attachments,
     });
   }
@@ -483,6 +504,15 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     if (!event) return json({ error: "Unknown event type." }, 404);
     if (!withinHorizon(date, settings)) return json({ error: "That date is outside the booking window." }, 400);
 
+    // Custom questions for this event type: validate required, collect answers.
+    const answersIn = body.answers && typeof body.answers === "object" ? body.answers : {};
+    const answers = {};
+    for (const q of event.questions || []) {
+      const v = String(answersIn[q.label] || "").trim().slice(0, 2000);
+      if (q.required && !v) return json({ error: "Please answer: " + q.label }, 400);
+      if (v) answers[q.label] = v;
+    }
+
     // Per-IP rate limit over the last hour.
     const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "";
     if (ip) {
@@ -509,13 +539,14 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     const id = makeId("ml_");
     const end = start + event.duration;
     const createdAt = new Date().toISOString();
+    const answersJson = JSON.stringify(answers);
     await env.DB.prepare(
-      "INSERT INTO meetly_bookings (id, event_id, name, email, notes, date, start_min, end_min, tz, created_at, canceled, ip) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)"
-    ).bind(id, event.id, name, email, notes, date, start, end, tz, createdAt, ip).run();
+      "INSERT INTO meetly_bookings (id, event_id, name, email, notes, date, start_min, end_min, tz, created_at, canceled, ip, answers) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)"
+    ).bind(id, event.id, name, email, notes, date, start, end, tz, createdAt, ip, answersJson).run();
 
     // Fire-and-forget confirmation mail so it never blocks the response.
-    const bookingRow = { id, event_id: event.id, name, email, notes, date, start_min: start, end_min: end, tz, created_at: createdAt };
+    const bookingRow = { id, event_id: event.id, name, email, notes, date, start_min: start, end_min: end, tz, created_at: createdAt, answers };
     const mail = sendConfirmation(env, bookingRow, settings, event);
     if (ctx && ctx.waitUntil) ctx.waitUntil(mail); else await mail.catch(() => {});
 
@@ -524,7 +555,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
       booking: {
         id, event: event.id, eventName: event.name, duration: event.duration,
         location: event.location, name, email, notes, date, start, end,
-        label: minutesLabel(start), tz, created_at: createdAt,
+        label: minutesLabel(start), tz, created_at: createdAt, answers,
       },
     }, 201);
   }
@@ -557,9 +588,10 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     if (path === "/api/meetly/admin/settings" && method === "GET") {
       const settings = await readSettings(env);
       const { results } = await env.DB.prepare(
-        "SELECT id, name, duration, description, location, sort, active FROM meetly_event_types ORDER BY sort, name"
+        "SELECT id, name, duration, description, location, sort, active, questions FROM meetly_event_types ORDER BY sort, name"
       ).all();
-      return json({ settings, events: results || [] });
+      const evs = (results || []).map((e) => ({ ...e, questions: parseQuestions(e.questions) }));
+      return json({ settings, events: evs });
     }
 
     if (path === "/api/meetly/admin/settings" && method === "PUT") {
@@ -596,14 +628,15 @@ export async function handleMeetlyApi(request, env, url, ctx) {
           location: String(e.location || "").trim(),
           sort: i,
           active: e.active === false ? 0 : 1,
+          questions: sanitizeQuestions(e.questions),
         });
       }
       if (!clean.length) return json({ error: "Keep at least one event type." }, 400);
       await env.DB.prepare("DELETE FROM meetly_event_types").run();
       for (const e of clean) {
         await env.DB.prepare(
-          "INSERT INTO meetly_event_types (id, name, duration, description, location, sort, active) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).bind(e.id, e.name, e.duration, e.description, e.location, e.sort, e.active).run();
+          "INSERT INTO meetly_event_types (id, name, duration, description, location, sort, active, questions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(e.id, e.name, e.duration, e.description, e.location, e.sort, e.active, JSON.stringify(e.questions)).run();
       }
       return json({ ok: true, events: clean });
     }
@@ -628,7 +661,7 @@ function bookingOut(row) {
     id: row.id, event: row.event_id, name: row.name, email: row.email,
     notes: row.notes || "", date: row.date, start: row.start_min, end: row.end_min,
     label: minutesLabel(row.start_min), tz: row.tz || "", created_at: row.created_at,
-    canceled: !!row.canceled,
+    canceled: !!row.canceled, answers: parseAnswers(row.answers),
   };
 }
 

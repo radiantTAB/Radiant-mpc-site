@@ -32,9 +32,9 @@
     hours: { 0: [], 1: [[9, 12], [13, 17]], 2: [[9, 12], [13, 17]], 3: [[9, 12], [13, 17]], 4: [[9, 12], [13, 17]], 5: [[9, 12], [13, 16]], 6: [] }
   };
   var DEFAULT_EVENTS = [
-    { id: "intro-15", name: "15 Minute Intro Call", duration: 15, description: "A quick introduction to see if we're a good fit.", location: "Google Meet (link sent after booking)", sort: 0, active: 1 },
-    { id: "meeting-30", name: "30 Minute Meeting", duration: 30, description: "A focused conversation about your project or question.", location: "Zoom (link sent after booking)", sort: 1, active: 1 },
-    { id: "deep-60", name: "60 Minute Deep Dive", duration: 60, description: "An in-depth working session. Bring your questions.", location: "Phone call", sort: 2, active: 1 }
+    { id: "intro-15", name: "15 Minute Intro Call", duration: 15, description: "A quick introduction to see if we're a good fit.", location: "Google Meet (link sent after booking)", sort: 0, active: 1, questions: [] },
+    { id: "meeting-30", name: "30 Minute Meeting", duration: 30, description: "A focused conversation about your project or question.", location: "Zoom (link sent after booking)", sort: 1, active: 1, questions: [] },
+    { id: "deep-60", name: "60 Minute Deep Dive", duration: 60, description: "An in-depth working session. Bring your questions.", location: "Phone call", sort: 2, active: 1, questions: [] }
   ];
 
   // ---------- shared helpers ----------
@@ -158,10 +158,19 @@
     if (!free.some(function (x) { return x.start === data.start; })) {
       return Promise.reject(new Error("That time was just taken. Please pick another."));
     }
+    // Custom questions: validate required, collect answers.
+    var answersIn = data.answers && typeof data.answers === "object" ? data.answers : {};
+    var answers = {};
+    var qs = event.questions || [];
+    for (var qi = 0; qi < qs.length; qi++) {
+      var v = String(answersIn[qs[qi].label] || "").trim();
+      if (qs[qi].required && !v) return Promise.reject(new Error("Please answer: " + qs[qi].label));
+      if (v) answers[qs[qi].label] = v;
+    }
     var b = {
       id: makeId("ml_"), event_id: event.id, name: data.name, email: data.email,
       notes: data.notes || "", date: data.date, start_min: data.start, end_min: data.start + event.duration,
-      tz: data.tz || "", created_at: new Date().toISOString(), canceled: 0
+      tz: data.tz || "", created_at: new Date().toISOString(), canceled: 0, answers: answers
     };
     bookings.push(b);
     writeJSON(LS_BOOKINGS, bookings);
@@ -247,7 +256,7 @@
       id: b.id, event: b.event_id, eventName: event.name, duration: event.duration, location: event.location,
       name: b.name, email: b.email, notes: b.notes || "", date: b.date,
       start: b.start_min, end: b.end_min, label: minutesLabel(b.start_min), tz: b.tz || "",
-      created_at: b.created_at, canceled: !!b.canceled
+      created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {}
     };
   }
   function normalizeApiBooking(b) {
@@ -255,7 +264,7 @@
       id: b.id, event: b.event, eventName: b.eventName || b.event, duration: b.duration || (b.end - b.start),
       location: b.location || "", name: b.name, email: b.email, notes: b.notes || "", date: b.date,
       start: b.start, end: b.end, label: b.label || minutesLabel(b.start), tz: b.tz || "",
-      created_at: b.created_at, canceled: !!b.canceled
+      created_at: b.created_at, canceled: !!b.canceled, answers: b.answers || {}
     };
   }
 
@@ -308,8 +317,20 @@
         duration: clampInt(e.duration, 5, 480, 30),
         description: String(e.description || "").trim(),
         location: String(e.location || "").trim(),
-        sort: i, active: e.active === false || e.active === 0 ? 0 : 1
+        sort: i, active: e.active === false || e.active === 0 ? 0 : 1,
+        questions: sanitizeQuestions(e.questions)
       });
+    }
+    return out;
+  }
+  function sanitizeQuestions(qs) {
+    if (!Array.isArray(qs)) return [];
+    var out = [];
+    for (var i = 0; i < qs.length && out.length < 10; i++) {
+      var q = qs[i] || {};
+      var label = String(q.label || "").trim().slice(0, 120);
+      if (!label) continue;
+      out.push({ label: label, type: q.type === "textarea" ? "textarea" : "text", required: !!q.required });
     }
     return out;
   }

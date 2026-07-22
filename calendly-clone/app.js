@@ -277,6 +277,7 @@
       field("email", "Email", "email", state.form.email, true, "Please enter a valid email address.") +
       '<div class="field" id="f-notes"><label for="i-notes">Please share anything that will help prepare for our meeting</label>' +
       '<textarea id="i-notes" name="notes" placeholder="Optional">' + escapeHtml(state.form.notes) + "</textarea></div>" +
+      questionFields() +
       '<div class="form-actions"><button type="submit" class="btn btn-primary btn-lg" id="submitBtn">' +
       (state.rescheduleId ? "Confirm Reschedule" : "Schedule Event") + "</button></div></form></div></div>";
 
@@ -292,11 +293,13 @@
       nf.classList.remove("invalid"); ef.classList.remove("invalid");
       if (!name) { nf.classList.add("invalid"); ok = false; }
       if (!isEmail(email)) { ef.classList.add("invalid"); ok = false; }
-      if (!ok) { var bad = app.querySelector(".field.invalid input"); if (bad) bad.focus(); return; }
+      var qa = collectAnswers(form);
+      if (!qa.ok) ok = false;
+      if (!ok) { var bad = app.querySelector(".field.invalid input, .field.invalid textarea"); if (bad) bad.focus(); return; }
 
       var btn = app.querySelector("#submitBtn");
       btn.disabled = true; btn.textContent = "Scheduling…";
-      var payload = { event: state.event.id, date: state.selectedDate, start: state.selectedTime.start, name: name, email: email, notes: notes, tz: state.tz, company: form.company ? form.company.value : "" };
+      var payload = { event: state.event.id, date: state.selectedDate, start: state.selectedTime.start, name: name, email: email, notes: notes, tz: state.tz, company: form.company ? form.company.value : "", answers: qa.answers };
       store.createBooking(payload).then(function (booking) {
         // Reschedule: the new booking is in, cancel the old one.
         if (state.rescheduleId) {
@@ -413,6 +416,28 @@
   }
 
   // ---------- small view helpers ----------
+  function questionFields() {
+    var qs = state.event.questions || [];
+    return qs.map(function (q, i) {
+      var id = "q-" + i;
+      var control = q.type === "textarea"
+        ? '<textarea id="' + id + '" data-qlabel="' + escapeAttr(q.label) + '"' + (q.required ? " required" : "") + "></textarea>"
+        : '<input id="' + id + '" type="text" data-qlabel="' + escapeAttr(q.label) + '"' + (q.required ? " required" : "") + " />";
+      return '<div class="field" id="qf-' + i + '"><label for="' + id + '">' + escapeHtml(q.label) +
+        (q.required ? ' <span class="req" aria-hidden="true">*</span>' : "") + "</label>" + control +
+        '<div class="err">This field is required.</div></div>';
+    }).join("");
+  }
+  function collectAnswers(form) {
+    var answers = {}; var ok = true;
+    form.querySelectorAll("[data-qlabel]").forEach(function (el) {
+      var wrap = el.closest(".field"); wrap.classList.remove("invalid");
+      var v = el.value.trim();
+      if (el.hasAttribute("required") && !v) { wrap.classList.add("invalid"); ok = false; }
+      if (v) answers[el.getAttribute("data-qlabel")] = v;
+    });
+    return { answers: answers, ok: ok };
+  }
   function field(name, label, type, value, required, err) {
     return '<div class="field" id="f-' + name + '"><label for="i-' + name + '">' + label +
       (required ? ' <span class="req" aria-hidden="true">*</span>' : "") + "</label>" +
@@ -427,7 +452,14 @@
       '<div class="row"><span class="mi" aria-hidden="true">📅</span><div><b>' + escapeHtml(when) + "</b><span>" + b.duration + " minutes · " + escapeHtml(shortTz(b.tz || state.tz)) + "</span></div></div>" +
       (b.location ? '<div class="row"><span class="mi" aria-hidden="true">📍</span><div><b>' + escapeHtml(b.location) + "</b><span>Details in your invitation</span></div></div>" : "") +
       (b.notes ? '<div class="row"><span class="mi" aria-hidden="true">📝</span><div><b>Notes</b><span>' + escapeHtml(b.notes) + "</span></div></div>" : "") +
+      answerRows(b) +
       "</div>";
+  }
+  function answerRows(b) {
+    var ans = b.answers && typeof b.answers === "object" ? Object.keys(b.answers) : [];
+    return ans.map(function (k) {
+      return '<div class="row"><span class="mi" aria-hidden="true">💬</span><div><b>' + escapeHtml(k) + "</b><span>" + escapeHtml(b.answers[k]) + "</span></div></div>";
+    }).join("");
   }
   function tzSelect() {
     var opts = TZ_LIST.map(function (z) {
