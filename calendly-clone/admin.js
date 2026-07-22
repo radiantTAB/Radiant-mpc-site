@@ -355,8 +355,17 @@
         "<th>When</th><th>Event</th><th>Who</th><th>Status</th><th></th></tr></thead><tbody>" +
         bookings.map(bookingTr).join("") + "</tbody></table></div>";
     }
+    var feed = "";
+    if (store.mode === "api") {
+      var feedUrl = location.origin + "/api/meetly/feed.ics?token=" + encodeURIComponent(token);
+      feed = '<div class="feed-box"><label>Calendar subscription (keep this URL private)</label>' +
+        '<div class="feed-row"><input id="feedUrl" type="text" readonly value="' + esc(feedUrl) + '" />' +
+        '<button class="btn btn-outline btn-sm" id="copyFeed" type="button">Copy</button></div>' +
+        '<p class="hint">Add this as a subscribed calendar (Google/Apple/Outlook) to see bookings automatically.</p></div>';
+    }
+    var actions = '<div class="bk-actions"><button class="btn btn-ghost btn-sm" id="exportCsv" type="button">⭳ Export CSV</button></div>';
     return card("Bookings", "📋",
-      '<p class="hint">' + active.length + " upcoming · " + bookings.length + " total</p>" + body);
+      '<p class="hint">' + active.length + " upcoming · " + bookings.length + " total</p>" + actions + feed + body);
   }
   function bookingTr(b) {
     var when = humanDate(b.date) + " · " + b.label;
@@ -367,7 +376,16 @@
       "<td>" + (b.canceled ? '<span class="pill pill-off">Cancelled</span>' : '<span class="pill pill-on">Confirmed</span>') + "</td>" +
       "<td>" + (b.canceled ? "" : '<button class="btn btn-danger btn-sm bk-cancel" type="button">Cancel</button>') + "</td></tr>";
   }
-  function wireBookings() {
+  function wireBookings(bookings) {
+    var copyBtn = root.querySelector("#copyFeed");
+    if (copyBtn) copyBtn.addEventListener("click", function () {
+      var inp = root.querySelector("#feedUrl"); inp.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(inp.value) : Promise.reject()).then(function () {
+        copyBtn.textContent = "Copied ✓"; setTimeout(function () { copyBtn.textContent = "Copy"; }, 1500);
+      }).catch(function () { try { document.execCommand("copy"); copyBtn.textContent = "Copied ✓"; setTimeout(function () { copyBtn.textContent = "Copy"; }, 1500); } catch (e) {} });
+    });
+    var csvBtn = root.querySelector("#exportCsv");
+    if (csvBtn) csvBtn.addEventListener("click", function () { exportCsv(bookings); });
     root.querySelectorAll(".bk-cancel").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var tr = btn.closest("tr");
@@ -406,6 +424,19 @@
       '<select id="' + id + '" class="tz-select">' + list.map(function (z) {
         return '<option value="' + esc(z) + '"' + (z === current ? " selected" : "") + ">" + esc(z) + "</option>";
       }).join("") + "</select></div>";
+  }
+  function exportCsv(bookings) {
+    var cols = ["Date", "Time", "Event", "Name", "Email", "Status", "Notes"];
+    var rows = bookings.map(function (b) {
+      return [b.date, b.label, b.eventName || b.event, b.name, b.email, b.canceled ? "Cancelled" : "Confirmed", b.notes || ""];
+    });
+    var csv = [cols].concat(rows).map(function (r) {
+      return r.map(function (c) { return '"' + String(c == null ? "" : c).replace(/"/g, '""') + '"'; }).join(",");
+    }).join("\r\n");
+    var blob = new Blob([csv], { type: "text/csv" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href = url; a.download = "meetly-bookings.csv"; a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
   }
   function val(id) { var el = root.querySelector("#" + id); return el ? el.value.trim() : ""; }
   function humanDate(iso) {

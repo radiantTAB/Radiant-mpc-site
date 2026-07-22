@@ -51,6 +51,18 @@ time windows), **availability exceptions**, and **event types** (add / edit /
 activate / remove), plus review and **cancel bookings**. Changes drive the
 public booking page immediately.
 
+The Bookings panel also offers **Export CSV** (all bookings, works in every
+mode) and — when the backend is deployed — a **calendar subscription URL**.
+
+### Calendar subscription feed
+
+`GET /api/meetly/feed.ics?token=<admin-token>` returns a live iCal feed of
+recent + upcoming bookings that the host can subscribe to in Google / Apple /
+Outlook Calendar, so bookings show up on their own calendar automatically. The
+token is passed in the URL (calendar clients can't send auth headers), so treat
+the whole URL as a secret. The admin console shows the ready-made URL with a
+copy button when running against the deployed backend.
+
 ### Availability exceptions (date overrides)
 
 Override a specific date on top of the weekly schedule: **block** it entirely
