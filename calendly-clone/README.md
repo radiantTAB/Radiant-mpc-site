@@ -42,11 +42,22 @@ it (which frees the slot for others).
 
 ## Admin / settings (`admin.html`)
 
-Edit the **host** (name, title, initials, timezone, notification email),
-**scheduling rules** (slot interval, buffer, minimum notice, booking horizon,
-daily cap), **weekly availability** (per-day time windows), and **event types**
-(add / edit / activate / remove), plus review and **cancel bookings**. Changes
-drive the public booking page immediately.
+Opens on a **dashboard summary** — upcoming bookings, next-7-days, confirmed
+total, cancellations, and a by-event-type breakdown (all computed from the
+bookings list). Below it you can edit the **host** (name, title, initials,
+timezone, notification email), **scheduling rules** (slot interval, buffer,
+minimum notice, booking horizon, daily cap), **weekly availability** (per-day
+time windows), **availability exceptions**, and **event types** (add / edit /
+activate / remove), plus review and **cancel bookings**. Changes drive the
+public booking page immediately.
+
+### Availability exceptions (date overrides)
+
+Override a specific date on top of the weekly schedule: **block** it entirely
+(a holiday or day off) or set **custom hours** just for that day. An override
+wins over the recurring weekly windows for that date. Enforced on the API and
+the offline path, and reflected in the booking calendar (blocked dates are
+disabled).
 
 ## Guardrails (public endpoint protection)
 
