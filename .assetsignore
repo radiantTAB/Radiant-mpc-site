@@ -6,3 +6,10 @@ schema.sql
 .gitignore
 README.md
 design-docs
+
+# Local Worker dev artifacts (never present in the Git-connected build)
+node_modules
+package.json
+package-lock.json
+.wrangler
+.dev.vars

@@ -2,6 +2,13 @@
 .DS_Store
 Thumbs.db
 
+# Local Worker dev only (not part of the Git-connected Cloudflare build)
+node_modules/
+package.json
+package-lock.json
+.wrangler/
+.dev.vars
+
 # Temp / backup files
 *.tmp
 *.bak
