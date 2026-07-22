@@ -42,10 +42,34 @@ it (which frees the slot for others).
 
 ## Admin / settings (`admin.html`)
 
-Edit the **host** (name, title, initials, timezone), **scheduling rules** (slot
-interval, buffer), **weekly availability** (per-day time windows), and **event
-types** (add / edit / activate / remove), plus review and **cancel bookings**.
-Changes drive the public booking page immediately.
+Edit the **host** (name, title, initials, timezone, notification email),
+**scheduling rules** (slot interval, buffer, minimum notice, booking horizon,
+daily cap), **weekly availability** (per-day time windows), and **event types**
+(add / edit / activate / remove), plus review and **cancel bookings**. Changes
+drive the public booking page immediately.
+
+## Guardrails (public endpoint protection)
+
+Because a scheduling link is public, `POST /bookings` is protected by:
+
+- **Minimum notice** — slots too soon (default: within 120 min) are hidden and refused.
+- **Booking horizon** — dates beyond N days out (default 60) are disabled.
+- **Daily cap** — an optional per-day booking limit (0 = unlimited).
+- **Per-IP rate limit** — at most 5 bookings per IP per rolling hour.
+- **Honeypot** — a hidden `company` field; if a bot fills it, the request is silently ignored.
+
+The first three are enforced on both the API and the offline localStorage path;
+the rate limit and honeypot are server-side.
+
+## Email (confirmations + reminders)
+
+When deployed with a `RESEND_API_KEY` (the same secret the site's portal already
+uses), booking sends a **confirmation email** to the invitee — with the `.ics`
+attached and a manage/cancel link — plus a **notification** to the host's email
+if one is set. A **Cloudflare Cron Trigger** (every 15 min, in `wrangler.jsonc`)
+drives **reminder emails** ~24h and ~1h before each meeting, each sent once.
+Mail failures never block a booking. With no `RESEND_API_KEY`, email is simply
+skipped and everything else works.
 
 ## Storage: works now, scales later
 
@@ -76,6 +100,19 @@ no new infrastructure. Tables are created on first use.
    is unset, the admin API is refused entirely** — an unconfigured deploy can
    never expose open settings writes. (The public booking endpoints stay open,
    as a scheduling link should.)
+3. **Email (optional)** — set `RESEND_API_KEY` (already used by the site's
+   portal) to turn on confirmation + reminder mail. Reminders run off the Cron
+   Trigger declared in `wrangler.jsonc`. Optionally set `MEETLY_BASE_URL` (the
+   public base URL of the `calendly-clone/` folder) so the manage/cancel links
+   in emails are correct; it defaults to `https://radiant-mpc.com/calendly-clone`.
+
+### Secrets / vars
+
+| Name | Required | Purpose |
+|------|----------|---------|
+| `MEETLY_ADMIN_TOKEN` | for admin | Unlocks the admin API; admin refused when unset. |
+| `RESEND_API_KEY` | for email | Enables confirmation + reminder mail (shared with the portal). |
+| `MEETLY_BASE_URL` | optional | Base URL used in email links. |
 
 Endpoints:
 
