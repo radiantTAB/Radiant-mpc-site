@@ -63,6 +63,35 @@ token is passed in the URL (calendar clients can't send auth headers), so treat
 the whole URL as a secret. The admin console shows the ready-made URL with a
 copy button when running against the deployed backend.
 
+### Google Calendar sync (optional, deploy-only)
+
+Connect the host's Google Calendar (admin → Google Calendar → Connect) to:
+
+- **Hide busy times** — the slots endpoint checks the host's calendar free/busy
+  and removes overlapping slots (fail-open: if Google is unreachable, booking
+  still works rather than blocking).
+- **Add bookings to your calendar** — each booking creates a Google Calendar
+  event (with the invitee as an attendee).
+
+**Setup (required, done once):**
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create an
+   OAuth 2.0 Client (type: Web application). Add the redirect URI
+   `https://<your-host>/api/meetly/oauth/google/callback`.
+2. Enable the **Google Calendar API** for the project.
+3. Set the Worker secrets:
+   ```
+   npx wrangler secret put GOOGLE_CLIENT_ID
+   npx wrangler secret put GOOGLE_CLIENT_SECRET
+   ```
+4. Open the admin console → **Google Calendar** → **Connect**, and approve.
+
+> **Untested here:** the live OAuth handshake and Google API calls can't run in
+> the build sandbox (no network / no real Google app). The pure logic
+> (busy→slot conversion, consent-URL building) and the API calls (with a mocked
+> `fetch`) are unit-tested, but the real end-to-end only proves out on a deploy
+> with real credentials.
+
 ### Team & round-robin
 
 Add **team members** in the admin Team card, then assign them to an event type
