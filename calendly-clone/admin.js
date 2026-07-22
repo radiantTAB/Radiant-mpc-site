@@ -90,12 +90,13 @@
       teamSection() +
       rulesSection() +
       integrationsSection() +
+      googleSection() +
       availabilitySection() +
       overridesSection() +
       eventsSection() +
       bookingsSection(bookings) +
       "</div>";
-    wireHost(); wireTeam(); wireRules(); wireIntegrations(); wireAvailability(); wireOverrides(); wireEvents(); wireBookings(bookings);
+    wireHost(); wireTeam(); wireRules(); wireIntegrations(); wireGoogle(); wireAvailability(); wireOverrides(); wireEvents(); wireBookings(bookings);
   }
 
   // ---- summary / analytics (computed client-side from the bookings list) ----
@@ -303,6 +304,41 @@
       var next = Object.assign({}, settings, { webhookUrl: val("wh-url"), webhookSecret: val("wh-secret") });
       saveSettings(next, "intNote");
     });
+  }
+
+  // ---- Google Calendar ----
+  function googleSection() {
+    return card("Google Calendar", "📆",
+      '<p class="hint">Connect the host\'s Google Calendar to hide times you\'re already busy and add each booking to your calendar.</p>' +
+      '<div id="googleBox"><p class="hint">Checking…</p></div>'
+    );
+  }
+  function wireGoogle() {
+    var box = root.querySelector("#googleBox");
+    // Surface the ?google=… result from the OAuth redirect.
+    var res = new URLSearchParams(location.search).get("google");
+    if (res) {
+      var msg = res === "connected" ? "Google Calendar connected ✓" : res === "unconfigured" ? "Google isn't configured on the server." : "Google connection failed. Please try again.";
+      var banner = document.createElement("div"); banner.className = "save-note " + (res === "connected" ? "ok" : "err"); banner.textContent = msg;
+      box.parentNode.insertBefore(banner, box);
+      history.replaceState(null, "", location.pathname);
+    }
+    store.googleStatus(token).then(function (st) {
+      if (st.local) { box.innerHTML = '<p class="hint">Available on the deployed backend only.</p>'; return; }
+      if (!st.configured) { box.innerHTML = '<p class="hint">Not configured. Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> secrets on the Worker.</p>'; return; }
+      if (st.connected) {
+        box.innerHTML = '<p class="save-note ok">Connected' + (st.email ? " as " + esc(st.email) : "") + '.</p>' +
+          '<div class="card-actions"><button class="btn btn-danger" id="gDisconnect" type="button">Disconnect</button></div>';
+        root.querySelector("#gDisconnect").addEventListener("click", function () {
+          store.googleDisconnect(token).then(function () { wireGoogle(); box.innerHTML = '<p class="hint">Disconnected.</p>'; });
+        });
+      } else {
+        box.innerHTML = '<div class="card-actions"><button class="btn btn-primary" id="gConnect" type="button">Connect Google Calendar</button></div>';
+        root.querySelector("#gConnect").addEventListener("click", function () {
+          store.googleAuthUrl(token).then(function (u) { location.href = u; }).catch(function (err) { alert(err.message || "Could not start Google connect."); });
+        });
+      }
+    }).catch(function () { box.innerHTML = '<p class="hint">Could not check Google status.</p>'; });
   }
 
   // ---- availability ----

@@ -236,6 +236,10 @@
     writeJSON(LS_EVENTS, clean);
     return Promise.resolve({ ok: true, events: clean });
   };
+  // Google Calendar is server-only; local mode reports "not available".
+  LocalStore.prototype.googleStatus = function () { return Promise.resolve({ configured: false, connected: false, email: "", local: true }); };
+  LocalStore.prototype.googleAuthUrl = function () { return Promise.reject(new Error("Google Calendar requires the deployed backend.")); };
+  LocalStore.prototype.googleDisconnect = function () { return Promise.resolve({ ok: true, connected: false }); };
   LocalStore.prototype.adminBookings = function (all) {
     var s = this._settings();
     var list = this._bookings().filter(function (b) { return all ? true : !b.canceled; });
@@ -279,6 +283,9 @@
   ApiStore.prototype.adminBookings = function (all, token) {
     return api("GET", "/api/meetly/admin/bookings" + (all ? "?all=1" : ""), null, token).then(function (d) { return d.bookings.map(normalizeApiBooking); });
   };
+  ApiStore.prototype.googleStatus = function (token) { return api("GET", "/api/meetly/admin/google/status", null, token); };
+  ApiStore.prototype.googleAuthUrl = function (token) { return api("GET", "/api/meetly/admin/google/auth", null, token).then(function (d) { return d.url; }); };
+  ApiStore.prototype.googleDisconnect = function (token) { return api("POST", "/api/meetly/admin/google/disconnect", null, token); };
 
   // ---------- normalizers so both stores return the same booking shape ----------
   function shape(b, event, settings) {

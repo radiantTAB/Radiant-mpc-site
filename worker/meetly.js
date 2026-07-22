@@ -20,6 +20,8 @@
 // covered by meetly.test.mjs. Actual mail delivery + cron firing only prove
 // out on a real deploy.
 
+import * as G from "./meetly-google.js";
+
 const SETTINGS_ID = 1;
 const MEETLY_FROM = "Meetly Scheduling <no-reply@send.radiant-mpc.com>";
 const REMIND_24_MIN = 24 * 60; // send a reminder ~24h out
@@ -87,6 +89,9 @@ export async function ensureMeetlySchema(env) {
   for (const col of ["questions TEXT", "hosts TEXT"]) {
     try { await env.DB.prepare("ALTER TABLE meetly_event_types ADD COLUMN " + col).run(); } catch (_) {}
   }
+  await env.DB.prepare(
+    "CREATE TABLE IF NOT EXISTS meetly_google (id INTEGER PRIMARY KEY, refresh_token TEXT, calendar_id TEXT, email TEXT, connected_at TEXT, pending_state TEXT)"
+  ).run();
 
   const s = await env.DB.prepare("SELECT id FROM meetly_settings WHERE id = ?").bind(SETTINGS_ID).first();
   if (!s) {
@@ -201,7 +206,7 @@ function sanitizeHosts(hosts) {
 // Pure function so it is unit-testable and identical to the browser copy.
 // `date` is "YYYY-MM-DD"; `bookings` are that day's non-cancelled bookings.
 // nowMs lets the minimum-notice rule (and tests) be deterministic.
-export function computeSlots(settings, event, date, bookings, nowMs) {
+export function computeSlots(settings, event, date, bookings, nowMs, busy) {
   const windows = windowsFor(settings, date);
   const step = settings.slotStep || 30;
   const buffer = settings.buffer || 0;
@@ -211,6 +216,7 @@ export function computeSlots(settings, event, date, bookings, nowMs) {
   const dur = event.duration;
   const members = eventMembers(settings, event);
   const taken = (bookings || []).filter((b) => !b.canceled);
+  const ext = busy || []; // external (calendar) busy blocks, block every member
   const out = [];
   for (const w of windows) {
     const startMin = w[0] * 60;
@@ -218,6 +224,8 @@ export function computeSlots(settings, event, date, bookings, nowMs) {
     for (let m = startMin; m + dur <= endMin; m += step) {
       const s = m;
       const e = m + dur;
+      // Blocked entirely if it overlaps the host's external calendar busy time.
+      if (ext.some((x) => s < x.end_min + buffer && x.start_min - buffer < e)) continue;
       // Offered if at least one assigned member is free — no booking of theirs
       // (matched by host_id) overlaps [s,e] expanded by the buffer.
       const anyFree = members.some((mem) =>
@@ -294,6 +302,21 @@ function dateInZone(utcMs, tz) {
   new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(utcMs)).forEach((x) => { p[x.type] = x.value; });
   return p.year + "-" + p.month + "-" + p.day;
 }
+// Map Google busy periods (RFC3339 UTC instants) to host-local minute ranges
+// for a single date, clamped to that day. Pure + unit-tested.
+export function busyMinutes(busy, dateStr, tz) {
+  const dayStart = hostInstant(dateStr, 0, tz);
+  const dayEnd = dayStart + 1440 * 60000;
+  const out = [];
+  for (const b of busy || []) {
+    const bs = Date.parse(b.start), be = Date.parse(b.end);
+    if (isNaN(bs) || isNaN(be)) continue;
+    const s = Math.max(dayStart, bs), e = Math.min(dayEnd, be);
+    if (e <= s) continue;
+    out.push({ start_min: Math.floor((s - dayStart) / 60000), end_min: Math.ceil((e - dayStart) / 60000) });
+  }
+  return out;
+}
 function humanDate(dateStr) {
   const p = dateStr.split("-").map(Number);
   return new Date(Date.UTC(p[0], p[1] - 1, p[2])).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -369,6 +392,54 @@ async function resendSend(env, payload) {
 }
 
 function baseUrl(env) { return env.MEETLY_BASE_URL || "https://radiant-mpc.com/calendly-clone"; }
+
+// ---- Google Calendar connection (single row) ----
+async function readGoogle(env) {
+  try { return await env.DB.prepare("SELECT * FROM meetly_google WHERE id = 1").first(); } catch (_) { return null; }
+}
+function googleConnected(row) { return !!(row && row.refresh_token); }
+
+// Host's busy minute-ranges for a date, from Google (empty on any failure so
+// an outage never blocks bookings — fail-open, documented in the README).
+async function googleBusyFor(env, settings, dateStr) {
+  if (!G.googleConfigured(env)) return [];
+  const row = await readGoogle(env);
+  if (!googleConnected(row)) return [];
+  try {
+    const tz = (settings.host && settings.host.timezone) || "America/New_York";
+    const token = await G.accessToken(env, row.refresh_token);
+    const minISO = new Date(hostInstant(dateStr, 0, tz)).toISOString();
+    const maxISO = new Date(hostInstant(dateStr, 1440, tz)).toISOString();
+    const busy = await G.freeBusy(token, row.calendar_id, minISO, maxISO);
+    return busyMinutes(busy, dateStr, tz);
+  } catch (err) {
+    console.error("meetly google freebusy error:", String((err && err.message) || err));
+    return [];
+  }
+}
+
+// Create a Google Calendar event for a booking (fire-and-forget).
+async function googleCreateEvent(env, settings, booking, event) {
+  if (!G.googleConfigured(env)) return;
+  const row = await readGoogle(env);
+  if (!googleConnected(row)) return;
+  try {
+    const tz = (settings.host && settings.host.timezone) || "America/New_York";
+    const token = await G.accessToken(env, row.refresh_token);
+    const startUtc = hostInstant(booking.date, booking.start_min, tz);
+    const endUtc = hostInstant(booking.date, booking.end_min, tz);
+    await G.insertEvent(token, row.calendar_id, {
+      summary: (event.name || "Meeting") + " with " + booking.name,
+      description: "Booked via Meetly." + (booking.notes ? " Notes: " + booking.notes : ""),
+      location: event.location || "",
+      start: { dateTime: new Date(startUtc).toISOString() },
+      end: { dateTime: new Date(endUtc).toISOString() },
+      attendees: [{ email: booking.email }],
+    });
+  } catch (err) {
+    console.error("meetly google event error:", String((err && err.message) || err));
+  }
+}
 
 // Fire an outbound webhook for a booking lifecycle event. Fire-and-forget;
 // failures are logged, never surfaced to the booker.
@@ -554,6 +625,32 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     return new Response(ics, { headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "no-cache" } });
   }
 
+  // Google OAuth callback — Google redirects the browser here (public). The
+  // state must match the pending value we stored when the admin started auth.
+  if (path === "/api/meetly/oauth/google/callback" && method === "GET") {
+    const code = url.searchParams.get("code") || "";
+    const state = url.searchParams.get("state") || "";
+    const dest = baseUrl(env) + "/admin.html";
+    if (!G.googleConfigured(env)) return Response.redirect(dest + "?google=unconfigured", 302);
+    const row = await readGoogle(env);
+    if (!code || !state || !row || !row.pending_state || !timingSafeEqual(state, row.pending_state)) {
+      return Response.redirect(dest + "?google=error", 302);
+    }
+    try {
+      const tok = await G.exchangeCode(env, url, code);
+      const email = tok.access_token ? await G.getEmail(tok.access_token) : "";
+      // Keep any prior refresh_token if Google omits one on re-consent.
+      const refresh = tok.refresh_token || row.refresh_token || "";
+      await env.DB.prepare(
+        "UPDATE meetly_google SET refresh_token = ?, email = ?, connected_at = ?, pending_state = NULL WHERE id = 1"
+      ).bind(refresh, email, new Date().toISOString()).run();
+      return Response.redirect(dest + "?google=connected", 302);
+    } catch (err) {
+      console.error("meetly google callback error:", String((err && err.message) || err));
+      return Response.redirect(dest + "?google=error", 302);
+    }
+  }
+
   if (path === "/api/meetly/slots" && method === "GET") {
     const eventId = url.searchParams.get("event") || "";
     const date = url.searchParams.get("date") || "";
@@ -569,7 +666,8 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     if (settings.dailyCap > 0 && (results || []).length >= settings.dailyCap) {
       return json({ date, event: event.id, slots: [] });
     }
-    const slots = computeSlots(settings, event, date, results || []);
+    const busy = await googleBusyFor(env, settings, date);
+    const slots = computeSlots(settings, event, date, results || [], undefined, busy);
     return json({ date, event: event.id, slots });
   }
 
@@ -625,6 +723,13 @@ export async function handleMeetlyApi(request, env, url, ctx) {
       return json({ error: "No more bookings are available on that day." }, 409);
     }
     const end = start + event.duration;
+    // Re-check the host's external calendar so a slot that filled up on Google
+    // between listing and booking is refused.
+    const buffer = settings.buffer || 0;
+    const busy = await googleBusyFor(env, settings, date);
+    if (busy.some((x) => start < x.end_min + buffer && x.start_min - buffer < end)) {
+      return json({ error: "That time is no longer available. Please pick another." }, 409);
+    }
     // Pick a free team member (round-robin). Null means no capacity left.
     const member = assignMember(settings, event, start, end, results || []);
     if (!member) {
@@ -644,6 +749,7 @@ export async function handleMeetlyApi(request, env, url, ctx) {
     const side = Promise.all([
       sendConfirmation(env, bookingRow, settings, event).catch(() => {}),
       sendWebhook(settings, "booking.created", bookingRow, event).catch(() => {}),
+      googleCreateEvent(env, settings, bookingRow, event).catch(() => {}),
     ]);
     if (ctx && ctx.waitUntil) ctx.waitUntil(side); else await side;
 
@@ -752,6 +858,26 @@ export async function handleMeetlyApi(request, env, url, ctx) {
         ).bind(e.id, e.name, e.duration, e.description, e.location, e.sort, e.active, JSON.stringify(e.questions), JSON.stringify(e.hosts)).run();
       }
       return json({ ok: true, events: clean });
+    }
+
+    if (path === "/api/meetly/admin/google/status" && method === "GET") {
+      const row = await readGoogle(env);
+      return json({ configured: G.googleConfigured(env), connected: googleConnected(row), email: (row && row.email) || "", calendarId: (row && row.calendar_id) || "primary" });
+    }
+
+    // Start OAuth: store a fresh state, hand back the consent URL.
+    if (path === "/api/meetly/admin/google/auth" && method === "GET") {
+      if (!G.googleConfigured(env)) return json({ error: "Google is not configured (set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)." }, 400);
+      const state = makeId("st_");
+      const row = await readGoogle(env);
+      if (row) await env.DB.prepare("UPDATE meetly_google SET pending_state = ? WHERE id = 1").bind(state).run();
+      else await env.DB.prepare("INSERT INTO meetly_google (id, calendar_id, pending_state) VALUES (1, 'primary', ?)").bind(state).run();
+      return json({ url: G.googleAuthUrl(env, url, state) });
+    }
+
+    if (path === "/api/meetly/admin/google/disconnect" && method === "POST") {
+      await env.DB.prepare("DELETE FROM meetly_google WHERE id = 1").run();
+      return json({ ok: true, connected: false });
     }
 
     if (path === "/api/meetly/admin/bookings" && method === "GET") {

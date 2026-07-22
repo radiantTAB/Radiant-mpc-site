@@ -4,16 +4,24 @@
 // guardrails (min-notice / horizon / daily cap), honeypot, rate limiting,
 // .ics generation, and reminder selection + sending (Resend fetch mocked).
 import assert from "node:assert";
-import { handleMeetlyApi, computeSlots, ensureMeetlySchema, hostInstant, buildIcs, buildFeedIcs, dueReminders, handleMeetlyReminders } from "./meetly.js";
+import { handleMeetlyApi, computeSlots, ensureMeetlySchema, hostInstant, buildIcs, buildFeedIcs, busyMinutes, dueReminders, handleMeetlyReminders } from "./meetly.js";
+import { googleAuthUrl } from "./meetly-google.js";
 
 // ---- Minimal in-memory D1 mock (only the queries meetly.js issues) --------
 function makeDb() {
-  const state = { settings: null, events: [], bookings: [] };
+  const state = { settings: null, events: [], bookings: [], google: null };
 
   function exec(sql, a) {
     a = a || [];
     if (/^\s*CREATE TABLE/i.test(sql)) return { _run: { meta: { changes: 0 } } };
     if (/^\s*ALTER TABLE/i.test(sql)) return { _run: { meta: { changes: 0 } } };
+
+    // ---- google connection ----
+    if (/SELECT \* FROM meetly_google WHERE id = 1/.test(sql)) return { _first: state.google };
+    if (/INSERT INTO meetly_google/.test(sql)) { state.google = { id: 1, calendar_id: "primary", pending_state: a[0], refresh_token: null, email: "" }; return { _run: { meta: { changes: 1 } } }; }
+    if (/UPDATE meetly_google SET pending_state = \?/.test(sql)) { if (state.google) state.google.pending_state = a[0]; return { _run: { meta: { changes: 1 } } }; }
+    if (/UPDATE meetly_google SET refresh_token/.test(sql)) { state.google = Object.assign(state.google || { id: 1, calendar_id: "primary" }, { refresh_token: a[0], email: a[1], connected_at: a[2], pending_state: null }); return { _run: { meta: { changes: 1 } } }; }
+    if (/DELETE FROM meetly_google/.test(sql)) { state.google = null; return { _run: { meta: { changes: 1 } } }; }
 
     if (/SELECT id FROM meetly_settings/.test(sql)) return { _first: state.settings ? { id: 1 } : null };
     if (/INSERT INTO meetly_settings/.test(sql)) { state.settings = { id: a[0], json: a[1] }; return { _run: { meta: { changes: 1 } } }; }
@@ -263,6 +271,64 @@ function ok(cond, msg) { assert.ok(cond, msg); pass++; }
   ok(!r.data.slots.some((x) => x.start === st), "full slot removed from availability");
   const otherStart = rslots[1].start;
   ok(r.data.slots.some((x) => x.start === otherStart), "other slots still available");
+
+  // --- Google Calendar: pure helpers ---
+  const gTz = "America/New_York";
+  const bStart = new Date(hostInstant(MON, 600, gTz)).toISOString(); // 10:00
+  const bEnd = new Date(hostInstant(MON, 660, gTz)).toISOString();   // 11:00
+  const bm = busyMinutes([{ start: bStart, end: bEnd }], MON, gTz);
+  ok(bm.length === 1 && bm[0].start_min === 600 && bm[0].end_min === 660, "busyMinutes maps a UTC busy period to host-local minutes");
+  const gSettings = { hours: { 1: [[9, 12]] }, slotStep: 30, buffer: 0, host: { timezone: gTz } };
+  const withoutBusy = computeSlots(gSettings, ev30, MON, [], 0);
+  const withBusy = computeSlots(gSettings, ev30, MON, [], 0, bm);
+  ok(withoutBusy.some((s) => s.start === 600) && !withBusy.some((s) => s.start === 600), "external busy removes the 10:00 slot");
+  const au = googleAuthUrl({ GOOGLE_CLIENT_ID: "cid" }, new URL("https://ex.com/x"), "STATE1");
+  ok(au.indexOf("accounts.google.com") > -1 && au.indexOf("client_id=cid") > -1 && au.indexOf("state=STATE1") > -1 && au.indexOf("access_type=offline") > -1, "googleAuthUrl builds the consent URL");
+
+  // --- Google admin endpoints + slots integration (fetch mocked) ---
+  const gd = makeDb(); const env10 = { DB: gd.DB, MEETLY_ADMIN_TOKEN: "t", GOOGLE_CLIENT_ID: "cid", GOOGLE_CLIENT_SECRET: "sec" };
+  seed(gd.state);
+  r = await call(env10, "GET", "/api/meetly/admin/google/status", { token: "t" });
+  ok(r.data.configured === true && r.data.connected === false, "status: configured but not connected");
+  r = await call(env10, "GET", "/api/meetly/admin/google/auth", { token: "t" });
+  ok(/accounts\.google\.com/.test(r.data.url) && gd.state.google && gd.state.google.pending_state, "auth returns URL + stores pending state");
+
+  // Simulate the OAuth callback with the matching state (token exchange mocked).
+  const savedState = gd.state.google.pending_state;
+  const realFetch3 = globalThis.fetch;
+  globalThis.fetch = async (u) => {
+    u = String(u);
+    if (u.indexOf("oauth2.googleapis.com/token") > -1) return new Response(JSON.stringify({ access_token: "at", refresh_token: "rt", expires_in: 3600 }), { status: 200 });
+    if (u.indexOf("userinfo") > -1) return new Response(JSON.stringify({ email: "host@example.com" }), { status: 200 });
+    return new Response("{}", { status: 200 });
+  };
+  let cb = await handleMeetlyApi(req("GET", "/api/meetly/oauth/google/callback?code=abc&state=" + savedState), env10, U("/api/meetly/oauth/google/callback?code=abc&state=" + savedState));
+  ok(cb.status === 302 && /google=connected/.test(cb.headers.get("location") || ""), "callback with valid state connects + redirects");
+  ok(gd.state.google.refresh_token === "rt" && gd.state.google.email === "host@example.com", "refresh token + email stored");
+  r = await call(env10, "GET", "/api/meetly/admin/google/status", { token: "t" });
+  ok(r.data.connected === true && r.data.email === "host@example.com", "status now connected");
+
+  // Now slots should exclude the host's Google busy time (freebusy mocked).
+  globalThis.fetch = async (u, init) => {
+    u = String(u);
+    if (u.indexOf("oauth2.googleapis.com/token") > -1) return new Response(JSON.stringify({ access_token: "at2", expires_in: 3600 }), { status: 200 });
+    if (u.indexOf("freeBusy") > -1) return new Response(JSON.stringify({ calendars: { primary: { busy: [{ start: bStart, end: bEnd }] } } }), { status: 200 });
+    return new Response("{}", { status: 200 });
+  };
+  r = await call(env10, "GET", "/api/meetly/slots?event=meeting-30&date=" + MON);
+  ok(!r.data.slots.some((s) => s.start === 600), "slots endpoint hides Google-busy 10:00 slot");
+  ok(r.data.slots.some((s) => s.start === 540), "other slots still offered");
+  // Booking a busy slot is refused.
+  r = await call(env10, "POST", "/api/meetly/bookings", { body: { event: "meeting-30", date: MON, start: 600, name: "Z", email: "z@x.com" } });
+  ok(r.status === 409, "booking a Google-busy slot -> 409");
+  globalThis.fetch = realFetch3;
+
+  // Callback with a bad state is rejected.
+  r = await handleMeetlyApi(req("GET", "/api/meetly/oauth/google/callback?code=abc&state=WRONG"), env10, U("/api/meetly/oauth/google/callback?code=abc&state=WRONG"));
+  ok(r.status === 302 && /google=error/.test(r.headers.get("location") || ""), "callback with wrong state -> error redirect");
+  // Disconnect.
+  r = await call(env10, "POST", "/api/meetly/admin/google/disconnect", { token: "t" });
+  ok(r.data.connected === false && gd.state.google === null, "disconnect clears the connection");
 
   // --- .ics generation ---
   const ics = buildIcs({ id: "ml_x", event_id: "meeting-30", event_name: "30 Minute Meeting", date: MON, start_min: 540, end_min: 570, location: "Zoom" }, { host: { name: "Alex Lark", timezone: "America/New_York" } });
