@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Radiant Treatment Summary — ESAPI binary plugin for Eclipse v15.6
+
+  A binary plugin is just a class library (DLL) that references the ESAPI
+  assemblies and exposes VMS.TPS.Script.Execute(ScriptContext).
+
+  IMPORTANT: The two ESAPI references below use HintPaths that point at a
+  typical Eclipse install. Adjust <EsapiRefPath> to match your workstation
+  (it must be the version-matched API folder for v15.6). These DLLs are NOT
+  redistributable and are intentionally not committed to the repo.
+-->
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props"
+          Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{B7E5F1A2-4C3D-4E7A-9F21-A1B2C3D4E5F6}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>VMS.TPS</RootNamespace>
+    <!-- The DLL name must match the plugin name Eclipse loads. -->
+    <AssemblyName>RadiantTreatmentSummary</AssemblyName>
+    <!-- Eclipse v15.6 runs on .NET Framework 4.6.1. -->
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <!-- ESAPI is x86; force the plugin to match. -->
+    <PlatformTarget>x86</PlatformTarget>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+
+    <!-- >>> Point this at your version-matched Eclipse v15.6 API folder <<< -->
+    <EsapiRefPath>C:\Program Files (x86)\Varian\RTM\15.6\esapi\API</EsapiRefPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Framework references used by the plugin -->
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsBase" />
+
+    <!-- ESAPI (version-matched, not redistributable) -->
+    <Reference Include="VMS.TPS.Common.Model.API">
+      <HintPath>$(EsapiRefPath)\VMS.TPS.Common.Model.API.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="VMS.TPS.Common.Model.Types">
+      <HintPath>$(EsapiRefPath)\VMS.TPS.Common.Model.Types.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Script.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

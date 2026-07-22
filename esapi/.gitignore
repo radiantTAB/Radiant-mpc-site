@@ -1,0 +1,11 @@
+# Build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Non-redistributable ESAPI assemblies — never commit these
+VMS.TPS.Common.Model.API.dll
+VMS.TPS.Common.Model.Types.dll
+*.dll
