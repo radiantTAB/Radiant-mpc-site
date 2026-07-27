@@ -29,7 +29,6 @@
 import { signLicense } from "./license-core.js";
 import { RADIANT_PRODUCTS, PRODUCT_IDS, PRODUCT_NAMES } from "./products.js";
 import { handleClientsApi } from "./clients.js";
-import { handleMeetlyApi, handleMeetlyReminders } from "./meetly.js";
 import { handlePortalApi, sessionClient, readCookie } from "./portal.js";
 import {
   handleAdminAuth,
@@ -83,15 +82,6 @@ export default {
     const resp = await handle(request, env, url, ctx);
     return withSecurityHeaders(resp);
   },
-
-  // Cron Trigger: drive Meetly reminder mail. Configured in wrangler.jsonc.
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil(
-      handleMeetlyReminders(env).catch((err) => {
-        console.error("meetly reminders failed:", String((err && err.message) || err));
-      })
-    );
-  },
 };
 
 async function handle(request, env, url, ctx) {
@@ -104,14 +94,15 @@ async function handle(request, env, url, ctx) {
       }
     }
 
-    // Meetly scheduling demo API (calendly-clone/). Public for booking-side
-    // reads/writes; admin writes are token-gated inside the handler.
+    // Meetly moved out to its own app, MeetMe (meetme.radiant-mpc.com). Keep
+    // old links alive: the booking pages 301 to the same path on MeetMe, and
+    // the retired /api/meetly/* returns 410 Gone (its data lives elsewhere now).
+    if (url.pathname === "/calendly-clone" || url.pathname.startsWith("/calendly-clone/")) {
+      const tail = url.pathname.replace(/^\/calendly-clone\/?/, "");
+      return Response.redirect("https://meetme.radiant-mpc.com/" + tail + url.search, 301);
+    }
     if (url.pathname.startsWith("/api/meetly/")) {
-      try {
-        return await handleMeetlyApi(request, env, url, ctx);
-      } catch (err) {
-        return json({ error: String((err && err.message) || err) }, 500);
-      }
+      return json({ error: "Meetly has moved to meetme.radiant-mpc.com." }, 410);
     }
 
     // Client portal API -- has its own email + password session auth.

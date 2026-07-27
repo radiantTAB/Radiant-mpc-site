@@ -26,13 +26,10 @@
   // no-reply@send.radiant-mpc.com. Cloudflare Email Sending would be the
   // native choice but requires a Workers Paid plan. The only config is the
   // RESEND_API_KEY secret -- set it in the dashboard, not here.
-
-  // Cron Trigger: drive Meetly reminder mail (see worker/index.js scheduled()).
-  // Every 15 minutes; the reminder logic fires each 24h/1h reminder once
-  // within a window, so the exact minute doesn't matter.
-  "triggers": {
-    "crons": ["*/15 * * * *"]
-  },
+  //
+  // No Cron Trigger here anymore: the only scheduled job was Meetly reminder
+  // mail, and Meetly has moved to its own Worker (meetme). Old links redirect
+  // (see worker/index.js).
 
   // D1 database for the License Manager.
   // database_id is filled in after the database is created in the
