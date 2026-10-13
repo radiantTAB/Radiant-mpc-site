@@ -75,6 +75,8 @@ document.getElementById('form').addEventListener('submit', async function(e){
     var data = {};
     try { data = await res.json(); } catch (ex) {}
     if (res.ok) {
+      // Fresh session: reset session-guard's stale activity stamp.
+      try { localStorage.setItem('rmpc_last_activity', String(Date.now())); } catch (ex) {}
       if (data.must_change_password) {
         location.href = '/admin/change-password.html';
         return;

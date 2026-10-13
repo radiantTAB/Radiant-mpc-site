@@ -72,6 +72,9 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     var data = {};
     try { data = await res.json(); } catch (ex) {}
     if (res.ok) {
+      // Fresh session: reset session-guard's activity stamp, or a stale one
+      // from a previous visit logs this new session straight back out.
+      try { localStorage.setItem('rmpc_last_activity', String(Date.now())); } catch (ex) {}
       // Forced first-login password change short-circuits everything.
       if (data.must_change_password) {
         var qsForChange = new URLSearchParams(location.search).get('next');
