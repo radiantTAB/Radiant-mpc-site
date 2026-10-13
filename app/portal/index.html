@@ -82,14 +82,37 @@ table th{color:var(--text-dim)}
 .notice,.warn{background:rgba(240,196,116,.10)!important;border:1px solid rgba(240,196,116,.35)!important;color:#f0d28a!important}
 .notice a,.warn a{color:#ffd98a!important}
 code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!important;border-color:var(--line-hi)!important;color:var(--text)!important}
-
+/* --- Modules page (2026-10-13): keys off the cards --- */
+.nav-right{display:flex;align-items:center;gap:22px}
+.nav-right a{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-mute)}
+.nav-right a:hover{color:var(--accent)}
+.app-card{display:flex;flex-direction:column;border-radius:14px;border-top-width:1px}
+.app-head{background:none!important}
+.app-type{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px}
+.app-launch{margin-top:auto;margin-bottom:0}
+.btn-ghost{background:#fff;color:var(--text);border-color:var(--line-hi)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.activation{margin-top:44px;border:1px solid var(--line);border-radius:14px;padding:24px;background:var(--bg-elev)}
+.activation h2{margin-bottom:4px}
+.key-item{border-top:1px solid var(--line);padding:14px 0;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.key-item:first-of-type{border-top:none}
+.key-for{font-weight:700;font-size:14.5px;flex:1;min-width:200px}
+.key-item .key-row{flex-basis:100%}
+.key-item .key-row[hidden]{display:none}
+.key-row code{background:#fff!important}
+@media(max-width:720px){.nav-right a{display:none}}
 </style>
 </head>
 <body>
 
 <nav class="nav">
-  <a href="/index.html"><img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo"></a>
-  <button class="signout" id="signoutBtn">Sign out</button>
+  <a href="/"><img src="/radiant-logo.png" alt="Radiant Medical Physics Consulting LLC" class="brand-logo"></a>
+  <div class="nav-right">
+    <a href="/">App Suite</a>
+    <a href="/downloads.html">Downloads</a>
+    <a href="/users-guides.html">User guides</a>
+    <button class="signout" id="signoutBtn">Sign out</button>
+  </div>
 </nav>
 
 <header class="hero">
@@ -100,9 +123,10 @@ code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!importan
 </header>
 
 <section class="section">
-  <h2>Your Radiant licenses</h2>
-  <div class="sub">The apps you are licensed for. Hosted apps launch in your browser; desktop apps install on your machine and activate with the key shown.</div>
+  <h2>Your active modules</h2>
+  <div class="sub">Web apps open in your browser. Desktop apps install on your workstation and need a one-time activation key (below).</div>
   <div id="appList"><p class="muted">Loading…</p></div>
+  <div id="activation"></div>
 </section>
 
 <footer class="footer">© 2026 Radiant Medical Physics Consulting LLC</footer>
@@ -111,20 +135,52 @@ code,.creds-row code,.app-key,.loc-key{background:rgba(255,255,255,.06)!importan
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
 function renderApp(a){
-  var cls = a.status === 'Active' ? 'badge-ok'
-    : (a.status === 'Revoked' ? 'badge-rev' : 'badge-exp');
-  var launch = a.hosted && a.launch_url
-    ? '<a class="btn btn-primary" href="' + esc(a.launch_url) + '">Launch</a>'
-    : '<span class="muted">Desktop app — install it, then activate with the key below.</span>';
+  var active = a.status === 'Active';
+  var cls = active ? 'badge-ok' : (a.status === 'Revoked' ? 'badge-rev' : 'badge-exp');
+  var action = !active
+    ? '<a class="btn btn-ghost" href="mailto:tbernath@radiant-mpc.com?subject=' +
+        encodeURIComponent('Renew ' + a.name) + '">Contact us to renew</a>'
+    : a.hosted && a.launch_url
+      ? '<a class="btn btn-primary" href="' + esc(a.launch_url) + '">Launch</a>'
+      : '<a class="btn btn-ghost" href="/downloads.html">Download</a>';
   return '<div class="app-card">' +
+    '<div class="app-type">' + (a.hosted ? 'Web app' : 'Desktop app') + '</div>' +
     '<div class="app-head"><h3>' + esc(a.name) + '</h3>' +
       '<span class="badge ' + cls + '">' + esc(a.status) + '</span></div>' +
-    '<div class="app-meta">Licensed through ' + esc(a.expires) + '</div>' +
-    '<div class="app-launch">' + launch + '</div>' +
-    '<div class="app-key"><label>License key</label>' +
-      '<div class="key-row"><code>' + esc(a.key) + '</code>' +
-      '<button class="rowbtn" onclick="copyKey(this)">Copy</button></div></div>' +
+    '<div class="app-meta">' + (active ? 'Licensed through ' : 'Ended ') + esc(a.expires) + '</div>' +
+    '<div class="app-launch">' + action + '</div>' +
   '</div>';
+}
+
+// Keys only matter for activating DESKTOP apps, so they live in one
+// collapsed panel under the grid -- grouped, since one license key can
+// cover several apps. Hidden until asked for.
+function renderActivation(apps){
+  var byKey = {};
+  apps.forEach(function(a){
+    if (a.hosted || a.status !== 'Active' || !a.key) return;
+    (byKey[a.key] = byKey[a.key] || []).push(a.name);
+  });
+  var keys = Object.keys(byKey);
+  if (!keys.length) return '';
+  return '<div class="activation"><h2>Desktop activation</h2>' +
+    '<div class="sub" style="margin-bottom:10px">Paste this key into the desktop app the first time you open it. Treat it like a password.</div>' +
+    keys.map(function(k, i){
+      return '<div class="key-item">' +
+        '<span class="key-for">Key for ' + esc(byKey[k].join(', ')) + '</span>' +
+        '<button class="rowbtn" aria-expanded="false" aria-controls="key' + i + '" onclick="toggleKey(this)">Show key</button>' +
+        '<div class="key-row" id="key' + i + '" hidden><code>' + esc(k) + '</code>' +
+        '<button class="rowbtn" onclick="copyKey(this)">Copy</button></div>' +
+      '</div>';
+    }).join('') + '</div>';
+}
+
+function toggleKey(btn){
+  var row = document.getElementById(btn.getAttribute('aria-controls'));
+  var show = row.hidden;
+  row.hidden = !show;
+  btn.textContent = show ? 'Hide key' : 'Show key';
+  btn.setAttribute('aria-expanded', String(show));
 }
 
 function copyKey(btn){
@@ -157,6 +213,7 @@ async function loadMe(){
       return;
     }
     wrap.innerHTML = '<div class="app-grid">' + data.apps.map(renderApp).join('') + '</div>';
+    document.getElementById('activation').innerHTML = renderActivation(data.apps);
   } catch (e) {
     wrap.innerHTML = '<p class="muted">Could not load your licenses — ' + esc(e.message) + '</p>';
   }
